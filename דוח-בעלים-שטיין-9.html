@@ -76,25 +76,27 @@
   .theme-btn:hover{color:var(--ink);border-color:var(--line-strong)}
 
   section{direction:rtl}
-  .sec-head{display:flex;align-items:center;gap:12px;margin:26px 2px 14px}
-  .sec-head .bar{width:5px;height:22px;background:var(--red);border-radius:3px;flex:none}
-  .sec-head h2{font-size:19px;margin:0;font-weight:700;letter-spacing:-.01em}
-  .sec-head .note{color:var(--muted);font-size:13px;margin-inline-start:auto}
+  .sec-head{display:flex;align-items:center;gap:12px;margin:30px 2px 15px}
+  .sec-head .bar{width:5px;height:24px;background:var(--red);border-radius:3px;flex:none}
+  .sec-head h2{font-size:21px;margin:0;font-weight:800;letter-spacing:-.02em}
+  .sec-head .note{color:var(--muted);font-size:12.5px;font-weight:600;margin-inline-start:auto}
 
-  /* ---------- KPI ---------- */
-  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-  @media (max-width:720px){.kpis{grid-template-columns:1fr}}
+  /* ---------- KPI as a visual equation: income − expenses = net ---------- */
+  .kpis{display:flex;flex-wrap:wrap;align-items:stretch;gap:12px}
+  @media (max-width:720px){.kpis{flex-direction:column}}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);transition:transform .18s ease,box-shadow .18s ease}
   .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
-  .kpi{padding:20px 22px}
-  .kpi .lbl{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);font-weight:700;margin-bottom:13px}
+  .kpi{flex:1;min-width:200px;padding:22px 24px}
+  .kpi .lbl{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);font-weight:700;letter-spacing:.05em;margin-bottom:14px;text-transform:uppercase}
   .dot{width:9px;height:9px;border-radius:50%;flex:none}
-  .kpi .val{font-size:clamp(25px,3.4vw,33px);font-weight:800;letter-spacing:-.02em;line-height:1}
-  .kpi .foot{font-size:12.5px;color:var(--muted);margin-top:9px}
-  .kpi.balance{border-top:3px solid var(--red)}
+  .kpi .val{font-size:clamp(28px,3.8vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1}
+  .kpi .foot{font-size:12px;color:var(--muted);margin-top:11px;font-weight:600}
+  .kpi.balance{border-top:3px solid var(--red);background:linear-gradient(180deg,var(--red-soft),transparent 60%)}
   .kpi.balance .val{color:var(--red)}
-  .kpi.income .val{color:var(--inc)}
-  .kpi.expense .val{color:var(--exp)}
+  .kpi.income{border-top:3px solid var(--inc)} .kpi.income .val{color:var(--inc)}
+  .kpi.expense{border-top:3px solid var(--exp)} .kpi.expense .val{color:var(--exp)}
+  .eqop{display:flex;align-items:center;font-size:30px;font-weight:800;color:var(--faint);padding:0 2px;user-select:none}
+  @media (max-width:720px){.eqop{justify-content:center;font-size:22px;padding:2px 0}}
 
   /* ---------- highlights ---------- */
   .hl{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
@@ -102,10 +104,10 @@
   @media (max-width:480px){.hl{grid-template-columns:1fr}}
   .hlcard{background:var(--surface);border:1px solid var(--line);border-right:4px solid var(--red);border-radius:var(--radius-sm);padding:15px 16px;box-shadow:var(--shadow);transition:transform .18s ease,box-shadow .18s ease}
   .hlcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
-  .hlcard .ic{font-size:18px;margin-bottom:8px}
-  .hlcard .t{font-size:12px;color:var(--muted);margin-bottom:5px;line-height:1.35}
-  .hlcard .m{font-size:18px;font-weight:800;letter-spacing:-.01em}
-  .hlcard .m small{font-size:12px;color:var(--muted);font-weight:600;margin-inline-start:5px}
+  .hlcard .ic{font-size:19px;margin-bottom:9px}
+  .hlcard .t{font-size:10.5px;color:var(--muted);margin-bottom:6px;line-height:1.35;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+  .hlcard .m{font-size:19px;font-weight:800;letter-spacing:-.01em}
+  .hlcard .m small{display:block;font-size:12px;color:var(--muted);font-weight:600;margin:3px 0 0}
 
   /* ---------- chart panel ---------- */
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px clamp(14px,2.4vw,24px)}
@@ -135,22 +137,36 @@
   .tip b{font-weight:700}
   .tip .li{display:flex;gap:10px;justify-content:space-between;margin-top:3px}
   .tip .li .k{opacity:.8}
+  .chart-cap{font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.55;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 13px}
+  .chart-cap b{color:var(--ink);font-weight:700}
+  .chart-cap .up{color:var(--inc);font-weight:700}
+  .chart-cap .down{color:var(--exp);font-weight:700}
+  .netlegend{display:none;gap:16px;font-size:12.5px;color:var(--muted)}
+  .netlegend span{display:inline-flex;align-items:center;gap:7px}
+  .vlabel{font-size:10px;font-weight:800;font-family:var(--sans)}
+  .vlabel.pos{fill:var(--inc)} .vlabel.neg{fill:var(--exp)} .vlabel.neutral{fill:var(--muted)}
 
-  /* month detail */
-  .mdet{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:16px 17px;display:flex;flex-direction:column}
-  .mdet .h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
-  .mdet .h .mn{font-size:16px;font-weight:800;color:var(--red)}
-  .mdet .h .tag{font-size:11px;color:var(--muted);background:var(--surface-3);border:1px solid var(--line);border-radius:999px;padding:3px 9px}
-  .mrow{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13.5px}
-  .mrow .k{color:var(--muted)}
-  .mrow .v{font-weight:700}
-  .mrow.net{border-bottom:0;margin-top:2px;padding-top:11px;border-top:2px solid var(--line-strong);font-size:15px}
-  .mrow.net .v{color:var(--red)}
-  .mitems{margin-top:12px}
-  .mitems .cap{font-size:11.5px;color:var(--muted);font-weight:700;letter-spacing:.03em;margin-bottom:7px}
-  .mitem{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:4px 0;color:var(--muted)}
-  .mitem .d{color:var(--ink)}
-  .empty{font-size:12.5px;color:var(--faint);font-style:normal}
+  /* month detail — clearer rows, distinct label vs value, profit/loss result */
+  .mdet{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);padding:18px;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+  .mdet .h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;padding-bottom:12px;border-bottom:2px solid var(--line-strong)}
+  .mdet .h .mn{font-size:17px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+  .mdet .h .tag{font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--red);background:var(--red-soft);border:1px solid var(--red-line);border-radius:999px;padding:3px 10px;text-transform:uppercase}
+  .mrow{display:flex;justify-content:space-between;align-items:center;padding:10px 0;font-size:13px}
+  .mrow+.mrow{border-top:1px solid var(--line)}
+  .mrow .k{color:var(--muted);font-weight:600;display:flex;align-items:center;gap:8px}
+  .mrow .k i{width:9px;height:9px;border-radius:2px;flex:none}
+  .mrow .v{font-weight:800;font-size:15px}
+  .mresult{margin-top:14px;border-radius:var(--radius-sm);padding:13px 15px;display:flex;align-items:center;justify-content:space-between}
+  .mresult .k{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+  .mresult .v{font-size:21px;font-weight:800;letter-spacing:-.01em}
+  .mresult.win{background:var(--inc-soft);border:1px solid var(--inc)} .mresult.win .k,.mresult.win .v{color:var(--inc)}
+  .mresult.loss{background:var(--exp-soft);border:1px solid var(--exp)} .mresult.loss .k,.mresult.loss .v{color:var(--exp)}
+  .mitems{margin-top:15px}
+  .mitems .cap{font-size:10.5px;color:var(--muted);font-weight:800;letter-spacing:.06em;margin-bottom:9px;text-transform:uppercase}
+  .mitem{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:7px 0;color:var(--muted);border-top:1px solid var(--line)}
+  .mitem:first-of-type{border-top:0;padding-top:0}
+  .mitem .d{color:var(--ink);font-weight:600}
+  .empty{font-size:12.5px;color:var(--faint);padding:6px 0}
 
   /* ---------- expense summary ---------- */
   .exgrid{display:grid;grid-template-columns:1fr 1.35fr;gap:14px}
@@ -279,20 +295,22 @@
       </div>
     </header>
 
-    <!-- KPIs -->
-    <section class="kpis">
+    <!-- KPIs as an equation: income − expenses = net -->
+    <section class="kpis" aria-label="הכנסות פחות הוצאות שווה רווח נטו">
       <div class="card kpi income">
         <div class="lbl"><span class="dot" style="background:var(--inc)"></span>סך הכנסות מהשכרה</div>
         <div class="val"><span class="sym">₪</span><span class="num" data-count="51212.23">0</span></div>
         <div class="foot">12 הזמנות בתשלום · 62 לילות · ללא יולי–אוגוסט 2026</div>
       </div>
+      <div class="eqop" aria-hidden="true">−</div>
       <div class="card kpi expense">
         <div class="lbl"><span class="dot" style="background:var(--exp)"></span>סך הוצאות</div>
         <div class="val"><span class="sym">₪</span><span class="num" data-count="21937.95">0</span></div>
         <div class="foot">ניהול · ניקיון · תיקונים · אספקה</div>
       </div>
+      <div class="eqop" aria-hidden="true">=</div>
       <div class="card kpi balance">
-        <div class="lbl"><span class="dot" style="background:var(--red)"></span>יתרה נטו לבעל הנכס</div>
+        <div class="lbl"><span class="dot" style="background:var(--red)"></span>רווח נטו לבעלים</div>
         <div class="val"><span class="sym">₪</span><span class="num" data-count="29274.28">0</span></div>
         <div class="foot">57% מסך ההכנסות</div>
       </div>
@@ -320,7 +338,12 @@
           <span><span class="sw" style="background:var(--inc)"></span>הכנסות</span>
           <span><span class="sw" style="background:var(--exp)"></span>הוצאות</span>
         </div>
+        <div class="netlegend" id="netlegend">
+          <span><span class="sw" style="background:var(--inc)"></span>רווח (מעל הקו)</span>
+          <span><span class="sw" style="background:var(--exp)"></span>הפסד (מתחת לקו)</span>
+        </div>
       </div>
+      <p class="chart-cap" id="chartCap"></p>
       <div class="mchips" id="mchips" role="group" aria-label="בחירת חודש לפירוט"></div>
       <div class="chart-grid">
         <div class="chartbox">
@@ -559,6 +582,11 @@
         r.addEventListener("mouseleave",hideTip);
         r.addEventListener("click",function(){select(i);});
       });
+      // net value label above the month group (the key takeaway)
+      var topH=Math.max(m.inc,m.exp)/maxV*plotH;
+      var nl=el("text",{x:cx,y:Math.max(baseY-topH-7,11),"text-anchor":"middle",class:"vlabel "+(m.net>0?"pos":m.net<0?"neg":"neutral")});
+      nl.textContent=(m.net<0?"−₪":"₪")+money(Math.abs(m.net));
+      svg.appendChild(nl);
       var lb=el("text",{x:cx,y:baseY+20,"text-anchor":"middle",class:"mlabel"+(i===selected?" on":""),"data-mi":i});
       lb.textContent=SHORT[i];lb.addEventListener("click",function(){select(i);});
       svg.appendChild(lb);
@@ -584,9 +612,13 @@
         if(reduce){rect.setAttribute("y",yy);rect.setAttribute("height",hh);}
         else{rect.style.transition="y .8s cubic-bezier(.2,.7,.2,1),height .8s cubic-bezier(.2,.7,.2,1)";rect.setAttribute("y",yy);rect.setAttribute("height",hh);}
       });});})(r,y,h);
-      r.addEventListener("mouseenter",function(){select(i);var bb=svg.getBoundingClientRect();showTip('<b>'+m.k+'</b><div class="li"><span class="k">רווח נטו</span><span>₪'+money(m.net)+'</span></div>',bb.width/W*cx,bb.height/H*y-6);});
+      r.addEventListener("mouseenter",function(){select(i);var bb=svg.getBoundingClientRect();showTip('<b>'+m.k+'</b><div class="li"><span class="k">'+(pos?"רווח":"הפסד")+'</span><span>₪'+money(Math.abs(m.net))+'</span></div>',bb.width/W*cx,bb.height/H*y-6);});
       r.addEventListener("mouseleave",hideTip);
       r.addEventListener("click",function(){select(i);});
+      // value label at the bar tip
+      var vl=el("text",{x:cx,y:pos?y-6:y+h+13,"text-anchor":"middle",class:"vlabel "+(pos?"pos":"neg")});
+      vl.textContent=(pos?"₪":"−₪")+money(Math.abs(m.net));
+      svg.appendChild(vl);
       var lb=el("text",{x:cx,y:baseY+20,"text-anchor":"middle",class:"mlabel"+(i===selected?" on":""),"data-mi":i});
       lb.textContent=SHORT[i];lb.addEventListener("click",function(){select(i);});
       svg.appendChild(lb);
@@ -600,11 +632,12 @@
   function renderDetail(i){
     var m=M[i];
     var items=EXP.filter(function(e){return e[0].indexOf(m.ym)===0;});
+    var win=m.net>=0;
     var html='<div class="h"><span class="mn">'+m.k+'</span><span class="tag">פירוט חודשי</span></div>';
-    html+='<div class="mrow"><span class="k">הכנסות</span><span class="v pos">'+cur(m.inc)+'</span></div>';
-    html+='<div class="mrow"><span class="k">עמלת ניהול</span><span class="v">'+cur(m.mgmt)+'</span></div>';
-    html+='<div class="mrow"><span class="k">הוצאות תפעוליות</span><span class="v">'+cur(m.op)+'</span></div>';
-    html+='<div class="mrow net"><span class="k">רווח נטו</span><span class="v">'+cur(m.net)+'</span></div>';
+    html+='<div class="mrow"><span class="k"><i style="background:var(--inc)"></i>הכנסות</span><span class="v pos">'+cur(m.inc)+'</span></div>';
+    html+='<div class="mrow"><span class="k"><i style="background:var(--exp)"></i>עמלת ניהול</span><span class="v">'+cur(m.mgmt)+'</span></div>';
+    html+='<div class="mrow"><span class="k"><i style="background:var(--exp)"></i>הוצאות תפעוליות</span><span class="v">'+cur(m.op)+'</span></div>';
+    html+='<div class="mresult '+(win?"win":"loss")+'"><span class="k">'+(win?"▲ רווח נטו":"▼ הפסד החודש")+'</span><span class="v">'+cur(Math.abs(m.net))+'</span></div>';
     html+='<div class="mitems"><div class="cap">הוצאות תפעוליות בחודש זה</div>';
     if(items.length){items.forEach(function(e){html+='<div class="mitem"><span class="d">'+e[3]+'</span><span class="num">₪'+money(e[4])+'</span></div>';});}
     else{html+='<div class="empty">אין הוצאות תפעוליות בחודש זה.</div>';}
@@ -628,15 +661,18 @@
     mchips.appendChild(b);
   });
 
-  renderChart();renderDetail(selected);
-
+  var CAP_BOTH='עמודה <span class="up">ירוקה</span> = הכנסות · עמודה <span class="down">אדומה</span> = כלל ההוצאות באותו חודש. המספר מעל כל חודש הוא <b>הרווח הנטו</b> (הכנסות פחות כל ההוצאות).';
+  var CAP_NET='<b>רווח נטו = הכנסות פחות כל ההוצאות.</b> עמודה כלפי <span class="up">מעלה (ירוק)</span> = חודש רווחי · עמודה כלפי <span class="down">מטה (אדום)</span> = חודש הפסד — ההוצאות עלו על ההכנסות (בעיקר בחודשי שהות בעלים, שבהם אין הכנסה אך יש ניקיון ותחזוקה).';
   function setView(v){
     view=v;
     document.querySelectorAll(".toggle button").forEach(function(o){o.setAttribute("aria-pressed",String(o.dataset.view===v));});
-    document.getElementById("legend").style.visibility=v==="both"?"visible":"hidden";
+    document.getElementById("legend").style.display=v==="both"?"flex":"none";
+    document.getElementById("netlegend").style.display=v==="net"?"flex":"none";
+    document.getElementById("chartCap").innerHTML=v==="both"?CAP_BOTH:CAP_NET;
     renderChart();
   }
   document.querySelectorAll(".toggle button").forEach(function(b){b.addEventListener("click",function(){setView(b.dataset.view);});});
+  setView("both");renderDetail(selected);
 
   // ---------- category summary (clickable to filter) ----------
   var maxC=Math.max.apply(null,CATS.map(function(c){return c[1];}));

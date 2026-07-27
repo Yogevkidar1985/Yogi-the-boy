@@ -20,7 +20,7 @@
     --shadow:0 1px 2px rgba(20,20,20,.05),0 10px 30px rgba(20,20,20,.07);
     --shadow-lg:0 4px 12px rgba(20,20,20,.08),0 24px 60px rgba(20,20,20,.12);
     --radius:14px; --radius-sm:9px;
-    --sans:Arial,"Helvetica Neue",Helvetica,sans-serif;
+    --sans:Arial,"Arial Hebrew","Segoe UI","Noto Sans Hebrew","Helvetica Neue",Helvetica,sans-serif;
     /* rented-room photo — replace url() once uploaded */
     --bg-img:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJyB2aWV3Qm94PScwIDAgMTIwIDEyMCc+CjxyZWN0IHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJyBmaWxsPScjZWZlNmQ4Jy8+CjxnIGZpbGw9JyNjMDZhM2YnIGZpbGwtb3BhY2l0eT0nMC42Jz4KPGNpcmNsZSBjeD0nMCcgY3k9JzAnIHI9JzMwJy8+PGNpcmNsZSBjeD0nMTIwJyBjeT0nMCcgcj0nMzAnLz48Y2lyY2xlIGN4PScwJyBjeT0nMTIwJyByPSczMCcvPjxjaXJjbGUgY3g9JzEyMCcgY3k9JzEyMCcgcj0nMzAnLz4KPC9nPgo8ZyBmaWxsPScjOGY5YzYzJyBmaWxsLW9wYWNpdHk9JzAuNTUnPgo8Y2lyY2xlIGN4PSc2MCcgY3k9JzMyJyByPScyMCcvPjxjaXJjbGUgY3g9JzYwJyBjeT0nODgnIHI9JzIwJy8+PGNpcmNsZSBjeD0nMzInIGN5PSc2MCcgcj0nMjAnLz48Y2lyY2xlIGN4PSc4OCcgY3k9JzYwJyByPScyMCcvPgo8L2c+CjxnIGZpbGw9JyNiNThhM2MnIGZpbGwtb3BhY2l0eT0nMC41Jz4KPGNpcmNsZSBjeD0nNjAnIGN5PSc2MCcgcj0nMTYnLz4KPC9nPgo8Y2lyY2xlIGN4PSc2MCcgY3k9JzYwJyByPSc3JyBmaWxsPScjMzg0MTRmJyBmaWxsLW9wYWNpdHk9JzAuNzUnLz4KPGcgc3Ryb2tlPScjMzg0MTRmJyBzdHJva2Utb3BhY2l0eT0nMC4yOCcgc3Ryb2tlLXdpZHRoPScxLjQnIGZpbGw9J25vbmUnPgo8Y2lyY2xlIGN4PSc2MCcgY3k9JzYwJyByPSczMCcvPjxjaXJjbGUgY3g9JzAnIGN5PScwJyByPSczMCcvPjxjaXJjbGUgY3g9JzEyMCcgY3k9JzAnIHI9JzMwJy8+PGNpcmNsZSBjeD0nMCcgY3k9JzEyMCcgcj0nMzAnLz48Y2lyY2xlIGN4PScxMjAnIGN5PScxMjAnIHI9JzMwJy8+CjwvZz4KPC9zdmc+"); --bg-size:150px;
   }
@@ -56,8 +56,9 @@
     --shadow-lg:0 4px 12px rgba(20,20,20,.08),0 24px 60px rgba(20,20,20,.12);
   }
 
-  *,*::before,*::after{box-sizing:border-box;font-family:Arial,"Helvetica Neue",Helvetica,sans-serif}
-  body{margin:0;font-family:Arial,"Helvetica Neue",Helvetica,sans-serif}
+  html,body,*,*::before,*::after{font-family:Arial,"Arial Hebrew","Segoe UI","Noto Sans Hebrew","Helvetica Neue",Helvetica,sans-serif !important}
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0}
   .bg-layer,.bg-wash{display:none}
   .page{position:relative;z-index:1;direction:rtl;color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased;padding:clamp(14px,3vw,40px);overflow-x:hidden}
   .sec-head{direction:rtl}
@@ -183,7 +184,7 @@
   @media (max-width:840px){.exgrid{grid-template-columns:1fr}}
   table{border-collapse:collapse;width:100%;font-size:13.5px}
   .sumtbl th,.sumtbl td{padding:11px 12px;text-align:right}
-  .sumtbl thead th{color:var(--red);font-size:12px;letter-spacing:.03em;border-bottom:2px solid var(--red-line);font-weight:700}
+  .sumtbl thead th{color:var(--ink);font-size:13px;letter-spacing:0;border-bottom:2px solid var(--line-strong);font-weight:800;padding:12px}
   .sumtbl tbody td{border-bottom:1px solid var(--line)}
   .sumtbl tbody tr:hover td{background:var(--surface-2)}
   .sumtbl .n{text-align:left}
@@ -207,6 +208,19 @@
   .notebar{display:flex;align-items:center;gap:10px;margin-top:14px;background:var(--red-soft);border:1px solid var(--red-line);border-radius:var(--radius-sm);padding:11px 15px;color:var(--ink);font-size:13.5px;direction:rtl}
   .notebar .ic{font-size:15px;flex:none}
   .notebar b{color:var(--red)}
+  /* balance-rollover explainer */
+  .explain{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:16px 18px;margin:12px 14px 8px}
+  .explain-h{font-size:14.5px;font-weight:800;color:var(--ink);margin-bottom:9px;display:flex;align-items:center;gap:9px}
+  .explain-h::before{content:"";width:5px;height:17px;background:var(--red);border-radius:3px;flex:none}
+  .explain p{margin:0 0 11px;font-size:13px;color:var(--muted);line-height:1.65}
+  .explain b{color:var(--ink);font-weight:700}
+  .explain .up{color:var(--inc);font-weight:800}
+  .explain .down{color:var(--exp);font-weight:800}
+  .flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:14px 0}
+  .flow .fchipx{background:var(--surface);border:1px solid var(--line-strong);border-radius:999px;padding:7px 13px;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap}
+  .flow .fchipx.paid{background:var(--inc-soft);border-color:var(--inc);color:var(--inc)}
+  .flow .arrow{color:var(--faint);font-weight:800;font-size:15px}
+  .explain-bl{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:11px 13px;font-size:12.5px;color:var(--muted);line-height:1.6;margin:0}
 
   /* ---------- tabs ---------- */
   .tabsec{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
@@ -251,18 +265,20 @@
 
   .tblwrap{overflow-x:auto;padding:8px 6px 12px}
   .dt{min-width:560px}
-  .dt thead th{text-align:right;font-weight:800;color:var(--muted);font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:11px 14px;border-bottom:1px solid var(--line-strong);white-space:nowrap;background:var(--surface-2)}
+  .dt thead th{text-align:right;font-weight:800;color:var(--ink);font-size:13px;letter-spacing:0;padding:13px 15px;border-bottom:2px solid var(--line-strong);white-space:nowrap;background:var(--surface-2)}
   .dt th.n,.dt td.n{text-align:left}
-  .dt tbody td{padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .dt tbody td{padding:14px 15px;border-bottom:1px solid var(--line);vertical-align:middle}
   .dt tbody tr:last-child td{border-bottom:none}
   .dt tbody tr:nth-child(even) td{background:var(--surface-2)}
   .dt tbody tr:hover td{background:var(--surface-3)}
-  .subttl{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 2px 11px}
-  .tgroup{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-  .toollbl{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
-  .catcell{white-space:nowrap;color:var(--muted);font-size:12.5px}
-  .cdot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-inline-end:7px;vertical-align:middle}
+  .subttl{font-size:15px;font-weight:800;color:var(--ink);margin:0 2px 14px;display:flex;align-items:center;gap:9px;letter-spacing:-.01em}
+  .subttl::before{content:"";width:4px;height:16px;background:var(--red);border-radius:2px;flex:none}
+  .tgroup{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .toollbl{font-size:12px;font-weight:800;color:var(--muted)}
+  .catcell{white-space:nowrap;color:var(--muted);font-size:13px}
+  .cdot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:8px;vertical-align:middle}
   .exdt td.amt .num{font-weight:800}
+  .exgrid{gap:24px}
   .name-cell{font-weight:700;white-space:nowrap}
   .datecell{color:var(--muted);white-space:nowrap}
   .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap}
@@ -421,13 +437,23 @@
       </div>
 
       <div class="panelbody hidden" id="panel-pay" role="tabpanel">
-        <div class="toolbar"><span class="title">תשלומים חודשיים לבעל הנכס והעברות יתרה בין החודשים</span></div>
+        <div class="explain">
+          <div class="explain-h">איך עובדת ה"יתרה המועברת"?</div>
+          <p>בסוף כל חודש מחושבת <b>היתרה שנותרה להעברה</b> לבעל הנכס. כשמדובר בסכום קטן, בדרך כלל לא מבצעים העברה בנקאית נפרדת — היתרה <b>נדחית ומצטברת לחודש הבא</b>, עד שנצבר סכום משמעותי שמועבר בפועל. לכן כל יתרה כזו מופיעה בטבלה <b>פעמיים</b>: <span class="down">יציאה מהחודש (−)</span> ו<span class="up">כניסה לחודש הבא (+)</span> — והשתיים מתקזזות ל־₪0. <b>הכסף לא נעלם, הוא רק ממתין לחודש שבו יועבר.</b></p>
+          <p style="margin-bottom:6px"><b>הדוגמה מהנתונים שלנו — היתרה שהתגלגלה עד שהועברה ביוני:</b></p>
+          <div class="flow">
+            <span class="fchipx">סוף מרץ · ₪203</span><span class="arrow">←</span>
+            <span class="fchipx">סוף אפריל · ₪1,058</span><span class="arrow">←</span>
+            <span class="fchipx">סוף מאי · ₪3,607</span><span class="arrow">←</span>
+            <span class="fchipx paid">יוני · הועבר בפועל ₪10,967</span>
+          </div>
+          <p class="explain-bl"><b>שורה תחתונה:</b> סך הכסף שהועבר בפועל למשפחת נפתלי בתקופה הוא <b>₪28,972</b> — 3 העברות בנקאיות (עבור החודשים ינואר, פברואר ויוני). היתרות המתגלגלות אינן כסף נוסף, אלא חלק מאותו סכום שהמתין לחודש שבו הועבר.</p>
+        </div>
         <div class="tblwrap"><table class="dt">
           <thead><tr><th>תאריך</th><th>נמען / תיאור</th><th>סוג</th><th>תקופה</th><th class="n">סכום</th></tr></thead>
           <tbody id="payBody"></tbody>
           <tfoot><tr><td colspan="3">סה״כ ששולם בפועל למשפחת נפתלי (3 העברות)</td><td></td><td class="n pos"><span class="sym">₪</span><span class="num">28,972</span></td></tr></tfoot>
         </table></div>
-        <p class="hint2" style="padding:10px 14px 12px">שורות "יתרה מועברת" הן העברת היתרה בין הדוחות החודשיים ומתקזזות זו מול זו (נטו ₪0). התשלומים בפועל הם 3 ההעברות הבנקאיות למשפחת נפתלי.</p>
       </div>
     </section>
 

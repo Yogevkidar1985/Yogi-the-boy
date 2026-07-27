@@ -240,6 +240,17 @@
 
   footer.rep{margin-top:22px;padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);color:var(--muted);font-size:12.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;direction:rtl}
   .hidden{display:none}
+  /* mobile: keep every sub-heading / note pinned to the right (RTL start) */
+  @media (max-width:640px){
+    .sec-head{flex-wrap:wrap;row-gap:4px}
+    .sec-head .note{margin-inline-start:0;flex-basis:100%;padding-inline-start:17px;text-align:right}
+    .chart-top,.extools,.toolbar{justify-content:flex-start}
+    .toolbar .title{flex-basis:100%;text-align:right}
+    .legend2{width:100%;justify-content:flex-start}
+    footer.rep{flex-direction:column;align-items:flex-start;text-align:right}
+    header.rep{flex-direction:column;align-items:flex-start}
+    .meta{align-items:flex-start;text-align:right}
+  }
   @media (prefers-reduced-motion:no-preference){
     .card,.hlcard,.panel,.tabsec{animation:rise .5s both}
     @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}

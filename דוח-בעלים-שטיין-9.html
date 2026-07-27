@@ -172,6 +172,9 @@
   .schip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
   .badge-cnt{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--surface-3);border:1px solid var(--line);border-radius:999px;padding:1px 9px}
   .hlcard{cursor:pointer}
+  .notebar{display:flex;align-items:center;gap:10px;margin-top:14px;background:var(--red-soft);border:1px solid var(--red-line);border-radius:var(--radius-sm);padding:11px 15px;color:var(--ink);font-size:13.5px;direction:rtl}
+  .notebar .ic{font-size:15px;flex:none}
+  .notebar b{color:var(--red)}
 
   /* ---------- tabs ---------- */
   .tabsec{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
@@ -246,7 +249,7 @@
       <div class="card kpi income">
         <div class="lbl"><span class="dot" style="background:var(--inc)"></span>סך הכנסות מהשכרה</div>
         <div class="val"><span class="sym">₪</span><span class="num" data-count="51212.23">0</span></div>
-        <div class="foot">12 הזמנות בתשלום · 62 לילות</div>
+        <div class="foot">12 הזמנות בתשלום · 62 לילות · ללא יולי–אוגוסט 2026</div>
       </div>
       <div class="card kpi expense">
         <div class="lbl"><span class="dot" style="background:var(--exp)"></span>סך הוצאות</div>
@@ -259,6 +262,7 @@
         <div class="foot">57% מסך ההכנסות</div>
       </div>
     </section>
+    <div class="notebar"><span class="ic">ℹ️</span><span>שימו לב: ההכנסות בדוח <b>אינן כוללות את החודשים יולי ואוגוסט 2026</b>. הדוח מתייחס לתקופה שבין 31/12/2025 ל־27/06/2026 בלבד.</span></div>
 
     <!-- Highlights -->
     <div class="sec-head"><span class="bar"></span><h2>הבלטות</h2><span class="note">התובנות המרכזיות של התקופה</span></div>
@@ -270,7 +274,7 @@
     </section>
 
     <!-- Monthly chart -->
-    <div class="sec-head"><span class="bar"></span><h2>ביצועים חודשיים</h2><span class="note">רחפו או לחצו על חודש לפירוט מלא</span></div>
+    <div class="sec-head"><span class="bar"></span><h2>ביצועים חודשיים</h2><span class="note">דצמבר 2025 – יוני 2026 · ללא יולי–אוגוסט</span></div>
     <section class="panel" id="chartSec">
       <div class="chart-top">
         <div class="toggle" role="group" aria-label="תצוגת גרף">

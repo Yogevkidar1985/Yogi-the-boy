@@ -10,7 +10,7 @@
 <body>
 <style>
   :root{
-    --ground:#eceae6; --surface:#ffffff; --surface-2:#faf9f7; --surface-3:#f4f2ee;
+    --ground:#f4f4f3; --surface:#ffffff; --surface-2:#faf9f7; --surface-3:#f4f2ee;
     --ink:#1a1a1a; --muted:#616161; --faint:#9a9a9a;
     --line:#e6e4e0; --line-strong:#d3d0ca;
     --red:#b41722; --red-2:#8f121b; --red-soft:#b4172210; --red-line:#b4172233;
@@ -47,7 +47,7 @@
     --shadow-lg:0 6px 18px rgba(0,0,0,.5),0 28px 64px rgba(0,0,0,.55);
   }
   :root[data-theme="light"]{
-    --ground:#eceae6; --surface:#ffffff; --surface-2:#faf9f7; --surface-3:#f4f2ee;
+    --ground:#f4f4f3; --surface:#ffffff; --surface-2:#faf9f7; --surface-3:#f4f2ee;
     --ink:#1a1a1a; --muted:#616161; --faint:#9a9a9a;
     --line:#e6e4e0; --line-strong:#d3d0ca;
     --red:#b41722; --red-2:#8f121b; --red-soft:#b4172210; --red-line:#b4172233;
@@ -56,13 +56,9 @@
     --shadow-lg:0 4px 12px rgba(20,20,20,.08),0 24px 60px rgba(20,20,20,.12);
   }
 
-  *{box-sizing:border-box}
-  body{margin:0;font-family:var(--sans)}
-  .bg-layer{position:fixed;inset:0;z-index:0;background-image:var(--bg-img);background-size:var(--bg-size,150px);background-repeat:repeat;opacity:.22;pointer-events:none}
-  .bg-wash{position:fixed;inset:0;z-index:0;background:var(--surface);opacity:.30;pointer-events:none}
-  @media (max-width:720px){.bg-layer{opacity:.26}}
-  :root[data-theme="dark"] .bg-layer{opacity:.10}
-  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .bg-layer{opacity:.10}}
+  *,*::before,*::after{box-sizing:border-box;font-family:Arial,"Helvetica Neue",Helvetica,sans-serif}
+  body{margin:0;font-family:Arial,"Helvetica Neue",Helvetica,sans-serif}
+  .bg-layer,.bg-wash{display:none}
   .page{position:relative;z-index:1;direction:rtl;color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased;padding:clamp(14px,3vw,40px);overflow-x:hidden}
   .sec-head{direction:rtl}
   .wrap{max-width:1080px;margin:0 auto;width:100%}
@@ -255,11 +251,18 @@
 
   .tblwrap{overflow-x:auto;padding:8px 6px 12px}
   .dt{min-width:560px}
-  .dt thead th{text-align:right;font-weight:700;color:var(--red);font-size:11.5px;letter-spacing:.02em;padding:10px 12px;border-bottom:2px solid var(--red-line);white-space:nowrap;background:var(--surface)}
+  .dt thead th{text-align:right;font-weight:800;color:var(--muted);font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:11px 14px;border-bottom:1px solid var(--line-strong);white-space:nowrap;background:var(--surface-2)}
   .dt th.n,.dt td.n{text-align:left}
-  .dt tbody td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .dt tbody td{padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
   .dt tbody tr:last-child td{border-bottom:none}
-  .dt tbody tr:hover td{background:var(--surface-2)}
+  .dt tbody tr:nth-child(even) td{background:var(--surface-2)}
+  .dt tbody tr:hover td{background:var(--surface-3)}
+  .subttl{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 2px 11px}
+  .tgroup{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .toollbl{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .catcell{white-space:nowrap;color:var(--muted);font-size:12.5px}
+  .cdot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-inline-end:7px;vertical-align:middle}
+  .exdt td.amt .num{font-weight:800}
   .name-cell{font-weight:700;white-space:nowrap}
   .datecell{color:var(--muted);white-space:nowrap}
   .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap}
@@ -303,9 +306,9 @@
         <p class="sub">סיכום רשמי של הכנסות, הוצאות, תפוסה וביצועים חודשיים — מוגש לבעל הנכס.</p>
       </div>
       <div class="meta">
-        <span class="stamp">📅 31/12/2025 – 27/06/2026</span>
+        <span class="stamp">31/12/2025 – 27/06/2026</span>
         <div class="row">בעלים: <b>משפחת נפתלי</b></div>
-        <button class="theme-btn" id="themeBtn" type="button">מצב תצוגה ☾</button>
+        <button class="theme-btn" id="themeBtn" type="button">מצב תצוגה</button>
       </div>
     </header>
 
@@ -329,15 +332,15 @@
         <div class="foot">57% מסך ההכנסות</div>
       </div>
     </section>
-    <div class="notebar"><span class="ic">ℹ️</span><span>שימו לב: ההכנסות בדוח <b>אינן כוללות את החודשים יולי ואוגוסט 2026</b>. הדוח מתייחס לתקופה שבין 31/12/2025 ל־27/06/2026 בלבד.</span></div>
+    <div class="notebar"><span>שימו לב: ההכנסות בדוח <b>אינן כוללות את החודשים יולי ואוגוסט 2026</b>. הדוח מתייחס לתקופה שבין 31/12/2025 ל־27/06/2026 בלבד.</span></div>
 
     <!-- Highlights -->
     <div class="sec-head"><span class="bar"></span><h2>הבלטות</h2><span class="note">התובנות המרכזיות של התקופה</span></div>
     <section class="hl">
-      <div class="hlcard" data-act="month" data-mi="6" tabindex="0" role="button"><div class="ic">🏆</div><div class="t">החודש החזק ביותר</div><div class="m">יוני <small>₪19,358 הכנסה</small></div></div>
-      <div class="hlcard" data-act="net" data-mi="6" tabindex="0" role="button"><div class="ic">📈</div><div class="t">שיא רווח נטו חודשי</div><div class="m">יוני <small>₪14,574</small></div></div>
-      <div class="hlcard" data-act="expfilter" data-cat="דמי ניהול" tabindex="0" role="button"><div class="ic">🧾</div><div class="t">ההוצאה הגדולה ביותר</div><div class="m">דמי ניהול <small>₪12,051</small></div></div>
-      <div class="hlcard" data-act="expfilter" data-cat="תיקונים ותחזוקה" tabindex="0" role="button"><div class="ic">🛠️</div><div class="t">הוצאה חד־פעמית בולטת</div><div class="m">צבע ושיפוץ <small>₪1,800</small></div></div>
+      <div class="hlcard" data-act="month" data-mi="6" tabindex="0" role="button"><div class="t">החודש החזק ביותר</div><div class="m">יוני<small>₪19,358 הכנסה</small></div></div>
+      <div class="hlcard" data-act="net" data-mi="6" tabindex="0" role="button"><div class="t">שיא רווח נטו חודשי</div><div class="m">יוני<small>₪14,574 רווח</small></div></div>
+      <div class="hlcard" data-act="expfilter" data-cat="דמי ניהול" tabindex="0" role="button"><div class="t">ההוצאה הגדולה ביותר</div><div class="m">דמי ניהול<small>₪12,051</small></div></div>
+      <div class="hlcard" data-act="expfilter" data-cat="תיקונים ותחזוקה" tabindex="0" role="button"><div class="t">הוצאה חד־פעמית בולטת</div><div class="m">צבע ושיפוץ<small>₪1,800</small></div></div>
     </section>
 
     <!-- Monthly chart -->
@@ -372,8 +375,8 @@
     <div class="sec-head"><span class="bar"></span><h2>פירוט מלא</h2><span class="note">כל הנתונים לפי טאב</span></div>
     <section class="tabsec">
       <div class="tabbar" role="tablist" aria-label="פירוט לפי טאב">
-        <button class="tab" role="tab" aria-selected="true"  data-tab="res" type="button">🗓️ הזמנות ותפוסה <span class="cnt">22</span></button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="pay" type="button">🏦 תשלומים <span class="cnt">9</span></button>
+        <button class="tab" role="tab" aria-selected="true"  data-tab="res" type="button">הזמנות ותפוסה <span class="cnt">22</span></button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="pay" type="button">תשלומים <span class="cnt">9</span></button>
       </div>
 
       <div class="panelbody" id="panel-res" role="tabpanel">
@@ -418,45 +421,54 @@
       </div>
 
       <div class="panelbody hidden" id="panel-pay" role="tabpanel">
-        <div class="toolbar"><span class="title">העברות לבעל הנכס וגלגולי יתרה בין החודשים</span></div>
+        <div class="toolbar"><span class="title">תשלומים חודשיים לבעל הנכס והעברות יתרה בין החודשים</span></div>
         <div class="tblwrap"><table class="dt">
-          <thead><tr><th>תאריך</th><th>נמען / תיאור</th><th>אמצעי</th><th>סוג</th><th>תקופה</th><th class="n">סכום</th></tr></thead>
+          <thead><tr><th>תאריך</th><th>נמען / תיאור</th><th>סוג</th><th>תקופה</th><th class="n">סכום</th></tr></thead>
           <tbody id="payBody"></tbody>
-          <tfoot><tr><td>סה״כ הועבר לבעל הנכס</td><td></td><td></td><td></td><td></td><td class="n pos"><span class="sym">₪</span><span class="num">28,972</span></td></tr></tfoot>
+          <tfoot><tr><td colspan="3">סה״כ ששולם בפועל למשפחת נפתלי (3 העברות)</td><td></td><td class="n pos"><span class="sym">₪</span><span class="num">28,972</span></td></tr></tfoot>
         </table></div>
+        <p class="hint2" style="padding:10px 14px 12px">שורות "יתרה מועברת" הן העברת היתרה בין הדוחות החודשיים ומתקזזות זו מול זו (נטו ₪0). התשלומים בפועל הם 3 ההעברות הבנקאיות למשפחת נפתלי.</p>
       </div>
     </section>
 
     <!-- Expenses focus -->
-    <div class="sec-head"><span class="bar"></span><h2>לאן הלך הכסף</h2><span class="note">סננו ומיינו — על מה הוצאנו וכמה עלה</span></div>
+    <div class="sec-head"><span class="bar"></span><h2>לאן הלך הכסף</h2><span class="note">על מה הוצאנו וכמה עלה</span></div>
     <section class="panel" id="expSec">
       <div class="exgrid">
         <div>
+          <div class="subttl">סיכום לפי קטגוריה</div>
           <table class="sumtbl">
             <thead><tr><th>קטגוריה</th><th>סוג</th><th class="n">סכום</th><th class="n">חלק</th></tr></thead>
             <tbody id="catBody"></tbody>
-            <tfoot><tr><td>סה״כ הוצאות</td><td></td><td class="n"><span class="sym">₪</span><span class="num">21,938</span></td><td class="n">100%</td></tr></tfoot>
+            <tfoot><tr><td>סה״כ</td><td></td><td class="n"><span class="sym">₪</span><span class="num">21,938</span></td><td class="n">100%</td></tr></tfoot>
           </table>
-          <p class="hint2">לחצו על קטגוריה כדי לסנן את הטבלה שלצידה.</p>
+          <p class="hint2">לחצו על קטגוריה לסינון הרשימה שלצידה.</p>
         </div>
         <div>
+          <div class="subttl">פירוט ההוצאות</div>
           <div class="extools">
-            <div class="filters" role="group" aria-label="סינון הוצאות">
-              <button class="fchip" data-ef="all" aria-pressed="true" type="button">הכל</button>
-              <button class="fchip" data-ef="fixed" aria-pressed="false" type="button">קבועות</button>
-              <button class="fchip" data-ef="var" aria-pressed="false" type="button">חד־פעמיות</button>
+            <div class="tgroup">
+              <span class="toollbl">סינון</span>
+              <div class="filters" role="group" aria-label="סינון הוצאות">
+                <button class="fchip" data-ef="all" aria-pressed="true" type="button">הכל</button>
+                <button class="fchip" data-ef="fixed" aria-pressed="false" type="button">קבועות</button>
+                <button class="fchip" data-ef="var" aria-pressed="false" type="button">חד־פעמיות</button>
+              </div>
             </div>
-            <div class="filters" role="group" aria-label="מיון הוצאות">
-              <button class="schip" data-es="amt_desc" aria-pressed="true" type="button">סכום ⬇</button>
-              <button class="schip" data-es="amt_asc" aria-pressed="false" type="button">סכום ⬆</button>
-              <button class="schip" data-es="date" aria-pressed="false" type="button">תאריך</button>
+            <div class="tgroup">
+              <span class="toollbl">מיון</span>
+              <div class="filters" role="group" aria-label="מיון הוצאות">
+                <button class="schip" data-es="amt_desc" aria-pressed="true" type="button">מהגבוה לנמוך</button>
+                <button class="schip" data-es="amt_asc" aria-pressed="false" type="button">מהנמוך לגבוה</button>
+                <button class="schip" data-es="date" aria-pressed="false" type="button">לפי תאריך</button>
+              </div>
             </div>
           </div>
           <div class="tblwrap" style="padding:0">
-            <table class="dt" style="min-width:auto">
-              <thead><tr><th>תאריך</th><th>תיאור</th><th>קטגוריה</th><th>סוג</th><th class="n">סכום</th></tr></thead>
+            <table class="dt exdt" style="min-width:auto">
+              <thead><tr><th>תיאור ההוצאה</th><th>קטגוריה</th><th>תאריך</th><th class="n">סכום</th></tr></thead>
               <tbody id="exFocusBody"></tbody>
-              <tfoot><tr><td colspan="2" id="exFootLbl">סה״כ כל ההוצאות</td><td></td><td class="n"><span class="badge-cnt" id="exFootCnt">16</span></td><td class="n neg"><span class="sym">₪</span><span class="num" id="exFootTot">21,938</span></td></tr></tfoot>
+              <tfoot><tr><td colspan="2" id="exFootLbl">סה״כ כל ההוצאות</td><td class="datecell"><span class="badge-cnt" id="exFootCnt">16</span> שורות</td><td class="n neg"><span class="sym">₪</span><span class="num" id="exFootTot">21,938</span></td></tr></tfoot>
             </table>
           </div>
         </div>
@@ -538,12 +550,12 @@
   ];
   var PAY=[
     ["2026-07-12","משפחת נפתלי","העברה בנקאית","pay","יוני 2026",10967],
-    ["2026-06-11","גלגול יתרה ממאי 2026","גלגול","roll","מאי 2026",3607.48],
-    ["2026-06-11","גלגול יתרה ליוני 2026","גלגול","roll","מאי 2026",-3607.48],
-    ["2026-05-10","גלגול יתרה מאפריל 2026","גלגול","roll","אפריל 2026",1057.94],
-    ["2026-05-10","גלגול יתרה למאי 2026","גלגול","roll","אפריל 2026",-1057.94],
-    ["2026-04-25","גלגול יתרה ממרץ 2026","גלגול","roll","מרץ 2026",202.54],
-    ["2026-04-25","גלגול יתרה לאפריל 2026","גלגול","roll","מרץ 2026",-202.54],
+    ["2026-06-11","יתרה שהועברה ממאי 2026","","roll","מאי 2026",3607.48],
+    ["2026-06-11","יתרה שהועברה ליוני 2026","","roll","מאי 2026",-3607.48],
+    ["2026-05-10","יתרה שהועברה מאפריל 2026","","roll","אפריל 2026",1057.94],
+    ["2026-05-10","יתרה שהועברה למאי 2026","","roll","אפריל 2026",-1057.94],
+    ["2026-04-25","יתרה שהועברה ממרץ 2026","","roll","מרץ 2026",202.54],
+    ["2026-04-25","יתרה שהועברה לאפריל 2026","","roll","מרץ 2026",-202.54],
     ["2026-03-10","משפחת נפתלי","העברה בנקאית","pay","פברואר 2026",6764.48],
     ["2026-02-12","משפחת נפתלי","העברה בנקאית","pay","ינואר 2026",11240.41]
   ];
@@ -706,6 +718,7 @@
 
   // ---------- interactive expense ledger ----------
   var exFilter="all", exSort="amt_desc";
+  var CATCLR={};CATS.forEach(function(c){CATCLR[c[0]]=c[2];});
   var exBody=document.getElementById("exFocusBody");
   var LBL={all:"סה״כ כל ההוצאות",fixed:"סה״כ הוצאות קבועות",var:"סה״כ הוצאות חד־פעמיות"};
   function renderExp(){
@@ -722,9 +735,10 @@
     rows.forEach(function(r){
       tot+=r[3];
       var tr=document.createElement("tr");
-      tr.innerHTML='<td class="datecell"><span class="num">'+(r[0]?dfull(r[0]):"—")+'</span></td>'+
-        '<td class="name-cell">'+r[1]+'</td><td class="muted">'+r[2]+'</td>'+
-        '<td>'+badge(r[4])+'</td><td class="n">'+cur(r[3])+'</td>';
+      tr.innerHTML='<td class="name-cell">'+r[1]+'</td>'+
+        '<td class="catcell"><span class="cdot" style="background:'+(CATCLR[r[2]]||"var(--muted)")+'"></span>'+r[2]+'</td>'+
+        '<td class="datecell"><span class="num">'+(r[0]?dfull(r[0]):"—")+'</span></td>'+
+        '<td class="n amt">'+cur(r[3])+'</td>';
       exBody.appendChild(tr);
     });
     document.getElementById("exFootLbl").textContent=LBL[exFilter]||("סה״כ · "+exFilter);
@@ -775,12 +789,12 @@
   // payments
   var payBody=document.getElementById("payBody");
   PAY.forEach(function(r){
-    var neg=r[5]<0;
-    var pill=r[3]==="pay"?'<span class="pill pay">תשלום לבעלים</span>':'<span class="pill roll">גלגול יתרה</span>';
-    var amt=neg?'<span class="neg"><span class="num">('+money(Math.abs(r[5]))+' ₪)</span></span>':cur(r[5]);
+    var neg=r[5]<0, pay=r[3]==="pay";
+    var pill=pay?'<span class="pill pay">תשלום חודשי על השכרות</span>':'<span class="pill roll">יתרה מועברת</span>';
+    var amt=neg?'<span class="neg"><span class="num">−₪'+money(Math.abs(r[5]))+'</span></span>':cur(r[5]);
     var tr=document.createElement("tr");
     tr.innerHTML='<td class="datecell"><span class="num">'+dfull(r[0])+'</span></td>'+
-      '<td class="name-cell">'+r[1]+'</td><td class="muted">'+r[2]+'</td>'+
+      '<td class="name-cell">'+r[1]+'</td>'+
       '<td>'+pill+'</td><td class="muted">'+r[4]+'</td><td class="n">'+amt+'</td>';
     payBody.appendChild(tr);
   });

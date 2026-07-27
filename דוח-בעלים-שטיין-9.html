@@ -50,6 +50,9 @@
   html,body,*,*::before,*::after{font-family:Arial,"Arial Hebrew","Segoe UI","Noto Sans Hebrew","Helvetica Neue",Helvetica,sans-serif !important}
   *,*::before,*::after{box-sizing:border-box}
   body{margin:0}
+  html,body{overflow-x:hidden;max-width:100%}
+  /* grid/flex children must be allowed to shrink so inner tables scroll instead of pushing page width (RTL mobile) */
+  .exgrid>*,.chart-grid>*{min-width:0}
   .bg-layer{position:fixed;inset:0;z-index:0;background-image:var(--bg-img);background-size:cover;background-position:center center;background-repeat:no-repeat;opacity:.5;image-rendering:auto;pointer-events:none}
   .bg-wash{position:fixed;inset:0;z-index:0;background:rgba(255,255,255,.5);pointer-events:none}
   @media (max-width:720px){.bg-layer{opacity:.5}.bg-wash{background:rgba(255,255,255,.5)}}
@@ -259,7 +262,7 @@
   .ncard.tot .nbig{color:var(--red)}
   .dt tfoot tr.emph td{background:var(--red-soft)}
 
-  .tblwrap{overflow-x:auto;padding:8px 6px 12px}
+  .tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0;max-width:100%;padding:8px 6px 12px}
   .dt{min-width:560px}
   .dt thead th{text-align:right;font-weight:800;color:var(--ink);font-size:13px;letter-spacing:0;padding:13px 15px;border-bottom:2px solid var(--line-strong);white-space:nowrap;background:var(--surface-2)}
   .dt th.n,.dt td.n{text-align:left}

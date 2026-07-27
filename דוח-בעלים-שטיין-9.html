@@ -204,6 +204,23 @@
   .occ .lg .s{display:inline-flex;align-items:center;gap:6px}
   .occ .lg .s i{width:10px;height:10px;border-radius:2px}
 
+  /* nights breakdown cards */
+  .nightsgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px 14px 6px}
+  @media (max-width:640px){.nightsgrid{grid-template-columns:1fr}}
+  .ncard{font-family:var(--sans);text-align:right;cursor:pointer;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:15px 17px;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;display:flex;flex-direction:column;gap:5px}
+  .ncard:hover{border-color:var(--line-strong);transform:translateY(-2px);box-shadow:var(--shadow)}
+  .ncard[aria-pressed="true"]{border-color:var(--red);box-shadow:0 0 0 1.5px var(--red) inset}
+  .ncard .ncap{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);font-weight:700}
+  .ncard .ncap i{width:11px;height:11px;border-radius:3px;flex:none}
+  .ncard .nbig{font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1}
+  .ncard .nbig .unit{font-size:13px;font-weight:700;color:var(--muted);margin-inline-start:5px}
+  .ncard .nsub{font-size:12px;color:var(--muted)}
+  .ncard.ext .nbig{color:var(--inc)}
+  .ncard.own .nbig{color:var(--gold)}
+  .ncard.tot{background:var(--red-soft);border-color:var(--red-line)}
+  .ncard.tot .nbig{color:var(--red)}
+  .dt tfoot tr.emph td{background:var(--red-soft)}
+
   .tblwrap{overflow-x:auto;padding:8px 6px 12px}
   .dt{min-width:560px}
   .dt thead th{text-align:right;font-weight:700;color:var(--red);font-size:11.5px;letter-spacing:.02em;padding:10px 12px;border-bottom:2px solid var(--red-line);white-space:nowrap;background:var(--surface)}
@@ -346,26 +363,43 @@
       </div>
 
       <div class="panelbody" id="panel-res" role="tabpanel">
+        <div class="nightsgrid" role="group" aria-label="פילוח לילות — לחצו לסינון">
+          <button class="ncard ext" data-f="paid" aria-pressed="false" type="button">
+            <span class="ncap"><i style="background:var(--inc)"></i>אורחים חיצוניים</span>
+            <span class="nbig"><span class="num">62</span><span class="unit">לילות</span></span>
+            <span class="nsub">12 הזמנות · 73% מהלילות</span>
+          </button>
+          <button class="ncard own" data-f="owner" aria-pressed="false" type="button">
+            <span class="ncap"><i style="background:var(--gold)"></i>שהות בעלים</span>
+            <span class="nbig"><span class="num">23</span><span class="unit">לילות</span></span>
+            <span class="nsub">10 שהיות · 27% מהלילות</span>
+          </button>
+          <button class="ncard tot" data-f="all" aria-pressed="true" type="button">
+            <span class="ncap">סה״כ לילות מאוכלסים</span>
+            <span class="nbig"><span class="num">85</span><span class="unit">לילות</span></span>
+            <span class="nsub">22 הזמנות</span>
+          </button>
+        </div>
         <div class="occ">
-          <div class="stack" role="img" aria-label="73% לילות בתשלום, 27% שריון בעלים"><i class="seg-p" style="width:72.9%"></i><i class="seg-o" style="width:27.1%"></i></div>
-          <div class="lg"><span class="s"><i class="seg-p" style="background:var(--inc)"></i>בתשלום <b>62 לילות</b></span><span class="s"><i class="seg-o" style="background:var(--gold)"></i>שריון בעלים <b>23 לילות</b></span><span>סה״כ <b>85 לילות</b></span></div>
+          <div class="stack" role="img" aria-label="73% לילות אורחים חיצוניים, 27% שהות בעלים"><i class="seg-p" style="width:72.9%"></i><i class="seg-o" style="width:27.1%"></i></div>
+          <div class="lg"><span class="s"><i class="seg-p" style="background:var(--inc)"></i>אורחים חיצוניים <b>62 לילות</b></span><span class="s"><i class="seg-o" style="background:var(--gold)"></i>שהות בעלים <b>23 לילות</b></span></div>
         </div>
         <div class="toolbar">
-          <span class="title">כל ההזמנות בתקופת הדוח</span>
+          <span class="title">סינון ההזמנות — שורת הסה״כ מתעדכנת לפי הבחירה</span>
           <div class="filters" role="group" aria-label="סינון הזמנות">
             <button class="fchip" data-f="all"   aria-pressed="true"  type="button">הכל</button>
-            <button class="fchip" data-f="paid"  aria-pressed="false" type="button">בתשלום</button>
-            <button class="fchip" data-f="owner" aria-pressed="false" type="button">שריון בעלים</button>
+            <button class="fchip" data-f="paid"  aria-pressed="false" type="button">אורחים חיצוניים</button>
+            <button class="fchip" data-f="owner" aria-pressed="false" type="button">שהות בעלים</button>
           </div>
         </div>
         <div class="tblwrap"><table class="dt">
           <thead><tr><th>אורח</th><th>תאריכים</th><th class="n">לילות</th><th>סוג</th><th class="n">הכנסה נטו</th><th class="n">עמלת ניהול</th><th class="n">ניקיון</th><th class="n">רווח לבעלים</th></tr></thead>
           <tbody id="resBody"></tbody>
-          <tfoot><tr><td>סה״כ</td><td></td><td class="n num">85</td><td></td>
-            <td class="n"><span class="sym">₪</span><span class="num">51,212</span></td>
-            <td class="n"><span class="sym">₪</span><span class="num">12,051</span></td>
-            <td class="n"><span class="sym">₪</span><span class="num">5,714</span></td>
-            <td class="n pos"><span class="sym">₪</span><span class="num">39,161</span></td></tr></tfoot>
+          <tfoot><tr id="resFoot"><td id="rfLbl">סה״כ</td><td class="muted" id="rfCount">22 הזמנות</td><td class="n num" id="rfNights">85</td><td></td>
+            <td class="n"><span class="sym">₪</span><span class="num" id="rfNet">51,212</span></td>
+            <td class="n"><span class="sym">₪</span><span class="num" id="rfMgmt">12,051</span></td>
+            <td class="n"><span class="sym">₪</span><span class="num" id="rfClean">5,714</span></td>
+            <td class="n pos"><span class="sym">₪</span><span class="num" id="rfProfit">39,161</span></td></tr></tfoot>
         </table></div>
       </div>
 
@@ -643,14 +677,17 @@
   document.querySelectorAll(".schip[data-es]").forEach(function(c){c.addEventListener("click",function(){setExpSort(c.dataset.es);});});
   renderExp();
 
-  // reservations
+  // reservations — dynamic totals reflect the active filter
   var resBody=document.getElementById("resBody");
+  function txt(id,v){document.getElementById(id).textContent=v;}
   function renderRes(f){
     resBody.innerHTML="";
+    var cnt=0,ni=0,net=0,mg=0,cl=0,pf=0;
     RES.forEach(function(r){
       if(f!=="all"&&r[4]!==f)return;
       var o=r[4]==="owner";
-      var pill=o?'<span class="pill owner">שריון בעלים</span>':'<span class="pill paid">אורח משלם</span>';
+      cnt++;ni+=r[3];net+=r[5];mg+=r[6];cl+=r[7];pf+=r[8];
+      var pill=o?'<span class="pill owner">שהות בעלים</span>':'<span class="pill paid">אורח חיצוני</span>';
       var tr=document.createElement("tr");
       tr.innerHTML='<td class="name-cell">'+r[0]+'</td>'+
         '<td class="datecell"><span class="num">'+d(r[1])+' – '+d(r[2])+'</span></td>'+
@@ -661,6 +698,14 @@
         '<td class="n">'+(o?'<span class="muted">—</span>':'<span class="pos">'+cur(r[8])+'</span>')+'</td>';
       resBody.appendChild(tr);
     });
+    // update totals row
+    txt("rfNights",ni);txt("rfCount",cnt+" הזמנות");
+    txt("rfNet",money(net));txt("rfMgmt",money(mg));txt("rfClean",money(cl));txt("rfProfit",money(pf));
+    txt("rfLbl",f==="paid"?"סה״כ · אורחים חיצוניים":f==="owner"?"סה״כ · שהות בעלים":"סה״כ · הכל");
+    document.getElementById("resFoot").classList.toggle("emph",f!=="all");
+    // sync all controls (chips + night cards)
+    document.querySelectorAll("#panel-res .fchip[data-f]").forEach(function(c){c.setAttribute("aria-pressed",String(c.dataset.f===f));});
+    document.querySelectorAll(".ncard[data-f]").forEach(function(c){c.setAttribute("aria-pressed",String(c.dataset.f===f));});
   }
   renderRes("all");
 
@@ -699,11 +744,9 @@
     card.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();act();}});
   });
 
-  // filters
-  document.querySelectorAll(".fchip").forEach(function(c){c.addEventListener("click",function(){
-    document.querySelectorAll(".fchip").forEach(function(o){o.setAttribute("aria-pressed","false");});
-    c.setAttribute("aria-pressed","true");renderRes(c.dataset.f);
-  });});
+  // reservation filters (chips + clickable night cards, all synced)
+  document.querySelectorAll("#panel-res .fchip[data-f]").forEach(function(c){c.addEventListener("click",function(){renderRes(c.dataset.f);});});
+  document.querySelectorAll(".ncard[data-f]").forEach(function(c){c.addEventListener("click",function(){renderRes(c.dataset.f);});});
 
   // theme
   var root=document.documentElement;

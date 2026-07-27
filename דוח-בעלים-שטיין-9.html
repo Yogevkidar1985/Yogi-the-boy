@@ -49,8 +49,9 @@
 
   *{box-sizing:border-box}
   body{margin:0;font-family:var(--sans)}
-  .bg-layer{position:fixed;inset:0;z-index:0;background:var(--bg-img) center/cover no-repeat fixed;opacity:.10;pointer-events:none}
-  .bg-wash{position:fixed;inset:0;z-index:0;background:radial-gradient(120% 80% at 50% 0%,transparent,var(--ground) 78%);pointer-events:none}
+  .bg-layer{position:fixed;inset:0;z-index:0;background:var(--bg-img);background-size:cover;background-position:center;background-repeat:no-repeat;opacity:.12;pointer-events:none}
+  .bg-wash{position:fixed;inset:0;z-index:0;background:radial-gradient(120% 80% at 50% 0%,transparent,var(--ground) 82%);pointer-events:none}
+  @media (max-width:720px){.bg-layer{opacity:.16}}
   .page{position:relative;z-index:1;color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased;padding:clamp(14px,3vw,40px)}
   .wrap{max-width:1080px;margin:0 auto}
   .num{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
@@ -159,6 +160,18 @@
   .catbar i{display:block;height:100%;border-radius:999px;background:var(--red);width:0;transition:width .9s cubic-bezier(.2,.7,.2,1)}
   .catname{font-weight:600;display:flex;align-items:center;gap:8px}
   .catname .cd{width:9px;height:9px;border-radius:2px;flex:none}
+  .sumtbl tbody tr{cursor:pointer}
+  .sumtbl tbody tr.active td{background:var(--red-soft)}
+  .sumtbl tbody tr.active .catname{color:var(--red)}
+  .hint2{font-size:12px;color:var(--muted);margin:10px 2px 0}
+  .badge{display:inline-flex;align-items:center;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;letter-spacing:.02em}
+  .badge.fixed{background:var(--red-soft);color:var(--red);border:1px solid var(--red-line)}
+  .badge.var{background:var(--surface-3);color:var(--muted);border:1px solid var(--line)}
+  .extools{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .schip{font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--muted);background:var(--surface-3);border:1px solid var(--line);border-radius:999px;padding:6px 12px}
+  .schip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+  .badge-cnt{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--surface-3);border:1px solid var(--line);border-radius:999px;padding:1px 9px}
+  .hlcard{cursor:pointer}
 
   /* ---------- tabs ---------- */
   .tabsec{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
@@ -223,8 +236,7 @@
       </div>
       <div class="meta">
         <span class="stamp">📅 31/12/2025 – 27/06/2026</span>
-        <div class="row">בעל הנכס: <b>אלעד נפתלי</b></div>
-        <div class="row">ניהול: <b>Seanrent · יוגב קידר</b></div>
+        <div class="row">בעלים: <b>משפחת נפתלי</b></div>
         <button class="theme-btn" id="themeBtn" type="button">מצב תצוגה ☾</button>
       </div>
     </header>
@@ -251,15 +263,15 @@
     <!-- Highlights -->
     <div class="sec-head"><span class="bar"></span><h2>הבלטות</h2><span class="note">התובנות המרכזיות של התקופה</span></div>
     <section class="hl">
-      <div class="hlcard"><div class="ic">🏆</div><div class="t">החודש החזק ביותר</div><div class="m">יוני <small>₪19,358 הכנסה</small></div></div>
-      <div class="hlcard"><div class="ic">📈</div><div class="t">שיא רווח נטו חודשי</div><div class="m">יוני <small>₪14,574</small></div></div>
-      <div class="hlcard"><div class="ic">🧾</div><div class="t">ההוצאה הגדולה ביותר</div><div class="m">דמי ניהול <small>₪12,051</small></div></div>
-      <div class="hlcard"><div class="ic">🛠️</div><div class="t">הוצאה חד־פעמית בולטת</div><div class="m">צבע ושיפוץ <small>₪1,800</small></div></div>
+      <div class="hlcard" data-act="month" data-mi="6" tabindex="0" role="button"><div class="ic">🏆</div><div class="t">החודש החזק ביותר</div><div class="m">יוני <small>₪19,358 הכנסה</small></div></div>
+      <div class="hlcard" data-act="net" data-mi="6" tabindex="0" role="button"><div class="ic">📈</div><div class="t">שיא רווח נטו חודשי</div><div class="m">יוני <small>₪14,574</small></div></div>
+      <div class="hlcard" data-act="expfilter" data-cat="דמי ניהול" tabindex="0" role="button"><div class="ic">🧾</div><div class="t">ההוצאה הגדולה ביותר</div><div class="m">דמי ניהול <small>₪12,051</small></div></div>
+      <div class="hlcard" data-act="expfilter" data-cat="תיקונים ותחזוקה" tabindex="0" role="button"><div class="ic">🛠️</div><div class="t">הוצאה חד־פעמית בולטת</div><div class="m">צבע ושיפוץ <small>₪1,800</small></div></div>
     </section>
 
     <!-- Monthly chart -->
     <div class="sec-head"><span class="bar"></span><h2>ביצועים חודשיים</h2><span class="note">רחפו או לחצו על חודש לפירוט מלא</span></div>
-    <section class="panel">
+    <section class="panel" id="chartSec">
       <div class="chart-top">
         <div class="toggle" role="group" aria-label="תצוגת גרף">
           <button data-view="both" aria-pressed="true" type="button">הכנסות מול הוצאות</button>
@@ -280,20 +292,37 @@
     </section>
 
     <!-- Expenses focus -->
-    <div class="sec-head"><span class="bar"></span><h2>לאן הלך הכסף</h2><span class="note">על מה הוצאנו וכמה עלה</span></div>
-    <section class="panel">
+    <div class="sec-head"><span class="bar"></span><h2>לאן הלך הכסף</h2><span class="note">סננו ומיינו — על מה הוצאנו וכמה עלה</span></div>
+    <section class="panel" id="expSec">
       <div class="exgrid">
-        <table class="sumtbl">
-          <thead><tr><th>קטגוריה</th><th class="n">סכום</th><th class="n">חלק</th></tr></thead>
-          <tbody id="catBody"></tbody>
-          <tfoot><tr><td>סה״כ הוצאות</td><td class="n"><span class="sym">₪</span><span class="num">21,938</span></td><td class="n">100%</td></tr></tfoot>
-        </table>
-        <div class="tblwrap" style="padding:0">
-          <table class="dt" style="min-width:auto">
-            <thead><tr><th>תאריך</th><th>ספק</th><th>קטגוריה</th><th>תיאור</th><th class="n">סכום</th></tr></thead>
-            <tbody id="exFocusBody"></tbody>
-            <tfoot><tr><td colspan="4">סה״כ הוצאות תפעוליות (ללא דמי ניהול)</td><td class="n neg"><span class="sym">₪</span><span class="num">9,887</span></td></tr></tfoot>
+        <div>
+          <table class="sumtbl">
+            <thead><tr><th>קטגוריה</th><th>סוג</th><th class="n">סכום</th><th class="n">חלק</th></tr></thead>
+            <tbody id="catBody"></tbody>
+            <tfoot><tr><td>סה״כ הוצאות</td><td></td><td class="n"><span class="sym">₪</span><span class="num">21,938</span></td><td class="n">100%</td></tr></tfoot>
           </table>
+          <p class="hint2">לחצו על קטגוריה כדי לסנן את הטבלה שלצידה.</p>
+        </div>
+        <div>
+          <div class="extools">
+            <div class="filters" role="group" aria-label="סינון הוצאות">
+              <button class="fchip" data-ef="all" aria-pressed="true" type="button">הכל</button>
+              <button class="fchip" data-ef="fixed" aria-pressed="false" type="button">קבועות</button>
+              <button class="fchip" data-ef="var" aria-pressed="false" type="button">חד־פעמיות</button>
+            </div>
+            <div class="filters" role="group" aria-label="מיון הוצאות">
+              <button class="schip" data-es="amt_desc" aria-pressed="true" type="button">סכום ⬇</button>
+              <button class="schip" data-es="amt_asc" aria-pressed="false" type="button">סכום ⬆</button>
+              <button class="schip" data-es="date" aria-pressed="false" type="button">תאריך</button>
+            </div>
+          </div>
+          <div class="tblwrap" style="padding:0">
+            <table class="dt" style="min-width:auto">
+              <thead><tr><th>תאריך</th><th>תיאור</th><th>קטגוריה</th><th>סוג</th><th class="n">סכום</th></tr></thead>
+              <tbody id="exFocusBody"></tbody>
+              <tfoot><tr><td colspan="2" id="exFootLbl">סה״כ כל ההוצאות</td><td></td><td class="n"><span class="badge-cnt" id="exFootCnt">16</span></td><td class="n neg"><span class="sym">₪</span><span class="num" id="exFootTot">21,938</span></td></tr></tfoot>
+            </table>
+          </div>
         </div>
       </div>
     </section>
@@ -303,7 +332,6 @@
     <section class="tabsec">
       <div class="tabbar" role="tablist" aria-label="פירוט לפי טאב">
         <button class="tab" role="tab" aria-selected="true"  data-tab="res" type="button">🗓️ הזמנות ותפוסה <span class="cnt">22</span></button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="exp" type="button">🧾 הוצאות <span class="cnt">15</span></button>
         <button class="tab" role="tab" aria-selected="false" data-tab="pay" type="button">🏦 תשלומים <span class="cnt">9</span></button>
       </div>
 
@@ -331,15 +359,6 @@
         </table></div>
       </div>
 
-      <div class="panelbody hidden" id="panel-exp" role="tabpanel">
-        <div class="toolbar"><span class="title">כל ההוצאות התפעוליות של הנכס</span></div>
-        <div class="tblwrap"><table class="dt">
-          <thead><tr><th>תאריך</th><th>ספק</th><th>קטגוריה</th><th>תיאור</th><th class="n">סכום</th></tr></thead>
-          <tbody id="expBody"></tbody>
-          <tfoot><tr><td colspan="4">סה״כ הוצאות תפעוליות</td><td class="n neg"><span class="sym">₪</span><span class="num">9,887</span></td></tr></tfoot>
-        </table></div>
-      </div>
-
       <div class="panelbody hidden" id="panel-pay" role="tabpanel">
         <div class="toolbar"><span class="title">העברות לבעל הנכס וגלגולי יתרה בין החודשים</span></div>
         <div class="tblwrap"><table class="dt">
@@ -351,7 +370,7 @@
     </section>
 
     <footer class="rep">
-      <span>דוח רשמי · הופק עבור אלעד נפתלי · נכס שטיין 9, נווה צדק, תל אביב</span>
+      <span>דוח רשמי · הופק עבור משפחת נפתלי · נכס שטיין 9, נווה צדק, תל אביב</span>
       <span>כל הסכומים בשקלים חדשים (₪)</span>
     </footer>
   </div>
@@ -388,22 +407,22 @@
     ["Marina Busse","2026-06-02","2026-06-08",6,"paid",5481.19,1326.20,732.06,4154.99],
     ["שריון בעלים","2026-05-29","2026-05-30",1,"owner",0,0,0,0],
     ["Modi Cohen","2026-05-21","2026-05-23",2,"paid",2010.86,485.21,727.52,1525.64],
-    ["יוגב קידר","2026-05-12","2026-05-15",3,"owner",0,0,0,0],
-    ["יוגב קידר","2026-05-11","2026-05-12",1,"owner",0,0,0,0],
+    ["שהות בעלים","2026-05-12","2026-05-15",3,"owner",0,0,0,0],
+    ["שהות בעלים","2026-05-11","2026-05-12",1,"owner",0,0,0,0],
     ["Ben Adivi","2026-05-06","2026-05-09",3,"paid",1933.93,462.63,628.28,1471.30],
-    ["יוגב קידר","2026-04-28","2026-05-06",8,"owner",0,0,0,0],
+    ["שהות בעלים","2026-04-28","2026-05-06",8,"owner",0,0,0,0],
     ["שהות בעלים","2026-04-23","2026-04-24",1,"owner",0,0,0,0],
-    ["יוגב קידר","2026-02-25","2026-02-28",3,"owner",0,0,0,0],
+    ["שהות בעלים","2026-02-25","2026-02-28",3,"owner",0,0,0,0],
     ["Or Moreno","2026-02-19","2026-02-22",3,"paid",1887.03,448.92,0,1438.11],
     ["Or Moreno","2026-02-05","2026-02-19",14,"paid",8463.94,2009.42,456.71,6454.52],
-    ["יוגב קידר","2026-02-04","2026-02-05",1,"owner",0,0,0,0],
+    ["שהות בעלים","2026-02-04","2026-02-05",1,"owner",0,0,0,0],
     ["Tal Eliya Menahem","2026-02-02","2026-02-04",2,"paid",1286.93,306.51,456.71,980.42],
-    ["יוגב קידר","2026-02-01","2026-02-02",1,"owner",0,0,0,0],
+    ["שהות בעלים","2026-02-01","2026-02-02",1,"owner",0,0,0,0],
     ["Rotem Naim","2026-01-18","2026-01-29",11,"paid",6535.72,1549.75,459.15,4985.97],
     ["Rotem Naim","2026-01-15","2026-01-18",3,"paid",1782.45,422.65,0,1359.79],
-    ["יוגב קידר","2026-01-12","2026-01-15",3,"owner",0,0,0,0],
+    ["שהות בעלים","2026-01-12","2026-01-15",3,"owner",0,0,0,0],
     ["Maya Blanding","2026-01-09","2026-01-12",3,"paid",2200.83,527.25,459.15,1673.58],
-    ["יוגב קידר","2026-01-08","2026-01-09",1,"owner",0,0,0,0],
+    ["שהות בעלים","2026-01-08","2026-01-09",1,"owner",0,0,0,0],
     ["Alexis Morel","2025-12-31","2026-01-04",4,"paid",5752.87,1126.09,397.93,4626.79]
   ];
   var EXP=[
@@ -424,23 +443,29 @@
     ["2026-01-09","Business Model","ניקיון (בעלים)","ניקיון תחזוקתי",702.86]
   ];
   var PAY=[
-    ["2026-07-12","אלעד נפתלי","העברה בנקאית","pay","יוני 2026",10967],
+    ["2026-07-12","משפחת נפתלי","העברה בנקאית","pay","יוני 2026",10967],
     ["2026-06-11","גלגול יתרה ממאי 2026","גלגול","roll","מאי 2026",3607.48],
     ["2026-06-11","גלגול יתרה ליוני 2026","גלגול","roll","מאי 2026",-3607.48],
     ["2026-05-10","גלגול יתרה מאפריל 2026","גלגול","roll","אפריל 2026",1057.94],
     ["2026-05-10","גלגול יתרה למאי 2026","גלגול","roll","אפריל 2026",-1057.94],
     ["2026-04-25","גלגול יתרה ממרץ 2026","גלגול","roll","מרץ 2026",202.54],
     ["2026-04-25","גלגול יתרה לאפריל 2026","גלגול","roll","מרץ 2026",-202.54],
-    ["2026-03-10","אלעד נפתלי","העברה בנקאית","pay","פברואר 2026",6764.48],
-    ["2026-02-12","אלעד נפתלי","העברה בנקאית","pay","ינואר 2026",11240.41]
+    ["2026-03-10","משפחת נפתלי","העברה בנקאית","pay","פברואר 2026",6764.48],
+    ["2026-02-12","משפחת נפתלי","העברה בנקאית","pay","ינואר 2026",11240.41]
   ];
   var CATS=[
-    ["דמי ניהול",12051.28,"var(--red)"],
-    ["ניקיון (בעלים)",7386.25,"#d17a1e"],
-    ["תיקונים ותחזוקה",1800,"#8f7a2a"],
-    ["אספקה וציוד",700.42,"#7a7a7a"]
+    ["דמי ניהול",12051.28,"var(--red)","fixed"],
+    ["ניקיון (בעלים)",7386.25,"#d17a1e","fixed"],
+    ["תיקונים ותחזוקה",1800,"#8f7a2a","var"],
+    ["אספקה וציוד",700.42,"#7a7a7a","var"]
   ];
   var TOTEXP=21937.95;
+  // unified expense ledger: [date, description, category, amount, type]  (management fee added as one fixed line)
+  var EXPALL=EXP.map(function(e){
+    var t=(e[2]==="ניקיון (בעלים)")?"fixed":"var";
+    return [e[0],e[3],e[2],e[4],t];
+  });
+  EXPALL.push(["","עמלת ניהול על ההשכרות (12 הזמנות)","דמי ניהול",12051.28,"fixed"]);
   var reduce=window.matchMedia("(prefers-reduced-motion:reduce)").matches;
 
   // ---------- chart ----------
@@ -536,39 +561,65 @@
 
   renderChart();renderDetail(selected);
 
-  document.querySelectorAll(".toggle button").forEach(function(b){
-    b.addEventListener("click",function(){
-      document.querySelectorAll(".toggle button").forEach(function(o){o.setAttribute("aria-pressed","false");});
-      b.setAttribute("aria-pressed","true");view=b.dataset.view;
-      document.getElementById("legend").style.visibility=view==="both"?"visible":"hidden";
-      renderChart();
-    });
-  });
+  function setView(v){
+    view=v;
+    document.querySelectorAll(".toggle button").forEach(function(o){o.setAttribute("aria-pressed",String(o.dataset.view===v));});
+    document.getElementById("legend").style.visibility=v==="both"?"visible":"hidden";
+    renderChart();
+  }
+  document.querySelectorAll(".toggle button").forEach(function(b){b.addEventListener("click",function(){setView(b.dataset.view);});});
 
-  // ---------- category summary ----------
+  // ---------- category summary (clickable to filter) ----------
   var maxC=Math.max.apply(null,CATS.map(function(c){return c[1];}));
   var catBody=document.getElementById("catBody");
+  function badge(t){return t==="fixed"?'<span class="badge fixed">קבועה</span>':'<span class="badge var">משתנה</span>';}
   CATS.forEach(function(c){
     var pct=(c[1]/TOTEXP*100);
     var tr=document.createElement("tr");
+    tr.setAttribute("data-cat",c[0]);
     tr.innerHTML='<td><div class="catname"><span class="cd" style="background:'+c[2]+'"></span>'+c[0]+'</div>'+
       '<div class="catbar"><i style="background:'+c[2]+'" data-w="'+(c[1]/maxC*100)+'%"></i></div></td>'+
+      '<td>'+badge(c[3])+'</td>'+
       '<td class="n">'+cur(c[1])+'</td><td class="n">'+pct.toFixed(1)+'%</td>';
+    tr.addEventListener("click",function(){setExpFilter(c[0]);});
     catBody.appendChild(tr);
   });
 
-  // itemized expenses (focus + tab)
-  function fillExp(id){
-    var b=document.getElementById(id);
-    EXP.forEach(function(r){
-      var tr=document.createElement("tr");
-      tr.innerHTML='<td class="datecell"><span class="num">'+dfull(r[0])+'</span></td>'+
-        '<td class="name-cell">'+r[1]+'</td><td>'+r[2]+'</td>'+
-        '<td class="desc">'+r[3]+'</td><td class="n">'+cur(r[4])+'</td>';
-      b.appendChild(tr);
+  // ---------- interactive expense ledger ----------
+  var exFilter="all", exSort="amt_desc";
+  var exBody=document.getElementById("exFocusBody");
+  var LBL={all:"סה״כ כל ההוצאות",fixed:"סה״כ הוצאות קבועות",var:"סה״כ הוצאות חד־פעמיות"};
+  function renderExp(){
+    var rows=EXPALL.filter(function(r){
+      return exFilter==="all"||(exFilter==="fixed"&&r[4]==="fixed")||(exFilter==="var"&&r[4]==="var")||r[2]===exFilter;
     });
+    rows.sort(function(a,b){
+      if(exSort==="amt_desc")return b[3]-a[3];
+      if(exSort==="amt_asc")return a[3]-b[3];
+      return (b[0]||"")<(a[0]||"")?-1:1; // date desc, empty last
+    });
+    exBody.innerHTML="";
+    var tot=0;
+    rows.forEach(function(r){
+      tot+=r[3];
+      var tr=document.createElement("tr");
+      tr.innerHTML='<td class="datecell"><span class="num">'+(r[0]?dfull(r[0]):"—")+'</span></td>'+
+        '<td class="name-cell">'+r[1]+'</td><td class="muted">'+r[2]+'</td>'+
+        '<td>'+badge(r[4])+'</td><td class="n">'+cur(r[3])+'</td>';
+      exBody.appendChild(tr);
+    });
+    document.getElementById("exFootLbl").textContent=LBL[exFilter]||("סה״כ · "+exFilter);
+    document.getElementById("exFootCnt").textContent=rows.length;
+    document.getElementById("exFootTot").textContent=money(tot);
+    // reflect state on chips + category rows
+    document.querySelectorAll(".fchip[data-ef]").forEach(function(c){c.setAttribute("aria-pressed",String(c.dataset.ef===exFilter));});
+    document.querySelectorAll("#catBody tr").forEach(function(t){t.classList.toggle("active",t.getAttribute("data-cat")===exFilter);});
   }
-  fillExp("exFocusBody");fillExp("expBody");
+  function setExpFilter(f){exFilter=f;renderExp();}
+  function setExpSort(s){exSort=s;document.querySelectorAll(".schip[data-es]").forEach(function(c){c.setAttribute("aria-pressed",String(c.dataset.es===s));});renderExp();}
+  document.querySelectorAll(".fchip[data-ef]").forEach(function(c){c.addEventListener("click",function(){setExpFilter(c.dataset.ef);});});
+  document.querySelectorAll(".schip[data-es]").forEach(function(c){c.addEventListener("click",function(){setExpSort(c.dataset.es);});});
+  renderExp();
 
   // reservations
   var resBody=document.getElementById("resBody");
@@ -609,8 +660,22 @@
   tabs.forEach(function(t){t.addEventListener("click",function(){
     tabs.forEach(function(o){o.setAttribute("aria-selected","false");});
     t.setAttribute("aria-selected","true");
-    ["res","exp","pay"].forEach(function(k){document.getElementById("panel-"+k).classList.toggle("hidden",k!==t.dataset.tab);});
+    ["res","pay"].forEach(function(k){document.getElementById("panel-"+k).classList.toggle("hidden",k!==t.dataset.tab);});
   });});
+
+  // highlight-card interactivity
+  var smooth=reduce?"auto":"smooth";
+  function goto(id){var e=document.getElementById(id);if(e)e.scrollIntoView({behavior:smooth,block:"center"});}
+  document.querySelectorAll(".hlcard[data-act]").forEach(function(card){
+    function act(){
+      var a=card.dataset.act;
+      if(a==="month"){setView("both");select(+card.dataset.mi);goto("chartSec");}
+      else if(a==="net"){setView("net");select(+card.dataset.mi);goto("chartSec");}
+      else if(a==="expfilter"){setExpFilter(card.dataset.cat);goto("expSec");}
+    }
+    card.addEventListener("click",act);
+    card.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();act();}});
+  });
 
   // filters
   document.querySelectorAll(".fchip").forEach(function(c){c.addEventListener("click",function(){

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="description" content="דוח בעלים רשמי לנכס שטיין 9, נווה צדק — הכנסות, הוצאות, תפוסה ולילות.">
+<meta name="description" content="דוח בעלים רשמי לנכס שטיין 9, נווה צדק.">
 <title>שטיין 9 · דוח בעלים רשמי</title>
 </head>
 <body>
@@ -22,7 +22,7 @@
     --radius:14px; --radius-sm:9px;
     --sans:Arial,"Helvetica Neue",Helvetica,sans-serif;
     /* rented-room photo — replace url() once uploaded */
-    --bg-img:radial-gradient(circle at 22% 28%,#cfd7c6,transparent 46%),radial-gradient(circle at 82% 62%,#e6c6ad,transparent 46%),linear-gradient(160deg,#f3f0ea,#e9ece6);
+    --bg-img:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJyB2aWV3Qm94PScwIDAgMTIwIDEyMCc+CjxyZWN0IHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJyBmaWxsPScjZWZlNmQ4Jy8+CjxnIGZpbGw9JyNjMDZhM2YnIGZpbGwtb3BhY2l0eT0nMC42Jz4KPGNpcmNsZSBjeD0nMCcgY3k9JzAnIHI9JzMwJy8+PGNpcmNsZSBjeD0nMTIwJyBjeT0nMCcgcj0nMzAnLz48Y2lyY2xlIGN4PScwJyBjeT0nMTIwJyByPSczMCcvPjxjaXJjbGUgY3g9JzEyMCcgY3k9JzEyMCcgcj0nMzAnLz4KPC9nPgo8ZyBmaWxsPScjOGY5YzYzJyBmaWxsLW9wYWNpdHk9JzAuNTUnPgo8Y2lyY2xlIGN4PSc2MCcgY3k9JzMyJyByPScyMCcvPjxjaXJjbGUgY3g9JzYwJyBjeT0nODgnIHI9JzIwJy8+PGNpcmNsZSBjeD0nMzInIGN5PSc2MCcgcj0nMjAnLz48Y2lyY2xlIGN4PSc4OCcgY3k9JzYwJyByPScyMCcvPgo8L2c+CjxnIGZpbGw9JyNiNThhM2MnIGZpbGwtb3BhY2l0eT0nMC41Jz4KPGNpcmNsZSBjeD0nNjAnIGN5PSc2MCcgcj0nMTYnLz4KPC9nPgo8Y2lyY2xlIGN4PSc2MCcgY3k9JzYwJyByPSc3JyBmaWxsPScjMzg0MTRmJyBmaWxsLW9wYWNpdHk9JzAuNzUnLz4KPGcgc3Ryb2tlPScjMzg0MTRmJyBzdHJva2Utb3BhY2l0eT0nMC4yOCcgc3Ryb2tlLXdpZHRoPScxLjQnIGZpbGw9J25vbmUnPgo8Y2lyY2xlIGN4PSc2MCcgY3k9JzYwJyByPSczMCcvPjxjaXJjbGUgY3g9JzAnIGN5PScwJyByPSczMCcvPjxjaXJjbGUgY3g9JzEyMCcgY3k9JzAnIHI9JzMwJy8+PGNpcmNsZSBjeD0nMCcgY3k9JzEyMCcgcj0nMzAnLz48Y2lyY2xlIGN4PScxMjAnIGN5PScxMjAnIHI9JzMwJy8+CjwvZz4KPC9zdmc+"); --bg-size:150px;
   }
   @media (prefers-color-scheme:dark){
     :root{
@@ -58,9 +58,11 @@
 
   *{box-sizing:border-box}
   body{margin:0;font-family:var(--sans)}
-  .bg-layer{position:fixed;inset:0;z-index:0;background:var(--bg-img);background-size:cover;background-position:center;background-repeat:no-repeat;opacity:.12;pointer-events:none}
-  .bg-wash{position:fixed;inset:0;z-index:0;background:radial-gradient(120% 80% at 50% 0%,transparent,var(--ground) 82%);pointer-events:none}
-  @media (max-width:720px){.bg-layer{opacity:.16}}
+  .bg-layer{position:fixed;inset:0;z-index:0;background-image:var(--bg-img);background-size:var(--bg-size,150px);background-repeat:repeat;opacity:.22;pointer-events:none}
+  .bg-wash{position:fixed;inset:0;z-index:0;background:var(--surface);opacity:.30;pointer-events:none}
+  @media (max-width:720px){.bg-layer{opacity:.26}}
+  :root[data-theme="dark"] .bg-layer{opacity:.10}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .bg-layer{opacity:.10}}
   .page{position:relative;z-index:1;direction:rtl;color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased;padding:clamp(14px,3vw,40px);overflow-x:hidden}
   .sec-head{direction:rtl}
   .wrap{max-width:1080px;margin:0 auto;width:100%}
@@ -108,15 +110,18 @@
   @media (max-width:720px){.eqop{justify-content:center;font-size:22px;padding:2px 0}}
 
   /* ---------- highlights ---------- */
-  .hl{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .hl{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
   @media (max-width:860px){.hl{grid-template-columns:1fr 1fr}}
   @media (max-width:480px){.hl{grid-template-columns:1fr}}
-  .hlcard{background:var(--surface);border:1px solid var(--line);border-right:4px solid var(--red);border-radius:var(--radius-sm);padding:15px 16px;box-shadow:var(--shadow);transition:transform .18s ease,box-shadow .18s ease}
-  .hlcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
-  .hlcard .ic{font-size:19px;margin-bottom:9px}
-  .hlcard .t{font-size:10.5px;color:var(--muted);margin-bottom:6px;line-height:1.35;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
-  .hlcard .m{font-size:19px;font-weight:800;letter-spacing:-.01em}
-  .hlcard .m small{display:block;font-size:12px;color:var(--muted);font-weight:600;margin:3px 0 0}
+  .hlcard{position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 16px;box-shadow:var(--shadow);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+  .hlcard::before{content:"";position:absolute;top:0;right:0;left:0;height:4px;background:linear-gradient(90deg,var(--red),#d98a3d)}
+  .hlcard::after{content:"";position:absolute;left:-30px;top:-30px;width:90px;height:90px;border-radius:50%;background:var(--red-soft);opacity:.7;transition:transform .3s ease}
+  .hlcard:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--red-line)}
+  .hlcard:hover::after{transform:scale(1.5)}
+  .hlcard .ic{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:var(--red-soft);border:1px solid var(--red-line);font-size:19px;margin-bottom:12px}
+  .hlcard .t{position:relative;z-index:1;font-size:10.5px;color:var(--muted);margin-bottom:7px;line-height:1.35;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+  .hlcard .m{position:relative;z-index:1;font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1.05;color:var(--ink)}
+  .hlcard .m small{display:block;font-size:12.5px;color:var(--red);font-weight:700;margin:5px 0 0;letter-spacing:0}
 
   /* ---------- chart panel ---------- */
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px clamp(14px,2.4vw,24px)}
@@ -363,42 +368,6 @@
       </div>
     </section>
 
-    <!-- Expenses focus -->
-    <div class="sec-head"><span class="bar"></span><h2>לאן הלך הכסף</h2><span class="note">סננו ומיינו — על מה הוצאנו וכמה עלה</span></div>
-    <section class="panel" id="expSec">
-      <div class="exgrid">
-        <div>
-          <table class="sumtbl">
-            <thead><tr><th>קטגוריה</th><th>סוג</th><th class="n">סכום</th><th class="n">חלק</th></tr></thead>
-            <tbody id="catBody"></tbody>
-            <tfoot><tr><td>סה״כ הוצאות</td><td></td><td class="n"><span class="sym">₪</span><span class="num">21,938</span></td><td class="n">100%</td></tr></tfoot>
-          </table>
-          <p class="hint2">לחצו על קטגוריה כדי לסנן את הטבלה שלצידה.</p>
-        </div>
-        <div>
-          <div class="extools">
-            <div class="filters" role="group" aria-label="סינון הוצאות">
-              <button class="fchip" data-ef="all" aria-pressed="true" type="button">הכל</button>
-              <button class="fchip" data-ef="fixed" aria-pressed="false" type="button">קבועות</button>
-              <button class="fchip" data-ef="var" aria-pressed="false" type="button">חד־פעמיות</button>
-            </div>
-            <div class="filters" role="group" aria-label="מיון הוצאות">
-              <button class="schip" data-es="amt_desc" aria-pressed="true" type="button">סכום ⬇</button>
-              <button class="schip" data-es="amt_asc" aria-pressed="false" type="button">סכום ⬆</button>
-              <button class="schip" data-es="date" aria-pressed="false" type="button">תאריך</button>
-            </div>
-          </div>
-          <div class="tblwrap" style="padding:0">
-            <table class="dt" style="min-width:auto">
-              <thead><tr><th>תאריך</th><th>תיאור</th><th>קטגוריה</th><th>סוג</th><th class="n">סכום</th></tr></thead>
-              <tbody id="exFocusBody"></tbody>
-              <tfoot><tr><td colspan="2" id="exFootLbl">סה״כ כל ההוצאות</td><td></td><td class="n"><span class="badge-cnt" id="exFootCnt">16</span></td><td class="n neg"><span class="sym">₪</span><span class="num" id="exFootTot">21,938</span></td></tr></tfoot>
-            </table>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- Detail tabs -->
     <div class="sec-head"><span class="bar"></span><h2>פירוט מלא</h2><span class="note">כל הנתונים לפי טאב</span></div>
     <section class="tabsec">
@@ -455,6 +424,42 @@
           <tbody id="payBody"></tbody>
           <tfoot><tr><td>סה״כ הועבר לבעל הנכס</td><td></td><td></td><td></td><td></td><td class="n pos"><span class="sym">₪</span><span class="num">28,972</span></td></tr></tfoot>
         </table></div>
+      </div>
+    </section>
+
+    <!-- Expenses focus -->
+    <div class="sec-head"><span class="bar"></span><h2>לאן הלך הכסף</h2><span class="note">סננו ומיינו — על מה הוצאנו וכמה עלה</span></div>
+    <section class="panel" id="expSec">
+      <div class="exgrid">
+        <div>
+          <table class="sumtbl">
+            <thead><tr><th>קטגוריה</th><th>סוג</th><th class="n">סכום</th><th class="n">חלק</th></tr></thead>
+            <tbody id="catBody"></tbody>
+            <tfoot><tr><td>סה״כ הוצאות</td><td></td><td class="n"><span class="sym">₪</span><span class="num">21,938</span></td><td class="n">100%</td></tr></tfoot>
+          </table>
+          <p class="hint2">לחצו על קטגוריה כדי לסנן את הטבלה שלצידה.</p>
+        </div>
+        <div>
+          <div class="extools">
+            <div class="filters" role="group" aria-label="סינון הוצאות">
+              <button class="fchip" data-ef="all" aria-pressed="true" type="button">הכל</button>
+              <button class="fchip" data-ef="fixed" aria-pressed="false" type="button">קבועות</button>
+              <button class="fchip" data-ef="var" aria-pressed="false" type="button">חד־פעמיות</button>
+            </div>
+            <div class="filters" role="group" aria-label="מיון הוצאות">
+              <button class="schip" data-es="amt_desc" aria-pressed="true" type="button">סכום ⬇</button>
+              <button class="schip" data-es="amt_asc" aria-pressed="false" type="button">סכום ⬆</button>
+              <button class="schip" data-es="date" aria-pressed="false" type="button">תאריך</button>
+            </div>
+          </div>
+          <div class="tblwrap" style="padding:0">
+            <table class="dt" style="min-width:auto">
+              <thead><tr><th>תאריך</th><th>תיאור</th><th>קטגוריה</th><th>סוג</th><th class="n">סכום</th></tr></thead>
+              <tbody id="exFocusBody"></tbody>
+              <tfoot><tr><td colspan="2" id="exFootLbl">סה״כ כל ההוצאות</td><td></td><td class="n"><span class="badge-cnt" id="exFootCnt">16</span></td><td class="n neg"><span class="sym">₪</span><span class="num" id="exFootTot">21,938</span></td></tr></tfoot>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
 

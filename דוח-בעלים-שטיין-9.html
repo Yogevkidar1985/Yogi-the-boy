@@ -114,6 +114,10 @@
   .legend2{display:flex;gap:16px;font-size:12.5px;color:var(--muted)}
   .legend2 span{display:inline-flex;align-items:center;gap:7px}
   .sw{width:11px;height:11px;border-radius:3px}
+  .mchips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
+  .mchips .mchip{font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--muted);background:var(--surface-3);border:1px solid var(--line);border-radius:999px;padding:7px 13px;transition:all .15s ease}
+  .mchips .mchip:hover{color:var(--ink);border-color:var(--line-strong)}
+  .mchips .mchip[aria-pressed="true"]{background:var(--red);color:#fff;border-color:var(--red)}
   .chart-grid{display:grid;grid-template-columns:1.55fr 1fr;gap:18px;align-items:stretch}
   @media (max-width:840px){.chart-grid{grid-template-columns:1fr}}
   .chartbox{position:relative}
@@ -287,6 +291,7 @@
           <span><span class="sw" style="background:var(--exp)"></span>הוצאות</span>
         </div>
       </div>
+      <div class="mchips" id="mchips" role="group" aria-label="בחירת חודש לפירוט"></div>
       <div class="chart-grid">
         <div class="chartbox">
           <svg class="chart" id="chart" viewBox="0 0 720 320" role="img" aria-label="גרף הכנסות והוצאות חודשי"></svg>
@@ -562,7 +567,19 @@
   function select(i){
     selected=i;renderDetail(i);
     svg.querySelectorAll(".mlabel").forEach(function(l){l.classList.toggle("on",+l.getAttribute("data-mi")===i);});
+    mchips.querySelectorAll(".mchip").forEach(function(b,bi){b.setAttribute("aria-pressed",String(bi===i));});
   }
+
+  // month selector chips
+  var MLABEL=["דצמבר 2025","ינואר","פברואר","מרץ","אפריל","מאי","יוני"];
+  var mchips=document.getElementById("mchips");
+  M.forEach(function(m,i){
+    var b=document.createElement("button");
+    b.type="button";b.className="mchip";b.textContent=MLABEL[i];
+    b.setAttribute("aria-pressed",String(i===selected));
+    b.addEventListener("click",function(){select(i);});
+    mchips.appendChild(b);
+  });
 
   renderChart();renderDetail(selected);
 

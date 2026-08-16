@@ -127,6 +127,21 @@
     outline: 2px solid var(--accent); outline-offset: 1px;
   }
   .hint { position: absolute; top: 100%; inset-inline-start: 2px; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+  .hint.err { color: var(--fire-ink); font-weight: 600; }
+  .ac {
+    position: absolute; top: calc(100% + 4px); inset-inline: 0; z-index: 30;
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(7,31,61,.18); overflow: hidden; min-width: 240px;
+  }
+  .ac button {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    width: 100%; background: none; border: none; font: inherit; color: var(--ink);
+    padding: 10px 14px; cursor: pointer; text-align: start;
+  }
+  .ac button:hover, .ac button.sel { background: var(--card-2); }
+  .ac .city { font-weight: 650; }
+  .ac .sub { color: var(--ink-3); font-size: 12px; }
+  .ac .code { font-family: ui-monospace, Menlo, monospace; color: var(--ink-2); font-size: 13px; }
   .swap {
     background: var(--card-2); border: 1px solid var(--border); border-radius: 50%;
     width: 38px; height: 38px; cursor: pointer; color: var(--ink-2); font-size: 16px;
@@ -276,16 +291,16 @@
       <div class="fields">
         <div class="field">
           <label for="fOrigin">מאיפה</label>
-          <input id="fOrigin" name="origin" list="airportsFrom" value="TLV" required autocomplete="off" placeholder="עיר או קוד">
-          <datalist id="airportsFrom"></datalist>
-          <span class="hint ltr" id="hintOrigin">Ben Gurion International</span>
+          <input id="fOrigin" name="origin" value="תל אביב (TLV)" data-code="TLV" required autocomplete="off" placeholder="עיר, למשל: תל אביב">
+          <div class="ac" id="acOrigin" hidden></div>
+          <span class="hint" id="errOrigin"></span>
         </div>
         <button type="button" class="swap" id="swapBtn" title="החלפת כיוון" aria-label="החלפת כיוון">⇄</button>
         <div class="field">
           <label for="fDest">לאן</label>
-          <input id="fDest" name="destination" list="airportsTo" value="LHR" required autocomplete="off" placeholder="עיר או קוד">
-          <datalist id="airportsTo"></datalist>
-          <span class="hint ltr" id="hintDest">Heathrow</span>
+          <input id="fDest" name="destination" value="" data-code="" required autocomplete="off" placeholder="עיר, למשל: ברגמו או לונדון">
+          <div class="ac" id="acDest" hidden></div>
+          <span class="hint" id="errDest"></span>
         </div>
         <div class="field dates">
           <label for="fDep">יציאה</label>
@@ -453,37 +468,82 @@ for (const [tabId, formSel] of Object.entries(forms)) {
   });
 }
 
-// ---- airport autocomplete ----
-async function wireAutocomplete(inputId, listId, hintId) {
+// ---- airport autocomplete (Google-Flights style: type a city, pick from a list) ----
+function wireAutocomplete(inputId, acId, errId) {
   const input = document.getElementById(inputId);
-  const list = document.getElementById(listId);
-  input.addEventListener('input', async () => {
+  const ac = document.getElementById(acId);
+  let timer = null, items = [], sel = -1;
+
+  function close() { ac.hidden = true; sel = -1; }
+  function pick(a) {
+    input.value = `${a.city ?? a.name} (${a.code})`;
+    input.dataset.code = a.code;
+    document.getElementById(errId).textContent = '';
+    document.getElementById(errId).classList.remove('err');
+    close();
+  }
+  function renderList() {
+    if (!items.length) { close(); return; }
+    ac.innerHTML = items.map((a, i) => `<button type="button" data-i="${i}" class="${i === sel ? 'sel' : ''}">
+      <span><span class="city">${esc(a.city ?? a.name)}</span> <span class="sub">${esc(a.city ? (a.name || '') : '')}${a.country ? ' · ' + esc(a.country) : ''}</span></span>
+      <span class="code ltr">${esc(a.code)}</span>
+    </button>`).join('');
+    ac.hidden = false;
+    ac.querySelectorAll('button').forEach(b => b.addEventListener('mousedown', (ev) => {
+      ev.preventDefault();
+      pick(items[Number(b.dataset.i)]);
+    }));
+  }
+  input.addEventListener('input', () => {
+    input.dataset.code = '';
+    clearTimeout(timer);
     const q = input.value.trim();
-    if (q.length < 2) return;
-    try {
-      const airports = await api('/api/airports?q=' + encodeURIComponent(q));
-      list.innerHTML = airports.map(a => `<option value="${a.code}">${esc(a.name)}</option>`).join('');
-      const exact = airports.find(a => a.code === q.toUpperCase());
-      if (exact) document.getElementById(hintId).textContent = exact.name;
-    } catch {}
+    if (q.length < 2) { close(); return; }
+    timer = setTimeout(async () => {
+      try {
+        items = await api('/api/airports?q=' + encodeURIComponent(q));
+        sel = -1;
+        renderList();
+      } catch { close(); }
+    }, 150);
   });
-  input.addEventListener('change', async () => {
-    const code = input.value.trim().toUpperCase().slice(0, 3);
-    try {
-      const airports = await api('/api/airports?q=' + encodeURIComponent(code));
-      const exact = airports.find(a => a.code === code);
-      document.getElementById(hintId).textContent = exact ? exact.name : '';
-    } catch {}
+  input.addEventListener('keydown', (ev) => {
+    if (ac.hidden) return;
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); sel = Math.min(items.length - 1, sel + 1); renderList(); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); sel = Math.max(0, sel - 1); renderList(); }
+    else if (ev.key === 'Enter' && sel >= 0) { ev.preventDefault(); pick(items[sel]); }
+    else if (ev.key === 'Escape') close();
   });
+  input.addEventListener('blur', () => setTimeout(close, 150));
+  input.addEventListener('focus', () => { if (items.length && input.value.trim().length >= 2) ac.hidden = false; });
 }
-wireAutocomplete('fOrigin', 'airportsFrom', 'hintOrigin');
-wireAutocomplete('fDest', 'airportsTo', 'hintDest');
+wireAutocomplete('fOrigin', 'acOrigin', 'errOrigin');
+wireAutocomplete('fDest', 'acDest', 'errDest');
+
+/** Resolve an input to an airport code: picked value, or free text via the API. */
+async function resolveField(inputId, errId) {
+  const input = document.getElementById(inputId);
+  const err = document.getElementById(errId);
+  err.textContent = ''; err.classList.remove('err');
+  if (input.dataset.code) return input.dataset.code;
+  const q = input.value.trim();
+  if (!q) { err.textContent = 'חסר יעד'; err.classList.add('err'); return null; }
+  try {
+    const hit = await api('/api/airports/resolve?q=' + encodeURIComponent(q));
+    input.value = `${hit.city ?? hit.name} (${hit.code})`;
+    input.dataset.code = hit.code;
+    return hit.code;
+  } catch {
+    err.textContent = `לא מצאתי שדה תעופה עבור "${q}" — נסה שם עיר`;
+    err.classList.add('err');
+    return null;
+  }
+}
 
 $('#swapBtn').addEventListener('click', () => {
-  const a = $('#fOrigin').value, b = $('#fDest').value;
-  $('#fOrigin').value = b; $('#fDest').value = a;
-  const ha = $('#hintOrigin').textContent, hb = $('#hintDest').textContent;
-  $('#hintOrigin').textContent = hb; $('#hintDest').textContent = ha;
+  const o = $('#fOrigin'), d = $('#fDest');
+  [o.value, d.value] = [d.value, o.value];
+  [o.dataset.code, d.dataset.code] = [d.dataset.code, o.dataset.code];
 });
 
 // ---- health/providers ----
@@ -603,11 +663,16 @@ async function loadDateStrip(origin, destination, selectedDate) {
 // ---- regular search ----
 $('#searchForm').addEventListener('submit', async (ev) => {
   ev.preventDefault();
+  const [originCode, destCode] = await Promise.all([
+    resolveField('fOrigin', 'errOrigin'),
+    resolveField('fDest', 'errDest'),
+  ]);
+  if (!originCode || !destCode) return;
   $('#spin').classList.add('on');
   $('#resultsSec').hidden = true; $('#destsSec').hidden = true; $('#recsBox').innerHTML = '';
   const p = new URLSearchParams({
-    origin: $('#fOrigin').value.trim().toUpperCase().slice(0, 3),
-    destination: $('#fDest').value.trim().toUpperCase().slice(0, 3),
+    origin: originCode,
+    destination: destCode,
     departureDate: $('#fDep').value,
     adults: $('#fPax').value.replace('+', ''),
     cabin: $('#fCabin').value,

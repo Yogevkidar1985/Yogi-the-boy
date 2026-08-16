@@ -12,7 +12,8 @@ import { buildDefaultRegistry } from '../providers/registry.js';
 import { AnalysisService } from '../analyzer/service.js';
 import { FlightAgent, buildQuery } from '../agent/agent.js';
 import { parseTripRequest } from '../agent/parser.js';
-import { loadAirports, nearbyAirports } from '../core/airports.js';
+import { loadAirports, nearbyAirports, airportName, isValidAirport } from '../core/airports.js';
+import { searchCities, resolveAirport, cityForCode } from '../core/cities.js';
 import { routeKey } from '../core/types.js';
 import { currencyService } from '../core/currency.js';
 import { bookingLinks } from '../core/links.js';
@@ -274,12 +275,46 @@ app.get('/api/deals', (req, res) => {
 // ---- reference data -------------------------------------------------------
 
 app.get('/api/airports', (req, res) => {
-  const q = String(req.query.q ?? '').toLowerCase();
-  const all = [...loadAirports().entries()].map(([code, name]) => ({ code, name }));
-  const filtered = q
-    ? all.filter((a) => a.code.toLowerCase().includes(q) || a.name.toLowerCase().includes(q)).slice(0, 25)
-    : all.slice(0, 25);
-  res.json(filtered);
+  const q = String(req.query.q ?? '').trim();
+  if (!q) return res.json([]);
+  // 1) city search (Hebrew/English) — the Google-Flights-like path
+  const cityHits = searchCities(q, 8).map((s) => ({
+    code: s.code,
+    city: s.city,
+    country: s.country,
+    name: airportName(s.code) ?? s.code,
+  }));
+  // 2) airport-name / code search from the full airports DB
+  const ql = q.toLowerCase();
+  const seen = new Set(cityHits.map((c) => c.code));
+  const nameHits: { code: string; city: string | null; country?: string; name: string }[] = [];
+  for (const [code, name] of loadAirports().entries()) {
+    if (nameHits.length + cityHits.length >= 10) break;
+    if (seen.has(code)) continue;
+    if (code.toLowerCase() === ql || name.toLowerCase().includes(ql)) {
+      nameHits.push({ code, city: cityForCode(code)?.city ?? null, name });
+      seen.add(code);
+    }
+  }
+  res.json([...cityHits, ...nameHits]);
+});
+
+/** Resolve free text (Hebrew/English city, airport name, or code) → airport. */
+app.get('/api/airports/resolve', (req, res) => {
+  const q = String(req.query.q ?? '').trim();
+  if (!q) return res.status(400).json({ error: 'q required' });
+  const hit = resolveAirport(q);
+  if (hit && isValidAirport(hit.code)) {
+    return res.json({ code: hit.code, city: hit.city, name: airportName(hit.code) });
+  }
+  // fall back to airport-name substring from the full DB
+  const ql = q.toLowerCase();
+  for (const [code, name] of loadAirports().entries()) {
+    if (name.toLowerCase().includes(ql)) {
+      return res.json({ code, city: cityForCode(code)?.city ?? null, name });
+    }
+  }
+  res.status(404).json({ error: `no airport found for "${q}"` });
 });
 
 app.get('/api/airports/:code/nearby', (req, res) => {

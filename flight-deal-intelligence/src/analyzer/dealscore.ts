@@ -101,18 +101,18 @@ export function computeDealScore(flight: FlightResult, ctx: MarketContext): Deal
 
   const explanation: string[] = [];
   if (vsAverage !== null && vsAverage < -0.05) {
-    explanation.push(`${Math.round(Math.abs(vsAverage) * 100)}% below the route's ${stats?.windowDays ?? 90}-day average`);
+    explanation.push(`${Math.round(Math.abs(vsAverage) * 100)}% מתחת לממוצע המסלול ב-${stats?.windowDays ?? 90} הימים האחרונים`);
   }
   if (percentile !== null && percentile <= 10) {
-    explanation.push(`cheaper than ${100 - percentile}% of observed prices on this route`);
+    explanation.push(`זול מ-${100 - percentile}% מהמחירים שנצפו במסלול הזה`);
   }
   if (vsLowest !== null && vsLowest <= 0.05) {
-    explanation.push(vsLowest <= 0 ? 'lowest price we have observed on this route' : `only ${Math.round(vsLowest * 100)}% above the historical low`);
+    explanation.push(vsLowest <= 0 ? 'המחיר הנמוך ביותר שנצפה במסלול הזה' : `רק ${Math.round(vsLowest * 100)}% מעל השפל ההיסטורי`);
   }
-  if (flight.stops === 0) explanation.push('direct flight');
-  if (flight.bags > 0) explanation.push('baggage included');
+  if (flight.stops === 0) explanation.push('טיסה ישירה');
+  if (flight.bags > 0) explanation.push('כבודה כלולה');
   if (previousLow && price < previousLow * 0.85) {
-    explanation.push(`price dropped ${Math.round((1 - price / previousLow) * 100)}% since the previous check`);
+    explanation.push(`המחיר ירד ${Math.round((1 - price / previousLow) * 100)}% מאז הבדיקה הקודמת`);
   }
 
   return {
@@ -125,7 +125,7 @@ export function computeDealScore(flight: FlightResult, ctx: MarketContext): Deal
     isErrorFareCandidate,
     explanation,
     disclaimer: isErrorFareCandidate
-      ? 'Price appears unusually low. Verify directly with the airline before purchasing.'
+      ? 'המחיר נמוך באופן חריג — מומלץ לוודא ישירות מול חברת התעופה לפני רכישה.'
       : undefined,
   };
 }

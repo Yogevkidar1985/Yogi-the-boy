@@ -75,7 +75,7 @@ describe('deal score (§15)', () => {
     const suspicious = flight({ normalizedPrice: 180 });
     const a = computeDealScore(suspicious, { marketPrices: [180, 460, 500, 520], stats, history });
     expect(a.isErrorFareCandidate).toBe(true);
-    expect(a.disclaimer).toMatch(/verify directly/i);
+    expect(a.disclaimer).toMatch(/לוודא ישירות/);
   });
 
   it('value score prefers direct quality flights (§46)', () => {

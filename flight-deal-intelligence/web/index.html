@@ -382,6 +382,7 @@
 
   <section id="resultsSec" hidden>
     <h3 class="sec" id="resultsTitle">תוצאות</h3>
+    <div id="priceLevel" style="margin-bottom:10px"></div>
     <div class="sorttabs" role="tablist" aria-label="מיון">
       <button data-sort="best" aria-selected="true"><span class="t">הכי משתלם</span><span class="v" id="vBest">—</span></button>
       <button data-sort="cheap" aria-selected="false"><span class="t">הכי זול</span><span class="v" id="vCheap">—</span></button>
@@ -657,7 +658,30 @@ function flightRow(f) {
   </div>`;
 }
 
+/** Google-style price-level banner: is now a good time to book this route? */
+function renderPriceLevel() {
+  const box = $('#priceLevel');
+  const cheap = [...flights].sort((a, b) => a.normalizedPrice - b.normalizedPrice)[0];
+  const va = cheap?.analysis?.vsAverage;
+  if (va == null) { box.innerHTML = ''; return; }
+  const pct = Math.round(Math.abs(va) * 100);
+  if (va <= -0.12) {
+    box.innerHTML = `<div class="card" style="padding:10px 14px; border-inline-start:4px solid var(--good)">
+      <b style="color:var(--good-ink)">📉 המחירים כרגע נמוכים מהרגיל</b>
+      <span class="meta"> — ${pct}% מתחת לממוצע ההיסטורי של המסלול. זמן טוב להזמין.</span></div>`;
+  } else if (va >= 0.12) {
+    box.innerHTML = `<div class="card" style="padding:10px 14px; border-inline-start:4px solid var(--warning)">
+      <b style="color:var(--warn-ink)">📈 המחירים כרגע גבוהים מהרגיל</b>
+      <span class="meta"> — ${pct}% מעל הממוצע. שווה לעקוב 🔔 ולחכות לירידה.</span></div>`;
+  } else {
+    box.innerHTML = `<div class="card" style="padding:10px 14px">
+      <b>➡️ המחירים בטווח הרגיל</b>
+      <span class="meta"> למסלול הזה על פי ההיסטוריה שנאספה.</span></div>`;
+  }
+}
+
 function renderFlights() {
+  renderPriceLevel();
   let list = sorted();
   if (activeAirlines.size) list = list.filter(f => activeAirlines.has(f.airline));
   $('#flightList').innerHTML = list.slice(0, 12).map(flightRow).join('') ||

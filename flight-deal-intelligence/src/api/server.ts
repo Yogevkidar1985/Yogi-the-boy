@@ -20,6 +20,15 @@ import { bookingLinks } from '../core/links.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const db = getDatabase();
+
+// One-time cleanup: purge legacy records stored before the provider field
+// mapping was fixed (airline codes like 'XX' or sliced names) so stale broken
+// rows never surface in the deals feed.
+db.db.exec(`
+  DELETE FROM deal_scores WHERE flight_result_id IN
+    (SELECT id FROM flight_results WHERE airline = 'XX' OR length(airline) > 3);
+  DELETE FROM flight_results WHERE airline = 'XX' OR length(airline) > 3;
+`);
 const registry = buildDefaultRegistry(db);
 const analysis = new AnalysisService(db);
 const agent = new FlightAgent(registry, analysis, db);
@@ -106,18 +115,55 @@ app.get('/api/flights/:id', (req, res) => {
   res.json(row);
 });
 
-// ---- AI search (§30, §66) -------------------------------------------------
+// ---- AI search (§30, §66) — runs as a background job with live progress ----
+// A wide scan can take minutes, far beyond hosting proxies' ~100s request
+// limit, so the search runs server-side and the UI polls for progress.
 
-app.post('/api/ai/search', async (req, res) => {
+interface AiJob {
+  id: string;
+  status: 'running' | 'done' | 'error';
+  progress: number;
+  total: number;
+  bestSoFar: unknown | null;
+  report?: unknown;
+  error?: string;
+  createdAt: number;
+}
+const aiJobs = new Map<string, AiJob>();
+
+app.post('/api/ai/search', (req, res) => {
   const schema = z.object({ prompt: z.string().min(3).max(500) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  try {
-    const report = await agent.run(parsed.data.prompt);
-    res.json(report);
-  } catch (err) {
-    res.status(502).json({ error: 'agent failed', detail: String(err) });
+  // prune jobs older than an hour
+  for (const [id, job] of aiJobs) {
+    if (Date.now() - job.createdAt > 3600_000) aiJobs.delete(id);
   }
+  const id = randomUUID().slice(0, 8);
+  const job: AiJob = { id, status: 'running', progress: 0, total: 0, bestSoFar: null, createdAt: Date.now() };
+  aiJobs.set(id, job);
+  void (async () => {
+    try {
+      const report = await agent.run(parsed.data.prompt, (done, total, bestSoFar) => {
+        job.progress = done;
+        job.total = total;
+        job.bestSoFar = bestSoFar;
+      });
+      job.report = report;
+      job.status = 'done';
+      broadcast('deals', { jobId: id });
+    } catch (err) {
+      job.status = 'error';
+      job.error = err instanceof Error ? err.message : String(err);
+    }
+  })();
+  res.status(202).json({ jobId: id });
+});
+
+app.get('/api/ai/jobs/:id', (req, res) => {
+  const job = aiJobs.get(req.params.id);
+  if (!job) return res.status(404).json({ error: 'job not found' });
+  res.json(job);
 });
 
 app.post('/api/ai/parse', (req, res) => {

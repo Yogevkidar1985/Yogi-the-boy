@@ -25,6 +25,8 @@ export interface DateMatrixCell {
   isLowest: boolean;
 }
 
+export type AgentProgressFn = (done: number, total: number, bestSoFar: ScoredFlight | null) => void;
+
 export interface AgentSearchReport {
   request: ParsedTripRequest;
   totalQueries: number;
@@ -153,19 +155,24 @@ export class FlightAgent {
   }
 
   /** Full agent flow from natural language (§30, §82). */
-  async run(text: string): Promise<AgentSearchReport> {
+  async run(text: string, onProgress?: AgentProgressFn): Promise<AgentSearchReport> {
     const started = Date.now();
     const request = parseTripRequest(text);
-    return this.runParsed(request, started);
+    return this.runParsed(request, started, onProgress);
   }
 
-  async runParsed(request: ParsedTripRequest, started = Date.now()): Promise<AgentSearchReport> {
+  async runParsed(
+    request: ParsedTripRequest,
+    started = Date.now(),
+    onProgress?: AgentProgressFn
+  ): Promise<AgentSearchReport> {
     const queries =
       request.mode === 'WEEKEND' ? this.buildWeekendQueries(request) : this.buildSearchMatrix(request);
 
     const providersUsed = new Set<string>();
     const allScored: ScoredFlight[] = [];
     const cellResults: DateMatrixCell[] = [];
+    let done = 0;
 
     await mapLimit(queries, CONCURRENCY, async (q) => {
       const outcome = await this.registry.search(q);
@@ -179,6 +186,11 @@ export class FlightAgent {
         price: low,
         isLowest: false,
       });
+      done++;
+      if (onProgress) {
+        const bestSoFar = [...allScored].sort((a, b) => a.normalizedPrice - b.normalizedPrice)[0] ?? null;
+        onProgress(done, queries.length, bestSoFar);
+      }
     });
 
     // mark the lowest matrix cell (§19)

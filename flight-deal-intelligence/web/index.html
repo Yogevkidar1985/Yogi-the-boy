@@ -162,6 +162,15 @@
   }
   .spin { display: none; color: var(--ink-3); font-size: 13.5px; padding: 8px 2px; }
   .spin.on { display: block; }
+  .progress-outer { height: 8px; background: var(--card-2); border-radius: 99px; overflow: hidden; }
+  .progress-inner { height: 100%; background: var(--accent); border-radius: 99px; transition: width .6s ease; }
+  .avlogo {
+    width: 36px; height: 36px; border-radius: 50%; background: var(--card-2);
+    border: 1px solid var(--border); display: inline-flex; align-items: center;
+    justify-content: center; font-weight: 750; font-size: 12px; color: var(--ink-2);
+    font-family: ui-monospace, Menlo, monospace; flex-shrink: 0;
+  }
+  .buy .pr.cheap { color: var(--good-ink); }
 
   /* ---- layout ---- */
   main { max-width: 1060px; margin: 0 auto; padding: 26px 20px 80px; }
@@ -595,9 +604,11 @@ function renderAirlineChips() {
 function flightRow(f) {
   const a = f.analysis || {};
   const why = (a.explanation || []).slice(0, 3).map(e => `<li>${esc(e)}</li>`).join('');
+  const isCheap = (a.dealScore ?? 0) >= 70 || (a.vsAverage != null && a.vsAverage < -0.1);
   return `<div class="card flight">
     <div class="itin">
       <div class="leg">
+        <span class="avlogo">${esc((f.airline || '?').slice(0, 2))}</span>
         <span class="times ltr num">${hhmm(f.departureTime)} – ${hhmm(f.arrivalTime)}</span>
         <span class="airline">${esc(f.airlineName || f.airline)} <span class="ltr muted">${esc(f.flightNumber || '')}</span></span>
       </div>
@@ -616,7 +627,7 @@ function flightRow(f) {
       ${why ? `<ul class="whylist">${why}</ul>` : ''}
     </div>
     <div class="buy">
-      <span class="pr num">${fmt(f.normalizedPrice, f.normalizedCurrency)}</span>
+      <span class="pr num ${isCheap ? 'cheap' : ''}">${fmt(f.normalizedPrice, f.normalizedCurrency)}</span>
       <span class="per">נבדק לפני ${f.freshnessMinutes ?? '?'} דק׳ · ${esc(f.provider)}</span>
       <a class="book-btn" href="${esc(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה ↗</a>
       <div class="linkrow">
@@ -709,40 +720,71 @@ $('#searchForm').addEventListener('submit', async (ev) => {
   } finally { $('#spin').classList.remove('on'); }
 });
 
-// ---- AI search ----
+// ---- AI search: background job + live progress (wide scans take minutes) ----
+let aiPollTimer = null;
+
+function renderAiReport(r) {
+  flights = r.top || [];
+  activeAirlines.clear();
+  $('#resultsTitle').innerHTML = `החיפוש החכם <span class="muted">(${r.totalQueries} שאילתות · ${r.totalResults} מחירים · ${(r.elapsedMs/1000).toFixed(0)} שנ׳)</span>`;
+  renderAirlineChips(); renderFlights();
+  $('#resultsSec').hidden = false;
+  if (r.recommendations?.length) {
+    $('#recsBox').innerHTML = r.recommendations.map(x => `<p class="muted">💡 ${esc(x)}</p>`).join('');
+  }
+  if (r.byDestination?.length > 1) {
+    $('#destGrid').innerHTML = r.byDestination.slice(0, 12).map(d => `<div class="card dealcard">
+      <span class="dest">${esc(d.destinationName || d.destination)} <span class="muted ltr">${esc(d.destination)}</span></span>
+      <span class="pr num">${fmt(d.best.normalizedPrice, d.best.normalizedCurrency)}</span>
+      <span class="muted ltr">${esc(d.best.departureDate)}</span>
+      <a href="${esc(d.best.bookingUrl)}" target="_blank" rel="noopener">להזמנה ↗</a>
+    </div>`).join('');
+    $('#destsSec').hidden = false;
+  }
+  loadDeals();
+}
+
 $('#aiForm').addEventListener('submit', async (ev) => {
   ev.preventDefault();
   const prompt = $('#aiPrompt').value.trim();
   if (prompt.length < 3) return;
-  $('#spin').classList.add('on');
+  clearInterval(aiPollTimer);
+  $('#resultsSec').hidden = false; $('#destsSec').hidden = true; $('#recsBox').innerHTML = '';
+  $('#airlineChips').innerHTML = '';
+  $('#resultsTitle').textContent = 'החיפוש החכם רץ…';
+  $('#flightList').innerHTML = `<div class="card" style="padding:18px">
+    <div class="progress-outer"><div class="progress-inner" id="aiBar" style="width:3%"></div></div>
+    <p class="meta" id="aiProgressText" style="margin:10px 0 0">מתחיל סריקה…</p>
+  </div>`;
+  $('#resultsSec').scrollIntoView({ behavior: 'smooth' });
   try {
-    const r = await api('/api/ai/search', {
+    const { jobId } = await api('/api/ai/search', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt }),
     });
-    flights = r.top || [];
-    activeAirlines.clear();
-    $('#resultsTitle').innerHTML = `החיפוש החכם <span class="muted">(${r.totalQueries} שאילתות · ${r.totalResults} מחירים · ${(r.elapsedMs/1000).toFixed(1)} שנ׳)</span>`;
-    renderAirlineChips(); renderFlights();
-    $('#resultsSec').hidden = false;
-    if (r.recommendations?.length) {
-      $('#recsBox').innerHTML = r.recommendations.map(x => `<p class="muted">💡 ${esc(x)}</p>`).join('');
-    }
-    if (r.byDestination?.length > 1) {
-      $('#destGrid').innerHTML = r.byDestination.slice(0, 12).map(d => `<div class="card dealcard">
-        <span class="dest"><span class="ltr">${esc(d.destination)}</span> <span class="muted">${esc(d.destinationName || '')}</span></span>
-        <span class="pr num">${fmt(d.best.normalizedPrice)}</span>
-        <span class="muted ltr">${esc(d.best.departureDate)}</span>
-        <a href="${esc(d.best.bookingUrl)}" target="_blank" rel="noopener">להזמנה ↗</a>
-      </div>`).join('');
-      $('#destsSec').hidden = false;
-    }
-    loadDeals();
-    $('#resultsSec').scrollIntoView({ behavior: 'smooth' });
-  } catch {
+    aiPollTimer = setInterval(async () => {
+      try {
+        const job = await api('/api/ai/jobs/' + jobId);
+        if (job.status === 'running') {
+          const pct = job.total ? Math.max(3, Math.round((job.progress / job.total) * 100)) : 3;
+          $('#aiBar').style.width = pct + '%';
+          const best = job.bestSoFar;
+          $('#aiProgressText').innerHTML = `נסרקו ${job.progress}/${job.total || '?'} צירופים` +
+            (best ? ` · הזול ביותר עד כה: <b>${fmt(best.normalizedPrice, best.normalizedCurrency)}</b> ל-${esc(best.destination)} (${esc(best.departureDate)})` : '');
+        } else if (job.status === 'done') {
+          clearInterval(aiPollTimer);
+          renderAiReport(job.report);
+        } else {
+          clearInterval(aiPollTimer);
+          $('#resultsTitle').textContent = 'החיפוש החכם נכשל';
+          $('#flightList').innerHTML = `<div class="card" style="padding:16px"><span class="meta">${esc(job.error || 'שגיאה לא ידועה')}</span></div>`;
+        }
+      } catch { /* keep polling */ }
+    }, 1500);
+  } catch (e) {
     $('#resultsTitle').textContent = 'החיפוש החכם נכשל — נסה שוב.';
-    $('#resultsSec').hidden = false;
-  } finally { $('#spin').classList.remove('on'); }
+    $('#flightList').innerHTML = '';
+  }
 });
 
 // ---- anywhere ----

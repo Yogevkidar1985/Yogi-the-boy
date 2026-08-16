@@ -116,7 +116,8 @@
     padding: 7px 14px; border-radius: 999px; cursor: pointer;
   }
   .tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
-  .fields { display: grid; grid-template-columns: 1.2fr auto 1.2fr 1fr 1fr .9fr .9fr auto; gap: 8px; align-items: end; }
+  .fields { display: grid; grid-template-columns: 1.2fr auto 1.2fr 1fr 1fr auto; gap: 8px; align-items: end; }
+  .triptype { display: inline-flex; gap: 4px; }
   .field { display: flex; flex-direction: column; gap: 4px; position: relative; }
   .field label { font-size: 11.5px; font-weight: 600; color: var(--ink-3); letter-spacing: .04em; }
   .field input, .field select {
@@ -297,6 +298,22 @@
     </div>
 
     <form id="searchForm">
+      <div class="row" style="margin-bottom:10px; gap:14px">
+        <span class="triptype" role="group" aria-label="סוג נסיעה">
+          <button type="button" class="chip" data-trip="round" aria-pressed="true">⇄ הלוך ושוב</button>
+          <button type="button" class="chip" data-trip="oneway" aria-pressed="false">→ כיוון אחד</button>
+        </span>
+        <select id="fPax" name="adults" aria-label="נוסעים" class="chip" style="padding:6px 12px">
+          <option value="1">נוסע 1</option><option value="2">2 נוסעים</option>
+          <option value="3">3 נוסעים</option><option value="4">4 נוסעים</option><option value="5">5 נוסעים</option>
+        </select>
+        <select id="fCabin" name="cabin" aria-label="מחלקה" class="chip" style="padding:6px 12px">
+          <option value="ECONOMY">תיירים</option>
+          <option value="PREMIUM_ECONOMY">פרימיום</option>
+          <option value="BUSINESS">עסקים</option>
+          <option value="FIRST">ראשונה</option>
+        </select>
+      </div>
       <div class="fields">
         <div class="field">
           <label for="fOrigin">מאיפה</label>
@@ -315,25 +332,9 @@
           <label for="fDep">יציאה</label>
           <input id="fDep" type="date" name="departureDate" required>
         </div>
-        <div class="field dates">
+        <div class="field dates" id="retField">
           <label for="fRet">חזרה</label>
           <input id="fRet" type="date" name="returnDate">
-        </div>
-        <div class="field small">
-          <label for="fPax">נוסעים</label>
-          <select id="fPax" name="adults">
-            <option value="1">1 נוסע</option><option value="2">2 נוסעים</option>
-            <option value="3">3 נוסעים</option><option value="4">4 נוסעים</option><option value="5">5+</option>
-          </select>
-        </div>
-        <div class="field small">
-          <label for="fCabin">מחלקה</label>
-          <select id="fCabin" name="cabin">
-            <option value="ECONOMY">תיירים</option>
-            <option value="PREMIUM_ECONOMY">פרימיום</option>
-            <option value="BUSINESS">עסקים</option>
-            <option value="FIRST">ראשונה</option>
-          </select>
         </div>
         <button class="cta" type="submit">חיפוש</button>
       </div>
@@ -555,6 +556,24 @@ $('#swapBtn').addEventListener('click', () => {
   [o.dataset.code, d.dataset.code] = [d.dataset.code, o.dataset.code];
 });
 
+// ---- trip type: round-trip / one-way (Google-style) ----
+let tripType = 'round';
+$$('.triptype .chip').forEach(b => b.addEventListener('click', () => {
+  tripType = b.dataset.trip;
+  $$('.triptype .chip').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  const ret = $('#retField');
+  if (tripType === 'oneway') {
+    ret.style.display = 'none';
+    $('#fRet').value = '';
+  } else {
+    ret.style.display = '';
+    if (!$('#fRet').value) {
+      const dep = $('#fDep').value;
+      if (dep) $('#fRet').value = new Date(Date.parse(dep) + 7 * 864e5).toISOString().slice(0, 10);
+    }
+  }
+}));
+
 // ---- health/providers ----
 (async () => {
   try {
@@ -688,7 +707,7 @@ $('#searchForm').addEventListener('submit', async (ev) => {
     adults: $('#fPax').value.replace('+', ''),
     cabin: $('#fCabin').value,
   });
-  if ($('#fRet').value) p.set('returnDate', $('#fRet').value);
+  if (tripType === 'round' && $('#fRet').value) p.set('returnDate', $('#fRet').value);
   if ($('#fDirect').checked) p.set('stops', 'NON_STOP');
   if ($('#fMax').value) p.set('maxPrice', $('#fMax').value);
   try {

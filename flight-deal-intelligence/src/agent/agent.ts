@@ -43,7 +43,7 @@ export interface AgentSearchReport {
 }
 
 const MAX_QUERIES_PER_REQUEST = Number(process.env.MAX_QUERIES_PER_REQUEST ?? 24);
-const CONCURRENCY = Number(process.env.SEARCH_CONCURRENCY ?? 4);
+const CONCURRENCY = Number(process.env.SEARCH_CONCURRENCY ?? 6);
 
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = [];
@@ -168,6 +168,7 @@ export class FlightAgent {
   ): Promise<AgentSearchReport> {
     const queries =
       request.mode === 'WEEKEND' ? this.buildWeekendQueries(request) : this.buildSearchMatrix(request);
+    onProgress?.(0, queries.length, null); // report total immediately
 
     const providersUsed = new Set<string>();
     const allScored: ScoredFlight[] = [];

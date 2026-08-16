@@ -127,9 +127,11 @@ export class FastFlightsAdapter implements FlightSearchAdapter {
             maxStops,
             currency: query.currency,
           },
-          25000
+          20000
         ),
-      { attempts: 2, timeoutMs: 28000, baseDelayMs: 500 }
+      // single attempt keeps wide scans fast — the registry falls back to the
+      // next provider on failure anyway (§70)
+      { attempts: 1, timeoutMs: 22000 }
     );
     if (!res.ok || !res.flights) {
       throw new ProviderError(this.name, res.error ?? 'unknown bridge error');

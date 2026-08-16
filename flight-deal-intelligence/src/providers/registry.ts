@@ -18,8 +18,12 @@ export interface SearchOutcome {
   attempted: { provider: string; ok: boolean; error?: string; latencyMs: number }[];
 }
 
+const CACHE_TTL_MS = Number(process.env.SEARCH_CACHE_MINUTES ?? 10) * 60_000;
+
 export class ProviderRegistry {
   private adapters: FlightSearchAdapter[] = [];
+  /** Identical-search cache (§55): avoids hammering providers on repeats. */
+  private cache = new Map<string, { at: number; outcome: SearchOutcome }>();
 
   constructor(private db: FlightDatabase = getDatabase()) {}
 
@@ -69,6 +73,11 @@ export class ProviderRegistry {
    * returns results; records every attempt for provider health tracking.
    */
   async search(query: SearchQuery): Promise<SearchOutcome> {
+    const cacheKey = JSON.stringify(query);
+    const cached = this.cache.get(cacheKey);
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+      return cached.outcome;
+    }
     const attempted: SearchOutcome['attempted'] = [];
     for (const adapter of this.ordered()) {
       const started = Date.now();
@@ -82,7 +91,10 @@ export class ProviderRegistry {
         this.db.recordProviderRun(adapter.name, 'ok', latencyMs);
         attempted.push({ provider: adapter.name, ok: true, latencyMs });
         if (results.length > 0) {
-          return { results, provider: adapter.name, attempted };
+          const outcome = { results, provider: adapter.name, attempted };
+          if (this.cache.size > 500) this.cache.clear();
+          this.cache.set(cacheKey, { at: Date.now(), outcome });
+          return outcome;
         }
       } catch (err) {
         const latencyMs = Date.now() - started;

@@ -10,6 +10,8 @@ import type { FlightResult, ProviderHealth, SearchQuery } from '../core/types.js
 import { MockFlightProvider } from './mock.js';
 import { FastFlightsAdapter } from './fastflights.js';
 import { FliAdapter } from './fli.js';
+import { SerpApiAdapter } from './serpapi.js';
+import { AmadeusAdapter } from './amadeus.js';
 import { getDatabase, type FlightDatabase } from '../db/database.js';
 
 export interface SearchOutcome {
@@ -68,9 +70,44 @@ export class ProviderRegistry {
     });
   }
 
+  /** Availability cache: probing (e.g. spawning python) costs time per query. */
+  private availability = new Map<string, { at: number; ok: boolean }>();
+
+  private async isAvailableCached(adapter: FlightSearchAdapter): Promise<boolean> {
+    const cached = this.availability.get(adapter.name);
+    if (cached && Date.now() - cached.at < 5 * 60_000) return cached.ok;
+    const ok = await adapter.isAvailable();
+    this.availability.set(adapter.name, { at: Date.now(), ok });
+    return ok;
+  }
+
+  private async tryOne(
+    adapter: FlightSearchAdapter,
+    query: SearchQuery
+  ): Promise<{ provider: string; ok: boolean; error?: string; latencyMs: number; results: FlightResult[] }> {
+    const started = Date.now();
+    try {
+      if (!(await this.isAvailableCached(adapter))) {
+        return { provider: adapter.name, ok: false, error: 'unavailable', latencyMs: 0, results: [] };
+      }
+      const results = await adapter.search(query);
+      const latencyMs = Date.now() - started;
+      this.db.recordProviderRun(adapter.name, 'ok', latencyMs);
+      return { provider: adapter.name, ok: true, latencyMs, results };
+    } catch (err) {
+      const latencyMs = Date.now() - started;
+      const message = err instanceof Error ? err.message : String(err);
+      this.db.recordProviderRun(adapter.name, 'error', latencyMs, message.slice(0, 500));
+      this.db.logEvent('warn', 'provider_search_failed', { provider: adapter.name, message });
+      return { provider: adapter.name, ok: false, error: message, latencyMs, results: [] };
+    }
+  }
+
   /**
-   * Search with fallback chain. Tries providers in reliability order until one
-   * returns results; records every attempt for provider health tracking.
+   * Federated search: ALL live providers run in PARALLEL and their results are
+   * merged (dedupe happens downstream, §37). Total latency = slowest single
+   * provider, not the sum. Local/synthetic providers (mock) are used only when
+   * every live source came back empty, so demo data never pollutes real data.
    */
   async search(query: SearchQuery): Promise<SearchOutcome> {
     const cacheKey = JSON.stringify(query);
@@ -78,33 +115,40 @@ export class ProviderRegistry {
     if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
       return cached.outcome;
     }
-    const attempted: SearchOutcome['attempted'] = [];
-    for (const adapter of this.ordered()) {
-      const started = Date.now();
-      try {
-        if (!(await adapter.isAvailable())) {
-          attempted.push({ provider: adapter.name, ok: false, error: 'unavailable', latencyMs: 0 });
-          continue;
+
+    const ordered = this.ordered();
+    const live = ordered.filter((a) => a.capabilities.liveNetwork);
+    const local = ordered.filter((a) => !a.capabilities.liveNetwork);
+
+    const liveOutcomes = await Promise.all(live.map((a) => this.tryOne(a, query)));
+    const attempted: SearchOutcome['attempted'] = liveOutcomes.map(({ results, ...rest }) => rest);
+    let results: FlightResult[] = liveOutcomes.flatMap((o) => o.results);
+
+    if (results.length === 0) {
+      for (const adapter of local) {
+        const outcome = await this.tryOne(adapter, query);
+        const { results: r, ...rest } = outcome;
+        attempted.push(rest);
+        if (r.length) {
+          results = r;
+          break;
         }
-        const results = await adapter.search(query);
-        const latencyMs = Date.now() - started;
-        this.db.recordProviderRun(adapter.name, 'ok', latencyMs);
-        attempted.push({ provider: adapter.name, ok: true, latencyMs });
-        if (results.length > 0) {
-          const outcome = { results, provider: adapter.name, attempted };
-          if (this.cache.size > 500) this.cache.clear();
-          this.cache.set(cacheKey, { at: Date.now(), outcome });
-          return outcome;
-        }
-      } catch (err) {
-        const latencyMs = Date.now() - started;
-        const message = err instanceof Error ? err.message : String(err);
-        this.db.recordProviderRun(adapter.name, 'error', latencyMs, message.slice(0, 500));
-        this.db.logEvent('warn', 'provider_search_failed', { provider: adapter.name, message });
-        attempted.push({ provider: adapter.name, ok: false, error: message, latencyMs });
       }
     }
-    return { results: [], provider: 'none', attempted };
+
+    const successful = attempted.filter((a, i) =>
+      a.ok && (i < liveOutcomes.length ? liveOutcomes[i]!.results.length > 0 : results.length > 0)
+    );
+    const outcome: SearchOutcome = {
+      results,
+      provider: successful.length ? successful.map((a) => a.provider).join('+') : 'none',
+      attempted,
+    };
+    if (results.length > 0) {
+      if (this.cache.size > 500) this.cache.clear();
+      this.cache.set(cacheKey, { at: Date.now(), outcome });
+    }
+    return outcome;
   }
 }
 
@@ -117,6 +161,8 @@ export function buildDefaultRegistry(db?: FlightDatabase): ProviderRegistry {
   const registry = new ProviderRegistry(db);
   registry.register(new FastFlightsAdapter());
   registry.register(new FliAdapter());
+  registry.register(new SerpApiAdapter()); // active when SERPAPI_API_KEY is set
+  registry.register(new AmadeusAdapter()); // active when AMADEUS_CLIENT_ID/SECRET are set
   if (process.env.MOCK_PROVIDER === '1' || process.env.ALLOW_MOCK_FALLBACK === '1') {
     registry.register(new MockFlightProvider());
   }

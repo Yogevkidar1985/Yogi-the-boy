@@ -172,6 +172,10 @@
     font-family: ui-monospace, Menlo, monospace; flex-shrink: 0;
   }
   .buy .pr.cheap { color: var(--good-ink); }
+  .legsbox summary { cursor: pointer; font-size: 12.5px; }
+  .legslist { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding: 10px 12px; background: var(--card-2); border-radius: 8px; }
+  .legrow { display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline; font-size: 13px; }
+  .layover { padding-inline-start: 8px; border-inline-start: 2px dashed var(--border); font-size: 12px; }
 
   /* ---- layout ---- */
   main { max-width: 1060px; margin: 0 auto; padding: 26px 20px 80px; }
@@ -645,6 +649,18 @@ function flightRow(f) {
         ${a.isErrorFareCandidate ? '<span class="badge warn">⚠ ודא מול חברת התעופה</span>' : ''}
       </div>
       ${why ? `<ul class="whylist">${why}</ul>` : ''}
+      ${(f.segments || []).length ? `<details class="legsbox">
+        <summary class="muted">פרטי הטיסה המלאים (${f.segments.length} ${f.segments.length === 1 ? 'קטע' : 'קטעים'})</summary>
+        <div class="legslist">${f.segments.map((s, si) => `
+          <div class="legrow">
+            <span class="ltr num">${hhmm(s.departureTime)}–${hhmm(s.arrivalTime)}</span>
+            <span class="ltr"><b>${esc(s.origin)}</b> → <b>${esc(s.destination)}</b></span>
+            <span class="muted">${esc(s.airlineName || s.airline || '')} ${esc(s.flightNumber || '')}</span>
+            <span class="muted">${durTxt(s.durationMinutes)}${s.aircraft ? ' · ' + esc(s.aircraft) : ''}</span>
+          </div>
+          ${si < f.segments.length - 1 ? `<div class="layover muted">⏱ עצירת ביניים ב-${esc(s.destination)}</div>` : ''}`).join('')}
+        </div>
+      </details>` : ''}
     </div>
     <div class="buy">
       <span class="pr num ${isCheap ? 'cheap' : ''}">${fmt(f.normalizedPrice, f.normalizedCurrency)}</span>

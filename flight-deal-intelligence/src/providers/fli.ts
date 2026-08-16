@@ -51,7 +51,9 @@ export class FliAdapter implements FlightSearchAdapter {
     if (query.stops !== 'ANY') args.push('--stops', query.stops);
     if (query.airlines?.length) args.push('--airlines', query.airlines.join(','));
 
-    const stdout = await withRetry(this.name, () => this.run(args), { attempts: 2, timeoutMs: 70000 });
+    // single attempt with a tight budget: the whole request (all providers)
+    // must finish inside typical proxy limits (~100s on Render/Railway)
+    const stdout = await withRetry(this.name, () => this.run(args, 35000), { attempts: 1, timeoutMs: 38000 });
     let parsed: unknown;
     try {
       parsed = JSON.parse(stdout);

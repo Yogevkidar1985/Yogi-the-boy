@@ -593,6 +593,18 @@ $('#searchForm').addEventListener('submit', async (ev) => {
   if ($('#fMax').value) p.set('maxPrice', $('#fMax').value);
   try {
     const data = await api('/api/flights/search?' + p);
+    if (data.count === 0) {
+      const attempts = (data.attempted || []).map(a =>
+        `<li><b class="ltr">${esc(a.provider)}</b>: ${a.ok ? 'ענה אך ללא תוצאות' : esc((a.error || 'שגיאה').slice(0, 180))}</li>`).join('');
+      $('#resultsTitle').textContent = 'לא התקבלו תוצאות מהמקורות החיים';
+      $('#flightList').innerHTML = `<div class="card" style="padding:16px">
+        <p class="meta" style="margin-top:0">מה כל מקור ענה:</p>
+        <ul class="whylist ltr" style="direction:ltr">${attempts || '<li>אין מידע</li>'}</ul>
+        <p class="muted">אם זה נמשך — ייתכן ש-Google מגביל זמנית את כתובת השרת. נסה שוב בעוד כמה דקות.</p></div>`;
+      $('#airlineChips').innerHTML = '';
+      $('#resultsSec').hidden = false;
+      return;
+    }
     flights = data.flights;
     activeAirlines.clear();
     $('#resultsTitle').innerHTML = `תוצאות <span class="ltr">${p.get('origin')} → ${p.get('destination')}</span> <span class="muted">(${data.count} טיסות · מקור ${esc(data.provider)})</span>`;

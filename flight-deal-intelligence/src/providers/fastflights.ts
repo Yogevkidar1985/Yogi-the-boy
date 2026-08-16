@@ -106,9 +106,9 @@ export class FastFlightsAdapter implements FlightSearchAdapter {
             maxStops,
             currency: query.currency,
           },
-          45000
+          25000
         ),
-      { attempts: 2, timeoutMs: 50000 }
+      { attempts: 2, timeoutMs: 28000, baseDelayMs: 500 }
     );
     if (!res.ok || !res.flights) {
       throw new ProviderError(this.name, res.error ?? 'unknown bridge error');

@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flight Deal Intelligence</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --surface-0: #111110;
+    --surface-1: #1a1a19;
+    --surface-2: #242423;
+    --border: #33332f;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8a897f;
+    --series-1: #3987e5; /* daily low */
+    --series-2: #d95926; /* rolling average */
+    --good: #199e70;
+    --warning: #c98500;
+    --serious: #e66767;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--surface-0); color: var(--text-primary);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 20px 80px; }
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  h1 { font-size: 26px; margin: 0; letter-spacing: -0.02em; }
+  .tagline { color: var(--text-muted); font-size: 14px; }
+  h2 { font-size: 17px; margin: 34px 0 12px; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+  }
+  form.search { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+  input, select, textarea, button {
+    background: var(--surface-2); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; font: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--series-1); outline-offset: -1px; }
+  button.primary {
+    background: var(--series-1); border-color: var(--series-1); color: #fff;
+    font-weight: 600; cursor: pointer; padding: 9px 22px;
+  }
+  button.primary:hover { filter: brightness(1.1); }
+  button.ghost { background: transparent; cursor: pointer; color: var(--text-secondary); }
+  button.ghost[aria-pressed="true"] { border-color: var(--series-1); color: var(--text-primary); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .deals { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .deal { display: flex; flex-direction: column; gap: 8px; }
+  .deal .route { font-weight: 650; font-size: 16px; }
+  .deal .price { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .deal .old { color: var(--text-muted); text-decoration: line-through; font-size: 15px; font-weight: 400; margin-left: 8px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; padding: 2px 10px;
+  }
+  .badge.score { background: color-mix(in oklab, var(--good) 25%, transparent); color: #7fd6b3; }
+  .badge.fire { background: color-mix(in oklab, var(--serious) 22%, transparent); color: #f1a1a1; }
+  .badge.warn { background: color-mix(in oklab, var(--warning) 22%, transparent); color: #e5c07b; }
+  .meta { color: var(--text-secondary); font-size: 13px; }
+  .muted { color: var(--text-muted); font-size: 12px; }
+  a.book { color: var(--series-1); font-weight: 600; text-decoration: none; }
+  a.book:hover { text-decoration: underline; }
+  .chartwrap { position: relative; }
+  svg text { fill: var(--text-secondary); font-size: 11px; }
+  .grid line { stroke: var(--border); stroke-width: 1; }
+  .tooltip {
+    position: absolute; pointer-events: none; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px;
+    font-size: 12px; display: none; z-index: 5; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.4);
+  }
+  .legend { display: flex; gap: 18px; font-size: 12.5px; color: var(--text-secondary); margin-top: 6px; }
+  .legend .chip { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-weight: 500; font-size: 12px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+  .stat .v { font-size: 20px; font-weight: 650; }
+  .stat .k { font-size: 12px; color: var(--text-muted); }
+  #results .list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+  .spin { display: none; color: var(--text-muted); }
+  .spin.on { display: inline; }
+  .recs { border-left: 3px solid var(--series-1); padding-left: 12px; margin-top: 10px; }
+  footer { margin-top: 50px; color: var(--text-muted); font-size: 12px; }
+  @media (max-width: 640px) { .deal .price { font-size: 24px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>✈️ Flight Deal Intelligence</h1>
+    <span class="tagline">Price discovery · price intelligence · historical proof</span>
+  </header>
+  <p class="muted" id="health">connecting…</p>
+
+  <!-- §65-§66: search + AI search -->
+  <section class="card">
+    <form class="search" id="searchForm">
+      <label>From <input name="origin" value="TLV" maxlength="3" required pattern="[A-Za-z]{3}"></label>
+      <label>To <input name="destination" value="LHR" maxlength="3" required pattern="[A-Za-z]{3}"></label>
+      <label>Departure <input type="date" name="departureDate" required></label>
+      <label>Return <input type="date" name="returnDate"></label>
+      <label>Passengers <input type="number" name="adults" value="1" min="1" max="9"></label>
+      <label>Cabin
+        <select name="cabin">
+          <option>ECONOMY</option><option>PREMIUM_ECONOMY</option><option>BUSINESS</option><option>FIRST</option>
+        </select>
+      </label>
+      <label>Stops
+        <select name="stops"><option>ANY</option><option>NON_STOP</option><option>ONE_STOP</option></select>
+      </label>
+      <label>Max price <input type="number" name="maxPrice" placeholder="any"></label>
+      <label style="justify-content:flex-end"><button class="primary" type="submit">Search</button></label>
+    </form>
+    <div class="row" style="margin-top:12px">
+      <textarea id="aiPrompt" rows="1" style="flex:1" placeholder='Describe your trip: "אני רוצה לטוס ליוון בספטמבר, בערך שבוע, הכי זול שאפשר"'></textarea>
+      <button class="primary" id="aiBtn">AI Search</button>
+      <span class="spin" id="spin">searching…</span>
+    </div>
+  </section>
+
+  <section id="results"></section>
+
+  <!-- §41: best deals now -->
+  <h2>Best deals right now</h2>
+  <div class="deals" id="deals"><p class="muted">No deals yet — run a search and the engine starts learning prices.</p></div>
+
+  <!-- §43-§44: price history + route intelligence -->
+  <h2>Price history</h2>
+  <section class="card">
+    <div class="row">
+      <input id="routeInput" value="TLV-LHR" style="width:110px" aria-label="Route">
+      <span role="group" aria-label="Time range">
+        <button class="ghost range" data-days="7">7d</button>
+        <button class="ghost range" data-days="30">30d</button>
+        <button class="ghost range" data-days="90" aria-pressed="true">90d</button>
+        <button class="ghost range" data-days="180">180d</button>
+        <button class="ghost range" data-days="365">1y</button>
+      </span>
+    </div>
+    <div class="chartwrap" id="chartwrap">
+      <svg id="chart" width="100%" height="260" role="img" aria-label="Price history chart"></svg>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+    <div class="legend">
+      <span><span class="chip" style="background:var(--series-1)"></span>Daily low</span>
+      <span><span class="chip" style="background:var(--series-2)"></span>Daily average</span>
+    </div>
+    <div class="stats" id="routeStats" style="margin-top:14px"></div>
+    <details style="margin-top:10px"><summary class="muted">Data table</summary><div id="chartTable"></div></details>
+  </section>
+
+  <!-- §25, §27: monitors + alerts -->
+  <h2>Active monitors &amp; alerts</h2>
+  <section class="card">
+    <div id="monitors"><p class="muted">No monitors yet.</p></div>
+    <p class="muted" style="margin-bottom:0">Create one: search above, then “Track this route”, or via the MCP tool <code>create_price_alert</code>. The worker re-checks on an adaptive schedule (30m–24h) and alerts on drops.</p>
+  </section>
+
+  <footer>
+    <div id="providers"></div>
+    <p>Prices are the lowest found across the sources available to us at search time — not a guarantee of the lowest price that exists. Unusually low fares should be verified with the airline before purchase.</p>
+  </footer>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const fmt = (n, c = 'EUR') => n == null ? '—' : `${Math.round(n).toLocaleString()} ${c}`;
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+
+// default dates: 3 weeks out, 1 week trip
+const d0 = new Date(Date.now() + 21 * 864e5).toISOString().slice(0, 10);
+const d1 = new Date(Date.now() + 28 * 864e5).toISOString().slice(0, 10);
+document.querySelector('[name=departureDate]').value = d0;
+document.querySelector('[name=returnDate]').value = d1;
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+// ---- health + providers ----
+(async () => {
+  try {
+    const h = await api('/api/health');
+    $('#health').textContent = `engine ok · currency ${h.currency.system} (rates: ${h.currency.source}) · providers: ${h.providers.join(', ')}`;
+    const provs = await api('/api/providers');
+    $('#providers').innerHTML = provs.map(p =>
+      `<span class="badge ${p.successRate > 0.5 ? 'score' : 'warn'}" title="success rate">${esc(p.name)}: ${Math.round(p.successRate * 100)}% ok, ${Math.round(p.avgLatencyMs)}ms</span>`
+    ).join(' ');
+  } catch { $('#health').textContent = 'engine unreachable'; }
+})();
+
+// ---- flight card ----
+function flightCard(f, showTrack = true) {
+  const a = f.analysis || {};
+  const badges = [
+    `<span class="badge score">Deal Score ${a.dealScore ?? '—'}</span>`,
+    a.isExceptional ? `<span class="badge fire">🔥 Exceptional deal</span>` : '',
+    a.isErrorFareCandidate ? `<span class="badge warn">⚠ Error-fare candidate</span>` : '',
+  ].join(' ');
+  const why = (a.explanation || []).map(e => `<li>${esc(e)}</li>`).join('');
+  const fresh = f.freshnessMinutes != null ? `checked ${f.freshnessMinutes} min ago` : '';
+  return `<div class="card deal">
+    <div class="route">${esc(f.origin)} → ${esc(f.destination)}
+      <span class="meta">${esc(f.departureDate)}${f.returnDate ? ' – ' + esc(f.returnDate) : ''}</span></div>
+    <div class="price">${fmt(f.normalizedPrice, f.normalizedCurrency)}</div>
+    <div>${badges}</div>
+    <div class="meta">${esc(f.airlineName || f.airline)} · ${f.stops === 0 ? 'direct' : f.stops + ' stop(s)'} · ${Math.floor((f.durationMinutes||0)/60)}h${(f.durationMinutes||0)%60}m</div>
+    ${why ? `<ul class="meta" style="margin:0;padding-left:18px">${why}</ul>` : ''}
+    ${a.disclaimer ? `<div class="muted">${esc(a.disclaimer)}</div>` : ''}
+    <div class="row">
+      <a class="book" href="${esc(f.bookingUrl)}" target="_blank" rel="noopener">Book on Google Flights ↗</a>
+      <a class="book" href="${esc(f.deepLink)}" target="_blank" rel="noopener">Alt link ↗</a>
+      ${showTrack ? `<button class="ghost" onclick='track(${JSON.stringify(f.origin)},${JSON.stringify(f.destination)},${JSON.stringify(f.departureDate)},${JSON.stringify(f.returnDate ?? null)})'>Track this route</button>` : ''}
+    </div>
+    <div class="muted">${fresh} · via ${esc(f.provider)}</div>
+  </div>`;
+}
+
+// ---- search ----
+$('#searchForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  $('#spin').classList.add('on');
+  const params = new URLSearchParams();
+  for (const [k, v] of new FormData(ev.target)) if (v) params.set(k, v);
+  try {
+    const data = await api('/api/flights/search?' + params);
+    $('#results').innerHTML = `<h2>Results <span class="muted">(${data.count} found via ${esc(data.provider)})</span></h2>
+      <div class="list">${data.flights.slice(0, 8).map(f => flightCard(f)).join('')}</div>`;
+    const q = Object.fromEntries(params);
+    $('#routeInput').value = `${q.origin.toUpperCase()}-${q.destination.toUpperCase()}`;
+    loadChart(); loadDeals();
+  } catch (e) {
+    $('#results').innerHTML = `<div class="card"><b>Search failed.</b> <span class="meta">${esc(e.message)}</span>
+      <p class="muted">All live providers may be unavailable (network/rate limits). Try again shortly — the engine falls back across providers automatically.</p></div>`;
+  } finally { $('#spin').classList.remove('on'); }
+});
+
+// ---- AI search ----
+$('#aiBtn').addEventListener('click', async () => {
+  const prompt = $('#aiPrompt').value.trim();
+  if (prompt.length < 3) return;
+  $('#spin').classList.add('on');
+  try {
+    const r = await api('/api/ai/search', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+    const dests = (r.byDestination || []).slice(0, 8).map(d =>
+      `<tr><td>${esc(d.destination)} <span class="muted">${esc(d.destinationName || '')}</span></td>
+       <td>${fmt(d.best.normalizedPrice, d.best.normalizedCurrency)}</td>
+       <td>${d.best.analysis?.dealScore ?? '—'}</td>
+       <td>${esc(d.best.departureDate)}</td>
+       <td><a class="book" href="${esc(d.best.bookingUrl)}" target="_blank" rel="noopener">book ↗</a></td></tr>`).join('');
+    $('#results').innerHTML = `<h2>AI search <span class="muted">(${r.totalQueries} queries · ${r.totalResults} fares · ${(r.elapsedMs/1000).toFixed(1)}s)</span></h2>
+      ${r.best ? `<div class="list">${flightCard(r.best)}</div>` : '<p class="muted">Nothing found — providers may be unavailable.</p>'}
+      ${r.recommendations?.length ? `<div class="recs">${r.recommendations.map(x => `<div class="meta">💡 ${esc(x)}</div>`).join('')}</div>` : ''}
+      ${dests ? `<h2>Cheapest by destination</h2><div class="card"><table>
+        <tr><th>Destination</th><th>Best price</th><th>Deal score</th><th>Date</th><th></th></tr>${dests}</table></div>` : ''}
+      <p class="muted">${esc(r.disclaimer)}</p>`;
+    loadDeals();
+  } catch (e) {
+    $('#results').innerHTML = `<div class="card"><b>AI search failed.</b> <span class="meta">${esc(e.message)}</span></div>`;
+  } finally { $('#spin').classList.remove('on'); }
+});
+
+// ---- track (saved search + alert) ----
+window.track = async (origin, destination, departureDate, returnDate) => {
+  const body = {
+    name: `${origin}-${destination} ${departureDate}`,
+    query: { origin, destination, departureDate, returnDate: returnDate || undefined },
+    monitor: true, intervalMinutes: 180,
+  };
+  const { id } = await api('/api/searches', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  await api('/api/alerts', { method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ savedSearchId: id, kind: 'DROP_PERCENT', threshold: 10, channels: ['console','telegram','webhook'] }) });
+  loadMonitors();
+  alert('Tracking! The worker re-checks every ~3h (adaptive) and alerts on a 10%+ drop.');
+};
+
+// ---- deals feed ----
+async function loadDeals() {
+  const deals = await api('/api/deals?limit=9');
+  if (!deals.length) return;
+  $('#deals').innerHTML = deals.map(d => `<div class="card deal">
+    <div class="route">${esc(d.origin)} → ${esc(d.destination)} <span class="meta">${esc(d.departure_date)}</span></div>
+    <div class="price">${fmt(d.normalized_price, d.normalized_currency)}
+      ${d.typical_price && d.savings > 0 ? `<span class="old">${fmt(d.typical_price, d.normalized_currency)}</span>` : ''}</div>
+    <div>
+      <span class="badge score">Deal Score ${Math.round(d.score)}</span>
+      ${d.is_exceptional ? '<span class="badge fire">🔥</span>' : ''}
+      ${d.savings > 0 ? `<span class="badge score">save ${fmt(d.savings, d.normalized_currency)}</span>` : ''}
+    </div>
+    <div class="meta">${esc(d.airline_name || d.airline)} · ${d.stops === 0 ? 'direct' : d.stops + ' stop(s)'}</div>
+    <a class="book" href="${esc(d.booking_url)}" target="_blank" rel="noopener">Booking link ↗</a>
+    <div class="muted">checked ${d.freshness_minutes} min ago</div>
+  </div>`).join('');
+}
+
+// ---- monitors ----
+async function loadMonitors() {
+  const [searches, alerts] = await Promise.all([api('/api/searches'), api('/api/alerts')]);
+  if (!searches.length) return;
+  $('#monitors').innerHTML = `<table>
+    <tr><th>Search</th><th>Interval</th><th>Last run</th><th>Last low</th><th>Alerts</th></tr>
+    ${searches.map(s => `<tr>
+      <td>${esc(s.name)}</td>
+      <td>${s.adaptiveIntervalMinutes ?? s.intervalMinutes}m</td>
+      <td>${esc(s.lastRunAt ?? 'pending')}</td>
+      <td>${fmt(s.lastLowestPrice)}</td>
+      <td class="muted">${alerts.filter(a => a.savedSearchId === s.id).map(a => `${a.kind}<${a.threshold}`).join(', ') || '—'}</td>
+    </tr>`).join('')}</table>`;
+}
+
+// ---- price history chart (crosshair + tooltip per dataviz spec) ----
+let chartDays = 90;
+document.querySelectorAll('.range').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.range').forEach(x => x.removeAttribute('aria-pressed'));
+  b.setAttribute('aria-pressed', 'true');
+  chartDays = Number(b.dataset.days);
+  loadChart();
+}));
+$('#routeInput').addEventListener('change', loadChart);
+
+let chartData = [];
+async function loadChart() {
+  const route = $('#routeInput').value.trim().toUpperCase();
+  if (!/^[A-Z]{3}-[A-Z]{3}$/.test(route)) return;
+  const { series, stats } = await api(`/api/routes/${route}/history?days=${chartDays}`);
+  chartData = series;
+  drawChart(series);
+  $('#chartTable').innerHTML = series.length
+    ? `<table><tr><th>Day</th><th>Low</th><th>Avg</th></tr>${series.map(s => `<tr><td>${s.day}</td><td>${fmt(s.low)}</td><td>${fmt(s.avg)}</td></tr>`).join('')}</table>`
+    : '<p class="muted">No data.</p>';
+  $('#routeStats').innerHTML = stats ? [
+    ['Lowest', fmt(stats.lowest)], ['Average', fmt(stats.average)], ['Median', fmt(stats.median)],
+    ['Highest', fmt(stats.highest)], ['Volatility', (stats.volatility * 100).toFixed(1) + '%'],
+    ['Trend', stats.trend], ['Samples', stats.sampleCount],
+  ].map(([k, v]) => `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('')
+  : '<p class="muted">No history yet for this route — run a search to start building it.</p>';
+}
+
+function drawChart(series) {
+  const svg = $('#chart');
+  const W = svg.clientWidth || 900, H = 260, P = { l: 52, r: 14, t: 14, b: 26 };
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  if (!series.length) { svg.innerHTML = `<text x="${W/2}" y="${H/2}" text-anchor="middle">No price history yet</text>`; return; }
+  const xs = series.map((_, i) => i);
+  const all = series.flatMap(s => [s.low, s.avg]);
+  const yMin = Math.min(...all) * 0.95, yMax = Math.max(...all) * 1.05;
+  const x = i => P.l + (i / Math.max(1, xs.length - 1)) * (W - P.l - P.r);
+  const y = v => H - P.b - ((v - yMin) / (yMax - yMin)) * (H - P.t - P.b);
+  const path = key => series.map((s, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(s[key]).toFixed(1)}`).join('');
+  const ticks = 4;
+  let grid = '', labels = '';
+  for (let t = 0; t <= ticks; t++) {
+    const v = yMin + (t / ticks) * (yMax - yMin), yy = y(v);
+    grid += `<line x1="${P.l}" y1="${yy}" x2="${W - P.r}" y2="${yy}"/>`;
+    labels += `<text x="${P.l - 8}" y="${yy + 4}" text-anchor="end">${Math.round(v)}</text>`;
+  }
+  const xStep = Math.max(1, Math.floor(series.length / 6));
+  for (let i = 0; i < series.length; i += xStep) {
+    labels += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${series[i].day.slice(5)}</text>`;
+  }
+  svg.innerHTML = `<g class="grid">${grid}</g>${labels}
+    <path d="${path('avg')}" fill="none" stroke="var(--series-2)" stroke-width="2" stroke-linejoin="round"/>
+    <path d="${path('low')}" fill="none" stroke="var(--series-1)" stroke-width="2" stroke-linejoin="round"/>
+    <line id="xhair" y1="${P.t}" y2="${H - P.b}" stroke="var(--text-muted)" stroke-dasharray="3,3" style="display:none"/>
+    <circle id="dot" r="4" fill="var(--series-1)" stroke="var(--surface-1)" stroke-width="2" style="display:none"/>`;
+
+  const wrap = $('#chartwrap'), tip = $('#tooltip');
+  svg.onmousemove = (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const mx = (ev.clientX - rect.left) * (W / rect.width);
+    const i = Math.round(((mx - P.l) / (W - P.l - P.r)) * (xs.length - 1));
+    if (i < 0 || i >= series.length) return;
+    const s = series[i];
+    const xhair = $('#xhair'), dot = $('#dot');
+    xhair.style.display = 'block'; xhair.setAttribute('x1', x(i)); xhair.setAttribute('x2', x(i));
+    dot.style.display = 'block'; dot.setAttribute('cx', x(i)); dot.setAttribute('cy', y(s.low));
+    tip.style.display = 'block';
+    tip.innerHTML = `<b>${s.day}</b><br>low ${fmt(s.low)} · avg ${fmt(s.avg)}`;
+    const px = (x(i) / W) * rect.width;
+    tip.style.left = Math.min(rect.width - 150, px + 12) + 'px';
+    tip.style.top = '18px';
+  };
+  svg.onmouseleave = () => { tip.style.display = 'none'; $('#xhair').style.display = 'none'; $('#dot').style.display = 'none'; };
+}
+
+loadDeals(); loadMonitors(); loadChart();
+// SSE live updates (§11): refresh feeds when the worker broadcasts
+try {
+  const es = new EventSource('/api/events');
+  es.addEventListener('deals', () => { loadDeals(); loadMonitors(); });
+} catch {}
+</script>
+</body>
+</html>

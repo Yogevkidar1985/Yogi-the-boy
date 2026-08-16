@@ -1,0 +1,40 @@
+# Flight Deal Intelligence — production compose (§57).
+# The app itself uses SQLite by default; postgres/redis services are provided
+# for scaling the deployment (see docs/architecture.md, "Scaling path").
+services:
+  api:
+    build: .
+    command: npx tsx src/api/server.ts
+    ports:
+      - "${PORT:-3010}:3010"
+    env_file: .env
+    volumes:
+      - appdata:/app/data
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: npx tsx src/worker/monitor.ts
+    env_file: .env
+    volumes:
+      - appdata:/app/data
+    restart: unless-stopped
+
+  # Optional: Flight Finder as a sibling service (§3 Source 1)
+  # flight-finder:
+  #   image: ghcr.io/affromero/flight-finder:latest
+  #   ports: ["3003:3003"]
+  #   env_file: .env
+
+  # Scaling path (§63): move DATABASE to postgres + queue to redis
+  # postgres:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_DB: flight_intel
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set-a-password}
+  #   volumes: [pgdata:/var/lib/postgresql/data]
+  # redis:
+  #   image: redis:7-alpine
+
+volumes:
+  appdata:

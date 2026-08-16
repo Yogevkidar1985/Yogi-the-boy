@@ -1,0 +1,421 @@
+/**
+ * Database layer (§12). SQLite via better-sqlite3 for local/dev; the schema is
+ * portable to PostgreSQL for production (see infra/postgres/schema.sql note in docs).
+ *
+ * Price history is never deleted automatically (§72) unless a retention policy
+ * is configured via PRICE_RETENTION_DAYS.
+ */
+import Database from 'better-sqlite3';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+import type { FlightResult, SavedSearch, SearchQuery, AlertRule } from '../core/types.js';
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS saved_searches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER REFERENCES users(id),
+  name TEXT NOT NULL,
+  query_json TEXT NOT NULL,
+  monitor INTEGER NOT NULL DEFAULT 0,
+  interval_minutes INTEGER NOT NULL DEFAULT 180,
+  adaptive_interval_minutes INTEGER,
+  last_run_at TEXT,
+  last_lowest_price REAL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS search_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  saved_search_id INTEGER REFERENCES saved_searches(id),
+  provider TEXT NOT NULL,
+  status TEXT NOT NULL,
+  result_count INTEGER NOT NULL DEFAULT 0,
+  lowest_price REAL,
+  latency_ms INTEGER,
+  error TEXT,
+  ran_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS flight_results (
+  id TEXT PRIMARY KEY,
+  fingerprint TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  source TEXT NOT NULL,
+  origin TEXT NOT NULL,
+  destination TEXT NOT NULL,
+  departure_date TEXT NOT NULL,
+  return_date TEXT,
+  departure_time TEXT,
+  arrival_time TEXT,
+  duration_minutes INTEGER,
+  stops INTEGER NOT NULL DEFAULT 0,
+  airline TEXT,
+  airline_name TEXT,
+  flight_number TEXT,
+  aircraft TEXT,
+  cabin TEXT NOT NULL DEFAULT 'ECONOMY',
+  bags INTEGER NOT NULL DEFAULT 0,
+  base_price REAL,
+  taxes REAL,
+  total_price REAL NOT NULL,
+  currency TEXT NOT NULL,
+  normalized_price REAL NOT NULL,
+  normalized_currency TEXT NOT NULL,
+  exchange_rate REAL NOT NULL DEFAULT 1,
+  exchange_rate_timestamp TEXT,
+  booking_url TEXT,
+  deep_link TEXT,
+  segments_json TEXT,
+  raw_provider_data TEXT,
+  collected_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_results_route ON flight_results(origin, destination, departure_date);
+CREATE INDEX IF NOT EXISTS idx_results_fingerprint ON flight_results(fingerprint);
+
+CREATE TABLE IF NOT EXISTS flight_segments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  flight_result_id TEXT REFERENCES flight_results(id),
+  seq INTEGER NOT NULL,
+  origin TEXT NOT NULL,
+  destination TEXT NOT NULL,
+  departure_time TEXT,
+  arrival_time TEXT,
+  airline TEXT,
+  flight_number TEXT,
+  aircraft TEXT,
+  duration_minutes INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS airports (
+  code TEXT PRIMARY KEY,
+  name TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS airlines (
+  code TEXT PRIMARY KEY,
+  name TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS price_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  route TEXT NOT NULL,
+  origin TEXT NOT NULL,
+  destination TEXT NOT NULL,
+  departure_date TEXT NOT NULL,
+  return_date TEXT,
+  price REAL NOT NULL,
+  currency TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  airline TEXT,
+  stops INTEGER,
+  collected_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_snapshots_route ON price_snapshots(route, collected_at);
+CREATE INDEX IF NOT EXISTS idx_snapshots_route_date ON price_snapshots(route, departure_date);
+
+CREATE TABLE IF NOT EXISTS price_statistics (
+  route TEXT PRIMARY KEY,
+  sample_count INTEGER NOT NULL,
+  lowest REAL, highest REAL, average REAL, median REAL,
+  std_dev REAL, volatility REAL, trend TEXT,
+  window_days INTEGER NOT NULL DEFAULT 90,
+  computed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS deal_scores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  flight_result_id TEXT REFERENCES flight_results(id),
+  route TEXT NOT NULL,
+  score REAL NOT NULL,
+  breakdown_json TEXT,
+  is_exceptional INTEGER NOT NULL DEFAULT 0,
+  is_error_fare_candidate INTEGER NOT NULL DEFAULT 0,
+  computed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_deal_scores_route ON deal_scores(route, computed_at);
+
+CREATE TABLE IF NOT EXISTS alerts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  saved_search_id INTEGER REFERENCES saved_searches(id),
+  kind TEXT NOT NULL,
+  threshold REAL NOT NULL,
+  channels_json TEXT NOT NULL DEFAULT '["console"]',
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS alert_deliveries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  alert_id INTEGER REFERENCES alerts(id),
+  channel TEXT NOT NULL,
+  status TEXT NOT NULL,
+  message TEXT,
+  delivered_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS providers (
+  name TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  priority INTEGER NOT NULL DEFAULT 100
+);
+
+CREATE TABLE IF NOT EXISTS provider_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider TEXT NOT NULL,
+  status TEXT NOT NULL,
+  latency_ms INTEGER,
+  error TEXT,
+  ran_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_provider_runs ON provider_runs(provider, ran_at);
+
+CREATE TABLE IF NOT EXISTS route_statistics (
+  route TEXT PRIMARY KEY,
+  best_month TEXT,
+  best_day TEXT,
+  current_percentile REAL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS destination_groups (
+  name TEXT PRIMARY KEY,
+  airports_json TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS search_preferences (
+  user_id INTEGER PRIMARY KEY,
+  preferences_json TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS system_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  level TEXT NOT NULL,
+  event TEXT NOT NULL,
+  detail TEXT,
+  request_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`;
+
+export class FlightDatabase {
+  readonly db: Database.Database;
+
+  constructor(path: string = process.env.DATABASE_PATH ?? 'data/flight-intel.db') {
+    if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
+    this.db = new Database(path);
+    this.db.pragma('journal_mode = WAL');
+    this.db.exec(SCHEMA);
+  }
+
+  // ---- flight results -----------------------------------------------------
+
+  insertFlightResult(r: FlightResult, fingerprint: string): void {
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO flight_results
+         (id, fingerprint, provider, source, origin, destination, departure_date, return_date,
+          departure_time, arrival_time, duration_minutes, stops, airline, airline_name,
+          flight_number, aircraft, cabin, bags, base_price, taxes, total_price, currency,
+          normalized_price, normalized_currency, exchange_rate, exchange_rate_timestamp,
+          booking_url, deep_link, segments_json, raw_provider_data, collected_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      )
+      .run(
+        r.id, fingerprint, r.provider, r.source, r.origin, r.destination, r.departureDate,
+        r.returnDate ?? null, r.departureTime, r.arrivalTime, r.durationMinutes, r.stops,
+        r.airline, r.airlineName ?? null, r.flightNumber, r.aircraft ?? null, r.cabin, r.bags,
+        r.basePrice, r.taxes, r.totalPrice, r.currency, r.normalizedPrice, r.normalizedCurrency,
+        r.exchangeRate, r.exchangeRateTimestamp, r.bookingUrl, r.deepLink,
+        JSON.stringify(r.segments), r.rawProviderData ? JSON.stringify(r.rawProviderData) : null,
+        r.collectedAt
+      );
+  }
+
+  // ---- price history (§14, §72) ------------------------------------------
+
+  insertPriceSnapshot(s: {
+    route: string; origin: string; destination: string; departureDate: string;
+    returnDate?: string; price: number; currency: string; provider: string;
+    airline?: string; stops?: number; collectedAt?: string;
+  }): void {
+    this.db
+      .prepare(
+        `INSERT INTO price_snapshots (route, origin, destination, departure_date, return_date, price, currency, provider, airline, stops, collected_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+      )
+      .run(
+        s.route, s.origin, s.destination, s.departureDate, s.returnDate ?? null, s.price,
+        s.currency, s.provider, s.airline ?? null, s.stops ?? null,
+        s.collectedAt ?? new Date().toISOString()
+      );
+  }
+
+  priceHistory(route: string, windowDays = 90): { price: number; collectedAt: string; departureDate: string }[] {
+    return this.db
+      .prepare(
+        `SELECT price, collected_at as collectedAt, departure_date as departureDate
+         FROM price_snapshots
+         WHERE route = ? AND collected_at >= datetime('now', ?)
+         ORDER BY collected_at ASC`
+      )
+      .all(route, `-${windowDays} days`) as { price: number; collectedAt: string; departureDate: string }[];
+  }
+
+  /** Daily lowest price series for charting (§43). */
+  priceSeries(route: string, windowDays = 90): { day: string; low: number; avg: number }[] {
+    return this.db
+      .prepare(
+        `SELECT substr(collected_at, 1, 10) AS day, MIN(price) AS low, ROUND(AVG(price),2) AS avg
+         FROM price_snapshots
+         WHERE route = ? AND collected_at >= datetime('now', ?)
+         GROUP BY day ORDER BY day ASC`
+      )
+      .all(route, `-${windowDays} days`) as { day: string; low: number; avg: number }[];
+  }
+
+  // ---- saved searches / monitors (§25-§28) --------------------------------
+
+  createSavedSearch(name: string, query: SearchQuery, monitor: boolean, intervalMinutes: number): number {
+    const info = this.db
+      .prepare(
+        `INSERT INTO saved_searches (name, query_json, monitor, interval_minutes) VALUES (?,?,?,?)`
+      )
+      .run(name, JSON.stringify(query), monitor ? 1 : 0, intervalMinutes);
+    return Number(info.lastInsertRowid);
+  }
+
+  listSavedSearches(): SavedSearch[] {
+    const rows = this.db.prepare(`SELECT * FROM saved_searches ORDER BY id`).all() as Record<string, unknown>[];
+    return rows.map((r) => ({
+      id: r.id as number,
+      name: r.name as string,
+      query: JSON.parse(r.query_json as string) as SearchQuery,
+      monitor: !!r.monitor,
+      intervalMinutes: r.interval_minutes as number,
+      adaptiveIntervalMinutes: (r.adaptive_interval_minutes as number) ?? undefined,
+      lastRunAt: (r.last_run_at as string) ?? null,
+      lastLowestPrice: (r.last_lowest_price as number) ?? null,
+      createdAt: r.created_at as string,
+    }));
+  }
+
+  getSavedSearch(id: number): SavedSearch | undefined {
+    return this.listSavedSearches().find((s) => s.id === id);
+  }
+
+  deleteSavedSearch(id: number): void {
+    this.db.prepare(`DELETE FROM alerts WHERE saved_search_id = ?`).run(id);
+    this.db.prepare(`DELETE FROM saved_searches WHERE id = ?`).run(id);
+  }
+
+  updateSavedSearchRun(id: number, lowestPrice: number | null, adaptiveIntervalMinutes: number): void {
+    this.db
+      .prepare(
+        `UPDATE saved_searches SET last_run_at = datetime('now'), last_lowest_price = ?, adaptive_interval_minutes = ? WHERE id = ?`
+      )
+      .run(lowestPrice, adaptiveIntervalMinutes, id);
+  }
+
+  // ---- alerts (§25-§26) ---------------------------------------------------
+
+  createAlert(savedSearchId: number, kind: string, threshold: number, channels: string[]): number {
+    const info = this.db
+      .prepare(`INSERT INTO alerts (saved_search_id, kind, threshold, channels_json) VALUES (?,?,?,?)`)
+      .run(savedSearchId, kind, threshold, JSON.stringify(channels));
+    return Number(info.lastInsertRowid);
+  }
+
+  listAlerts(savedSearchId?: number): AlertRule[] {
+    const rows = (
+      savedSearchId
+        ? this.db.prepare(`SELECT * FROM alerts WHERE saved_search_id = ?`).all(savedSearchId)
+        : this.db.prepare(`SELECT * FROM alerts`).all()
+    ) as Record<string, unknown>[];
+    return rows.map((r) => ({
+      id: r.id as number,
+      savedSearchId: r.saved_search_id as number,
+      kind: r.kind as AlertRule['kind'],
+      threshold: r.threshold as number,
+      channels: JSON.parse(r.channels_json as string) as string[],
+      active: !!r.active,
+      createdAt: r.created_at as string,
+    }));
+  }
+
+  recordAlertDelivery(alertId: number, channel: string, status: string, message: string): void {
+    this.db
+      .prepare(`INSERT INTO alert_deliveries (alert_id, channel, status, message) VALUES (?,?,?,?)`)
+      .run(alertId, channel, status, message);
+  }
+
+  // ---- provider reliability (§38) -----------------------------------------
+
+  recordProviderRun(provider: string, status: 'ok' | 'error', latencyMs: number, error?: string): void {
+    this.db
+      .prepare(`INSERT INTO provider_runs (provider, status, latency_ms, error) VALUES (?,?,?,?)`)
+      .run(provider, status, latencyMs, error ?? null);
+  }
+
+  providerStats(provider: string, windowHours = 24): {
+    successCount: number; errorCount: number; avgLatencyMs: number;
+    lastSuccessAt: string | null; lastErrorAt: string | null; lastError: string | null;
+  } {
+    const row = this.db
+      .prepare(
+        `SELECT
+           SUM(CASE WHEN status='ok' THEN 1 ELSE 0 END) AS successCount,
+           SUM(CASE WHEN status='error' THEN 1 ELSE 0 END) AS errorCount,
+           AVG(CASE WHEN status='ok' THEN latency_ms END) AS avgLatencyMs,
+           MAX(CASE WHEN status='ok' THEN ran_at END) AS lastSuccessAt,
+           MAX(CASE WHEN status='error' THEN ran_at END) AS lastErrorAt
+         FROM provider_runs WHERE provider = ? AND ran_at >= datetime('now', ?)`
+      )
+      .get(provider, `-${windowHours} hours`) as Record<string, unknown>;
+    const lastError = this.db
+      .prepare(`SELECT error FROM provider_runs WHERE provider=? AND status='error' ORDER BY ran_at DESC LIMIT 1`)
+      .get(provider) as { error: string } | undefined;
+    return {
+      successCount: Number(row.successCount ?? 0),
+      errorCount: Number(row.errorCount ?? 0),
+      avgLatencyMs: Number(row.avgLatencyMs ?? 0),
+      lastSuccessAt: (row.lastSuccessAt as string) ?? null,
+      lastErrorAt: (row.lastErrorAt as string) ?? null,
+      lastError: lastError?.error ?? null,
+    };
+  }
+
+  // ---- observability (§48) ------------------------------------------------
+
+  logEvent(level: 'info' | 'warn' | 'error', event: string, detail?: unknown, requestId?: string): void {
+    this.db
+      .prepare(`INSERT INTO system_events (level, event, detail, request_id) VALUES (?,?,?,?)`)
+      .run(level, event, detail === undefined ? null : JSON.stringify(detail), requestId ?? null);
+  }
+
+  /** Retention policy (§72): only applies when PRICE_RETENTION_DAYS is set. */
+  applyRetention(): number {
+    const days = Number(process.env.PRICE_RETENTION_DAYS ?? 0);
+    if (!days) return 0;
+    const info = this.db
+      .prepare(`DELETE FROM price_snapshots WHERE collected_at < datetime('now', ?)`)
+      .run(`-${days} days`);
+    return info.changes;
+  }
+
+  close(): void {
+    this.db.close();
+  }
+}
+
+let singleton: FlightDatabase | null = null;
+export function getDatabase(): FlightDatabase {
+  if (!singleton) singleton = new FlightDatabase();
+  return singleton;
+}

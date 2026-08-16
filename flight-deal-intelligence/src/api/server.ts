@@ -1,0 +1,303 @@
+/**
+ * REST API (§50) + dashboard hosting (§41-§45) + SSE live updates (§11).
+ * Input validation with Zod (§56); request IDs + structured logging (§48).
+ */
+import express from 'express';
+import { randomUUID } from 'node:crypto';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
+import { getDatabase } from '../db/database.js';
+import { buildDefaultRegistry } from '../providers/registry.js';
+import { AnalysisService } from '../analyzer/service.js';
+import { FlightAgent, buildQuery } from '../agent/agent.js';
+import { parseTripRequest } from '../agent/parser.js';
+import { loadAirports, nearbyAirports } from '../core/airports.js';
+import { routeKey } from '../core/types.js';
+import { currencyService } from '../core/currency.js';
+import { bookingLinks } from '../core/links.js';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const db = getDatabase();
+const registry = buildDefaultRegistry(db);
+const analysis = new AnalysisService(db);
+const agent = new FlightAgent(registry, analysis, db);
+
+export const app = express();
+app.use(express.json({ limit: '256kb' }));
+
+// request id + logging (§48)
+app.use((req, res, next) => {
+  const id = randomUUID().slice(0, 8);
+  res.locals.requestId = id;
+  res.setHeader('X-Request-Id', id);
+  const started = Date.now();
+  res.on('finish', () => {
+    console.log(JSON.stringify({ id, method: req.method, path: req.path, status: res.statusCode, ms: Date.now() - started }));
+  });
+  next();
+});
+
+app.use(express.static(join(ROOT, 'web')));
+
+const searchSchema = z.object({
+  origin: z.string().length(3),
+  destination: z.string().length(3),
+  departureDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  adults: z.coerce.number().int().min(1).max(9).default(1),
+  children: z.coerce.number().int().min(0).max(8).default(0),
+  infants: z.coerce.number().int().min(0).max(4).default(0),
+  cabin: z.enum(['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST']).default('ECONOMY'),
+  stops: z.enum(['ANY', 'NON_STOP', 'ONE_STOP', 'TWO_PLUS_STOPS']).default('ANY'),
+  maxPrice: z.coerce.number().positive().optional(),
+  airlines: z.string().optional(),
+  currency: z.string().length(3).default(currencyService.systemCurrency),
+});
+
+function toQuery(p: z.infer<typeof searchSchema>) {
+  return buildQuery({
+    origin: p.origin.toUpperCase(),
+    destination: p.destination.toUpperCase(),
+    departureDate: p.departureDate,
+    returnDate: p.returnDate,
+    passengers: { adults: p.adults, children: p.children, infants: p.infants },
+    cabin: p.cabin,
+    stops: p.stops,
+    maxPrice: p.maxPrice,
+    airlines: p.airlines?.split(',').map((a) => a.trim().toUpperCase()),
+    currency: p.currency.toUpperCase(),
+  });
+}
+
+// ---- flights (§50) --------------------------------------------------------
+
+app.get('/api/flights/search', async (req, res) => {
+  const parsed = searchSchema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  try {
+    const outcome = await registry.search(toQuery(parsed.data));
+    const scored = analysis.analyze(outcome.results);
+    res.json({
+      provider: outcome.provider,
+      attempted: outcome.attempted,
+      count: scored.length,
+      flights: scored,
+      disclaimer: 'Lowest price found across the sources available to us at search time.',
+    });
+  } catch (err) {
+    db.logEvent('error', 'search_failed', { error: String(err) }, res.locals.requestId);
+    res.status(502).json({ error: 'all providers failed', detail: String(err) });
+  }
+});
+
+app.post('/api/flights/search', async (req, res) => {
+  const parsed = searchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const outcome = await registry.search(toQuery(parsed.data));
+  const scored = analysis.analyze(outcome.results);
+  res.json({ provider: outcome.provider, count: scored.length, flights: scored });
+});
+
+app.get('/api/flights/:id', (req, res) => {
+  const row = db.db.prepare(`SELECT * FROM flight_results WHERE id = ?`).get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  res.json(row);
+});
+
+// ---- AI search (§30, §66) -------------------------------------------------
+
+app.post('/api/ai/search', async (req, res) => {
+  const schema = z.object({ prompt: z.string().min(3).max(500) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  try {
+    const report = await agent.run(parsed.data.prompt);
+    res.json(report);
+  } catch (err) {
+    res.status(502).json({ error: 'agent failed', detail: String(err) });
+  }
+});
+
+app.post('/api/ai/parse', (req, res) => {
+  const schema = z.object({ prompt: z.string().min(3).max(500) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  res.json(parseTripRequest(parsed.data.prompt));
+});
+
+// ---- routes / history (§43-§44) ------------------------------------------
+
+app.get('/api/routes/:route/history', (req, res) => {
+  const windowDays = Math.min(365, Number(req.query.days ?? 90));
+  const route = req.params.route.toUpperCase();
+  const series = db.priceSeries(route, windowDays);
+  const stats = analysis.routeStatistics(route, windowDays);
+  res.json({ route, windowDays, series, stats });
+});
+
+app.get('/api/routes/:route/cheapest-dates', (req, res) => {
+  const route = req.params.route.toUpperCase();
+  const [origin, destination] = route.split('-');
+  if (!origin || !destination) return res.status(400).json({ error: 'route format: TLV-JFK' });
+  res.json({ route, dates: agent.cheapestDates(origin, destination, Number(req.query.days ?? 90)) });
+});
+
+// ---- saved searches / monitors (§25, §27, §50) ---------------------------
+
+const savedSearchSchema = z.object({
+  name: z.string().min(1).max(120),
+  query: searchSchema,
+  monitor: z.boolean().default(true),
+  intervalMinutes: z.number().int().min(30).max(1440).default(180),
+});
+
+app.post('/api/searches', (req, res) => {
+  const parsed = savedSearchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const id = db.createSavedSearch(
+    parsed.data.name,
+    toQuery(parsed.data.query),
+    parsed.data.monitor,
+    parsed.data.intervalMinutes
+  );
+  res.status(201).json({ id });
+});
+
+app.get('/api/searches', (_req, res) => {
+  res.json(db.listSavedSearches());
+});
+
+app.delete('/api/searches/:id', (req, res) => {
+  db.deleteSavedSearch(Number(req.params.id));
+  res.status(204).end();
+});
+
+app.post('/api/searches/:id/run', async (req, res) => {
+  const search = db.getSavedSearch(Number(req.params.id));
+  if (!search) return res.status(404).json({ error: 'not found' });
+  const outcome = await registry.search(search.query);
+  const scored = analysis.analyze(outcome.results);
+  const lowest = scored.length ? Math.min(...scored.map((s) => s.normalizedPrice)) : null;
+  db.updateSavedSearchRun(search.id, lowest, search.adaptiveIntervalMinutes ?? search.intervalMinutes);
+  res.json({ provider: outcome.provider, count: scored.length, lowest, flights: scored.slice(0, 10) });
+});
+
+// ---- alerts (§25) ---------------------------------------------------------
+
+app.post('/api/alerts', (req, res) => {
+  const schema = z.object({
+    savedSearchId: z.number().int(),
+    kind: z.enum(['PRICE_BELOW', 'DROP_PERCENT', 'DEAL_SCORE_ABOVE']),
+    threshold: z.number().positive(),
+    channels: z.array(z.string()).default(['console']),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const id = db.createAlert(parsed.data.savedSearchId, parsed.data.kind, parsed.data.threshold, parsed.data.channels);
+  res.status(201).json({ id });
+});
+
+app.get('/api/alerts', (_req, res) => res.json(db.listAlerts()));
+
+// ---- deals dashboard feed (§41) ------------------------------------------
+
+app.get('/api/deals', (req, res) => {
+  const limit = Math.min(50, Number(req.query.limit ?? 20));
+  const rows = db.db
+    .prepare(
+      `SELECT ds.route, ds.score, ds.is_exceptional, ds.computed_at,
+              fr.id, fr.origin, fr.destination, fr.departure_date, fr.return_date,
+              fr.airline, fr.airline_name, fr.stops, fr.normalized_price, fr.normalized_currency,
+              fr.booking_url, fr.deep_link, fr.collected_at, fr.duration_minutes
+       FROM deal_scores ds JOIN flight_results fr ON fr.id = ds.flight_result_id
+       WHERE ds.computed_at >= datetime('now', '-2 days')
+       ORDER BY ds.score DESC LIMIT ?`
+    )
+    .all(limit) as Record<string, unknown>[];
+  const stats = new Map<string, ReturnType<typeof analysis.routeStatistics>>();
+  const deals = rows.map((r) => {
+    const route = r.route as string;
+    if (!stats.has(route)) stats.set(route, analysis.routeStatistics(route));
+    const s = stats.get(route)!;
+    const price = r.normalized_price as number;
+    return {
+      ...r,
+      typical_price: s?.average ?? null,
+      savings: s ? Math.round((s.average - price) * 100) / 100 : null,
+      freshness_minutes: Math.round((Date.now() - Date.parse(String(r.collected_at))) / 60000),
+    };
+  });
+  res.json(deals);
+});
+
+// ---- reference data -------------------------------------------------------
+
+app.get('/api/airports', (req, res) => {
+  const q = String(req.query.q ?? '').toLowerCase();
+  const all = [...loadAirports().entries()].map(([code, name]) => ({ code, name }));
+  const filtered = q
+    ? all.filter((a) => a.code.toLowerCase().includes(q) || a.name.toLowerCase().includes(q)).slice(0, 25)
+    : all.slice(0, 25);
+  res.json(filtered);
+});
+
+app.get('/api/airports/:code/nearby', (req, res) => {
+  res.json(nearbyAirports(req.params.code));
+});
+
+app.get('/api/airlines', (_req, res) => {
+  const rows = db.db.prepare(`SELECT code, name FROM airlines LIMIT 100`).all();
+  res.json(rows);
+});
+
+app.get('/api/providers', (_req, res) => {
+  res.json(registry.list().map((a) => ({ name: a.name, priority: a.priority, ...registry.health(a.name) })));
+});
+
+app.get('/api/links', (req, res) => {
+  const schema = z.object({
+    origin: z.string().length(3),
+    destination: z.string().length(3),
+    departureDate: z.string(),
+    returnDate: z.string().optional(),
+  });
+  const parsed = schema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  res.json(bookingLinks(parsed.data));
+});
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    currency: { system: currencyService.systemCurrency, ratesUpdated: currencyService.lastUpdated, source: currencyService.source },
+    providers: registry.list().map((a) => a.name),
+  });
+});
+
+// ---- SSE live updates (§11) ----------------------------------------------
+
+const sseClients = new Set<express.Response>();
+app.get('/api/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.flushHeaders();
+  sseClients.add(res);
+  req.on('close', () => sseClients.delete(res));
+});
+
+export function broadcast(event: string, data: unknown): void {
+  for (const client of sseClients) {
+    client.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  }
+}
+
+// entrypoint
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const port = Number(process.env.PORT ?? 3010);
+  void currencyService.refresh();
+  app.listen(port, () => {
+    console.log(`Flight Deal Intelligence API + dashboard: http://localhost:${port}`);
+  });
+}

@@ -15,8 +15,13 @@ import sys
 
 
 def iso(dt) -> str:
-    (y, m, d), (hh, mm) = dt.date, dt.time
-    return f"{y:04d}-{m:02d}-{d:02d}T{hh:02d}:{mm:02d}:00"
+    # Defensive: Google occasionally yields partial tuples on odd responses
+    try:
+        date = list(dt.date) + [1, 1, 1]
+        time = list(dt.time) + [0, 0]
+        return f"{date[0]:04d}-{date[1]:02d}-{date[2]:02d}T{time[0]:02d}:{time[1]:02d}:00"
+    except Exception:
+        return ""
 
 
 def main() -> None:
@@ -48,9 +53,19 @@ def main() -> None:
             currency=currency,
             max_stops=req.get("maxStops"),
         )
-        result = get_flights(query)
+        try:
+            result = get_flights(query)
+        except ValueError as e:
+            # Google served an unparseable page (usually a datacenter-IP
+            # consent/at-capacity page). Surface a clear, actionable error.
+            print(json.dumps({
+                "ok": False,
+                "error": f"Google returned an unparseable response (likely blocking this server's IP): {e}",
+            }))
+            return
         out = []
         for f in list(result):
+          try:
             legs = list(getattr(f, "flights", []) or [])
             first, last = (legs[0], legs[-1]) if legs else (None, None)
             total_minutes = sum(int(getattr(l, "duration", 0) or 0) for l in legs)
@@ -76,6 +91,8 @@ def main() -> None:
                     ],
                 }
             )
+          except Exception:
+            continue  # skip a malformed itinerary, keep the rest
         print(json.dumps({"ok": True, "currency": currency, "flights": out}))
     except Exception as e:  # noqa: BLE001 - bridge must always emit JSON
         print(json.dumps({"ok": False, "error": f"{type(e).__name__}: {e}"}))

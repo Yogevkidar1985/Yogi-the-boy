@@ -719,7 +719,12 @@ $('#searchForm').addEventListener('submit', async (ev) => {
       $('#flightList').innerHTML = `<div class="card" style="padding:16px">
         <p class="meta" style="margin-top:0">מה כל מקור ענה:</p>
         <ul class="whylist ltr" style="direction:ltr">${attempts || '<li>אין מידע</li>'}</ul>
-        <p class="muted">אם זה נמשך — ייתכן ש-Google מגביל זמנית את כתובת השרת. נסה שוב בעוד כמה דקות.</p></div>`;
+        ${(data.attempted || []).some(a => (a.provider === 'serpapi' || a.provider === 'amadeus') && a.error === 'unavailable')
+          ? `<p class="meta" style="margin-bottom:0">💡 <b>הפתרון:</b> Google מגביל שרתי ענן. הפעל את המקורות העצמאיים — הוסף מפתח חינמי של
+             <a class="book" href="https://serpapi.com" target="_blank" rel="noopener">SerpAPI</a> או
+             <a class="book" href="https://developers.amadeus.com" target="_blank" rel="noopener">Amadeus</a>
+             ב-Render → Environment (משתני SERPAPI_API_KEY / AMADEUS_CLIENT_ID+SECRET) — והחיפוש יעבוד באופן אמין.</p>`
+          : `<p class="muted">אם זה נמשך — ייתכן ש-Google מגביל זמנית את כתובת השרת. נסה שוב בעוד כמה דקות.</p>`}</div>`;
       $('#airlineChips').innerHTML = '';
       $('#resultsSec').hidden = false;
       return;

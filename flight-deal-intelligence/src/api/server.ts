@@ -350,8 +350,8 @@ app.get('/api/airports/resolve', (req, res) => {
   const q = String(req.query.q ?? '').trim();
   if (!q) return res.status(400).json({ error: 'q required' });
   const hit = resolveAirport(q);
-  if (hit && isValidAirport(hit.code)) {
-    return res.json({ code: hit.code, city: hit.city, name: airportName(hit.code) });
+  if (hit) {
+    return res.json({ code: hit.code, city: hit.city, name: airportName(hit.code) ?? hit.code });
   }
   // fall back to airport-name substring from the full DB
   const ql = q.toLowerCase();

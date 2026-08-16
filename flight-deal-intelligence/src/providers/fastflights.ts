@@ -23,13 +23,13 @@ const SEAT: Record<CabinClass, string> = {
   FIRST: 'first',
 };
 
-/** Reverse lookup: airline display name → IATA code (from data/airlines.csv). */
+/** Reverse lookup: airline display name → IATA code (from assets/airlines.csv). */
 let nameToCode: Map<string, string> | null = null;
 function airlineCode(name: string): string {
   if (!nameToCode) {
     nameToCode = new Map();
     try {
-      const csv = readFileSync(join(ROOT, 'data', 'airlines.csv'), 'utf-8');
+      const csv = readFileSync(join(ROOT, 'assets', 'airlines.csv'), 'utf-8');
       for (const line of csv.split('\n').slice(1)) {
         const idx = line.indexOf(',');
         if (idx > 0) nameToCode.set(line.slice(idx + 1).trim().toLowerCase(), line.slice(0, idx).trim());

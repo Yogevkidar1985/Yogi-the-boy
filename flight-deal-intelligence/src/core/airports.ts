@@ -5,18 +5,27 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CITIES } from './cities.js';
 
-const DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data');
+// Reference data lives in assets/ — NOT in data/, which deployments may mount
+// a persistent disk over (shadowing bundled files).
+const DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets');
 
 let airportsCache: Map<string, string> | null = null;
 
 export function loadAirports(): Map<string, string> {
   if (airportsCache) return airportsCache;
-  const csv = readFileSync(join(DATA_DIR, 'airports.csv'), 'utf-8');
   const map = new Map<string, string>();
-  for (const line of csv.split('\n').slice(1)) {
-    const idx = line.indexOf(',');
-    if (idx > 0) map.set(line.slice(0, idx).trim().toUpperCase(), line.slice(idx + 1).trim());
+  try {
+    const csv = readFileSync(join(DATA_DIR, 'airports.csv'), 'utf-8');
+    for (const line of csv.split('\n').slice(1)) {
+      const idx = line.indexOf(',');
+      if (idx > 0) map.set(line.slice(0, idx).trim().toUpperCase(), line.slice(idx + 1).trim());
+    }
+  } catch (err) {
+    // A missing reference file must never take the API down — city search
+    // (cities.ts) still works without it.
+    console.error('[airports] failed to load airports.csv:', err instanceof Error ? err.message : err);
   }
   airportsCache = map;
   return map;
@@ -27,7 +36,11 @@ export function airportName(code: string): string | undefined {
 }
 
 export function isValidAirport(code: string): boolean {
-  return loadAirports().has(code.toUpperCase());
+  const map = loadAirports();
+  if (map.size > 0) return map.has(code.toUpperCase());
+  // airports DB unavailable — fall back to the curated city database
+  const c = code.toUpperCase();
+  return CITIES.some((e) => e.codes.includes(c));
 }
 
 /**

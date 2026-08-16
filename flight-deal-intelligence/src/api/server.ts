@@ -200,19 +200,59 @@ app.post('/api/alerts', (req, res) => {
 
 app.get('/api/alerts', (_req, res) => res.json(db.listAlerts()));
 
+/** Delivery log — proves alerts actually reached their channels (§48). */
+app.get('/api/alerts/deliveries', (_req, res) => {
+  const rows = db.db
+    .prepare(
+      `SELECT ad.channel, ad.status, ad.message, ad.delivered_at, a.kind, a.threshold
+       FROM alert_deliveries ad LEFT JOIN alerts a ON a.id = ad.alert_id
+       ORDER BY ad.delivered_at DESC LIMIT 20`
+    )
+    .all();
+  res.json(rows);
+});
+
+/** Send a test message through the Telegram channel so users can verify setup. */
+app.post('/api/alerts/test', async (_req, res) => {
+  const { TelegramChannel } = await import('../alerts/channels.js');
+  const tg = new TelegramChannel();
+  if (!tg.enabled()) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Telegram is not configured — set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID',
+    });
+  }
+  try {
+    await tg.send({
+      title: '✈️ Flight Deal Intelligence — בדיקת חיבור',
+      body: 'ההתראות מחוברות! כשמחיר במעקב יירד, ההודעה תגיע לכאן.',
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(502).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ---- deals dashboard feed (§41) ------------------------------------------
 
 app.get('/api/deals', (req, res) => {
   const limit = Math.min(50, Number(req.query.limit ?? 20));
+  // one card per route+departure date: the best-scoring most recent offer (§41)
   const rows = db.db
     .prepare(
-      `SELECT ds.route, ds.score, ds.is_exceptional, ds.computed_at,
-              fr.id, fr.origin, fr.destination, fr.departure_date, fr.return_date,
-              fr.airline, fr.airline_name, fr.stops, fr.normalized_price, fr.normalized_currency,
-              fr.booking_url, fr.deep_link, fr.collected_at, fr.duration_minutes
-       FROM deal_scores ds JOIN flight_results fr ON fr.id = ds.flight_result_id
-       WHERE ds.computed_at >= datetime('now', '-2 days')
-       ORDER BY ds.score DESC LIMIT ?`
+      `SELECT * FROM (
+         SELECT ds.route, ds.score, ds.is_exceptional, ds.computed_at,
+                fr.id, fr.origin, fr.destination, fr.departure_date, fr.return_date,
+                fr.airline, fr.airline_name, fr.stops, fr.normalized_price, fr.normalized_currency,
+                fr.booking_url, fr.deep_link, fr.collected_at, fr.duration_minutes,
+                ROW_NUMBER() OVER (
+                  PARTITION BY ds.route, fr.departure_date
+                  ORDER BY ds.computed_at DESC, ds.score DESC
+                ) AS rn
+         FROM deal_scores ds JOIN flight_results fr ON fr.id = ds.flight_result_id
+         WHERE ds.computed_at >= datetime('now', '-2 days')
+       ) WHERE rn = 1
+       ORDER BY score DESC LIMIT ?`
     )
     .all(limit) as Record<string, unknown>[];
   const stats = new Map<string, ReturnType<typeof analysis.routeStatistics>>();
@@ -273,6 +313,8 @@ app.get('/api/health', (_req, res) => {
     uptime: process.uptime(),
     currency: { system: currencyService.systemCurrency, ratesUpdated: currencyService.lastUpdated, source: currencyService.source },
     providers: registry.list().map((a) => a.name),
+    telegram: { configured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) },
+    workerInProcess: process.env.RUN_WORKER === '1',
   });
 });
 

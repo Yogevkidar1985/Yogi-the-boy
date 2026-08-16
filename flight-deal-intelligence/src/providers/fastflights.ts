@@ -1,18 +1,20 @@
 /**
- * FastFlightsAdapter (§4): wraps the fast-flights Python package (Google Flights
- * data, no API key — §59) behind the uniform FlightSearchAdapter interface via a
- * JSON stdin/stdout bridge subprocess.
+ * FastFlightsAdapter (§4): wraps the fast-flights Python package v3 (Google
+ * Flights data, no API key — §59) behind the uniform FlightSearchAdapter
+ * interface via a JSON stdin/stdout bridge subprocess.
  */
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FlightSearchAdapter, ProviderCapabilities } from './adapter.js';
 import { ProviderError, withRetry } from './adapter.js';
-import type { CabinClass, FlightResult, SearchQuery } from '../core/types.js';
+import type { CabinClass, FlightResult, FlightSegment, SearchQuery } from '../core/types.js';
 import { currencyService } from '../core/currency.js';
 import { bookingLinks } from '../core/links.js';
 
-const BRIDGE = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'fast_flights_bridge.py');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const BRIDGE = join(ROOT, 'scripts', 'fast_flights_bridge.py');
 
 const SEAT: Record<CabinClass, string> = {
   ECONOMY: 'economy',
@@ -21,30 +23,49 @@ const SEAT: Record<CabinClass, string> = {
   FIRST: 'first',
 };
 
+/** Reverse lookup: airline display name → IATA code (from data/airlines.csv). */
+let nameToCode: Map<string, string> | null = null;
+function airlineCode(name: string): string {
+  if (!nameToCode) {
+    nameToCode = new Map();
+    try {
+      const csv = readFileSync(join(ROOT, 'data', 'airlines.csv'), 'utf-8');
+      for (const line of csv.split('\n').slice(1)) {
+        const idx = line.indexOf(',');
+        if (idx > 0) nameToCode.set(line.slice(idx + 1).trim().toLowerCase(), line.slice(0, idx).trim());
+      }
+    } catch {
+      /* lookup stays empty — fall through to name slice */
+    }
+  }
+  return nameToCode.get(name.trim().toLowerCase()) ?? name.slice(0, 2).toUpperCase();
+}
+
+interface BridgeLeg {
+  from: string | null;
+  to: string | null;
+  departure: string;
+  arrival: string;
+  durationMinutes: number;
+  plane: string | null;
+}
+
 interface BridgeFlight {
-  name: string | null;
+  price: number | null;
+  type: string | null;
+  airlines: string[];
+  stops: number;
   departure: string | null;
   arrival: string | null;
-  duration: string | null;
-  stops: number | null;
-  price: string | number | null;
-  is_best: boolean | null;
+  durationMinutes: number;
+  legs: BridgeLeg[];
 }
 
-function parsePrice(raw: string | number | null): { amount: number; currency: string } | null {
-  if (raw == null) return null;
-  if (typeof raw === 'number') return { amount: raw, currency: 'EUR' };
-  const symbols: Record<string, string> = { '€': 'EUR', $: 'USD', '£': 'GBP', '₪': 'ILS' };
-  const m = raw.replace(/[,\s]/g, '').match(/([€$£₪]?)(\d+(?:\.\d+)?)/);
-  if (!m) return null;
-  return { amount: Number(m[2]), currency: symbols[m[1] ?? ''] ?? 'EUR' };
-}
-
-function parseDurationMinutes(raw: string | null): number {
-  if (!raw) return 0;
-  const h = raw.match(/(\d+)\s*h/i);
-  const m = raw.match(/(\d+)\s*m/i);
-  return (h ? Number(h[1]) * 60 : 0) + (m ? Number(m[1]) : 0);
+interface BridgeResponse {
+  ok: boolean;
+  currency?: string;
+  flights?: BridgeFlight[];
+  error?: string;
 }
 
 export class FastFlightsAdapter implements FlightSearchAdapter {
@@ -67,7 +88,7 @@ export class FastFlightsAdapter implements FlightSearchAdapter {
     });
   }
 
-  private runBridge(input: object, timeoutMs: number): Promise<{ ok: boolean; flights?: BridgeFlight[]; error?: string }> {
+  private runBridge(input: object, timeoutMs: number): Promise<BridgeResponse> {
     return new Promise((resolve, reject) => {
       const child = execFile(
         this.pythonBin,
@@ -113,14 +134,29 @@ export class FastFlightsAdapter implements FlightSearchAdapter {
     if (!res.ok || !res.flights) {
       throw new ProviderError(this.name, res.error ?? 'unknown bridge error');
     }
+    const priceCurrency = (res.currency ?? query.currency ?? 'EUR').toUpperCase();
     const links = bookingLinks(query);
     const now = new Date().toISOString();
     const results: FlightResult[] = [];
+
     for (const [i, f] of res.flights.entries()) {
-      const price = parsePrice(f.price);
-      if (!price) continue;
-      const conv = currencyService.convert(price.amount, price.currency);
-      const durationMinutes = parseDurationMinutes(f.duration);
+      if (f.price == null || f.price <= 0) continue;
+      if (query.maxPrice && f.price > query.maxPrice) continue;
+      const airlineName = f.airlines[0] ?? 'Unknown';
+      const code = airlineCode(airlineName);
+      const conv = currencyService.convert(f.price, priceCurrency);
+      const segments: FlightSegment[] = f.legs.map((l) => ({
+        origin: l.from ?? query.origin,
+        destination: l.to ?? query.destination,
+        departureTime: l.departure,
+        arrivalTime: l.arrival,
+        airline: code,
+        airlineName,
+        flightNumber: '',
+        aircraft: l.plane ?? undefined,
+        durationMinutes: l.durationMinutes,
+      }));
+
       results.push({
         id: `ff-${query.origin}-${query.destination}-${query.departureDate}-${i}`,
         provider: this.name,
@@ -131,26 +167,27 @@ export class FastFlightsAdapter implements FlightSearchAdapter {
         returnDate: query.returnDate,
         departureTime: f.departure ?? '',
         arrivalTime: f.arrival ?? '',
-        durationMinutes,
-        stops: f.stops ?? 0,
-        airline: (f.name ?? 'XX').slice(0, 20),
-        airlineName: f.name ?? undefined,
+        durationMinutes: f.durationMinutes,
+        stops: f.stops,
+        airline: code,
+        airlineName,
         flightNumber: '',
+        aircraft: f.legs[0]?.plane ?? undefined,
         cabin: query.cabin,
         bags: query.bags ?? 0,
-        basePrice: price.amount,
+        basePrice: f.price,
         taxes: 0,
-        totalPrice: price.amount,
-        currency: price.currency,
+        totalPrice: f.price,
+        currency: priceCurrency,
         normalizedPrice: conv.value,
         normalizedCurrency: currencyService.systemCurrency,
         exchangeRate: conv.rate,
         exchangeRateTimestamp: conv.timestamp,
         bookingUrl: links.googleFlights,
         deepLink: links.googleFlights,
-        segments: [],
+        segments,
         collectedAt: now,
-        rawProviderData: f,
+        rawProviderData: { type: f.type, airlines: f.airlines },
       });
     }
     return results;

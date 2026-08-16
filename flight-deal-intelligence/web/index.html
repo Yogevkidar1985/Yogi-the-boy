@@ -400,7 +400,20 @@
   </div>
 
   <h3 class="sec">מעקבים והתראות</h3>
+  <div class="card" style="padding:14px 16px; margin-bottom:12px">
+    <div class="row" style="justify-content:space-between">
+      <div class="row">
+        <span id="tgStatus" class="badge warn">טלגרם: בודק…</span>
+        <span class="muted">התראות על ירידות מחיר נשלחות לטלגרם שלך</span>
+      </div>
+      <button class="track" id="tgTest">📨 שלח הודעת בדיקה לטלגרם</button>
+    </div>
+    <p class="muted" id="tgTestResult" style="margin:8px 0 0; display:none"></p>
+  </div>
   <div class="card tablewrap" id="monitors" style="padding-top:8px"><p class="muted" style="padding:0 16px">אין מעקבים עדיין — אחרי חיפוש, לחץ "עקוב אחרי המסלול" והמנוע יבדוק מחירים סביב השעון ויתריע על ירידות.</p></div>
+  <details style="margin-top:10px"><summary class="muted">יומן התראות שנשלחו</summary>
+    <div class="card tablewrap" id="deliveries" style="margin-top:8px; padding:8px 0"><p class="muted" style="padding:0 16px">עוד לא נשלחו התראות.</p></div>
+  </details>
 </main>
 
 <footer>
@@ -411,7 +424,9 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
-const fmt = (n, c = 'EUR') => n == null ? '—' : `€${Math.round(n).toLocaleString('en')}`;
+const SYM = { ILS: '₪', EUR: '€', USD: '$', GBP: '£' };
+let SYSTEM_CURRENCY = 'EUR';
+const fmt = (n, c) => n == null ? '—' : `${SYM[c ?? SYSTEM_CURRENCY] ?? (c ?? '')}${Math.round(n).toLocaleString('en')}`;
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const hhmm = (t) => { const m = String(t).match(/T?(\d{2}:\d{2})/); return m ? m[1] : '—'; };
 const durTxt = (m) => m ? `${Math.floor(m/60)}ש׳ ${m%60}ד׳` : '—';
@@ -475,7 +490,16 @@ $('#swapBtn').addEventListener('click', () => {
 (async () => {
   try {
     const h = await api('/api/health');
+    SYSTEM_CURRENCY = h.currency.system;
     $('#health').textContent = `מחובר · מטבע ${h.currency.system}`;
+    const tg = $('#tgStatus');
+    if (h.telegram?.configured) {
+      tg.textContent = 'טלגרם: מחובר ✓';
+      tg.className = 'badge score';
+    } else {
+      tg.textContent = 'טלגרם: לא מוגדר';
+      tg.className = 'badge warn';
+    }
     const provs = await api('/api/providers');
     $('#providers').innerHTML = 'מקורות: ' + provs.map(p =>
       `<span class="ltr">${esc(p.name)} (${Math.round(p.successRate * 100)}%)</span>`).join(' · ');
@@ -532,7 +556,7 @@ function flightRow(f) {
       ${why ? `<ul class="whylist">${why}</ul>` : ''}
     </div>
     <div class="buy">
-      <span class="pr num">${fmt(f.normalizedPrice)}</span>
+      <span class="pr num">${fmt(f.normalizedPrice, f.normalizedCurrency)}</span>
       <span class="per">נבדק לפני ${f.freshnessMinutes ?? '?'} דק׳ · ${esc(f.provider)}</span>
       <a class="book-btn" href="${esc(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה ↗</a>
       <div class="linkrow">
@@ -687,17 +711,50 @@ async function loadDeals() {
   if (!deals.length) return;
   $('#deals').innerHTML = deals.map(d => `<div class="card dealcard">
     <span class="dest"><span class="ltr">${esc(d.origin)} → ${esc(d.destination)}</span></span>
-    <span class="pr num">${fmt(d.normalized_price)}${d.typical_price && d.savings > 0 ? `<span class="old num">${fmt(d.typical_price)}</span>` : ''}</span>
+    <span class="pr num">${fmt(d.normalized_price, d.normalized_currency)}${d.typical_price && d.savings > 0 ? `<span class="old num">${fmt(d.typical_price, d.normalized_currency)}</span>` : ''}</span>
     <span><span class="badge score">ציון ${Math.round(d.score)}</span> ${d.is_exceptional ? '<span class="badge fire">🔥</span>' : ''}
-      ${d.savings > 0 ? `<span class="badge score">חיסכון ${fmt(d.savings)}</span>` : ''}</span>
+      ${d.savings > 0 ? `<span class="badge score">חיסכון ${fmt(d.savings, d.normalized_currency)}</span>` : ''}</span>
     <span class="muted">${esc(d.airline_name || d.airline)} · ${d.stops === 0 ? 'ישירה' : d.stops + ' עצירות'} · <span class="ltr">${esc(d.departure_date)}</span></span>
     <a href="${esc(d.booking_url)}" target="_blank" rel="noopener">להזמנה ↗</a>
     <span class="muted">נבדק לפני ${d.freshness_minutes} דק׳</span>
   </div>`).join('');
 }
 
+// ---- telegram test ----
+$('#tgTest').addEventListener('click', async () => {
+  const out = $('#tgTestResult');
+  out.style.display = 'block';
+  out.textContent = 'שולח…';
+  try {
+    const res = await fetch('/api/alerts/test', { method: 'POST' });
+    const data = await res.json();
+    out.textContent = data.ok
+      ? '✅ נשלח! בדוק את הטלגרם שלך — אם ההודעה הגיעה, ההתראות מחוברות.'
+      : `❌ ${data.error}`;
+  } catch (e) {
+    out.textContent = '❌ שגיאה בשליחה: ' + e.message;
+  }
+});
+
+// ---- alert deliveries log ----
+async function loadDeliveries() {
+  try {
+    const rows = await api('/api/alerts/deliveries');
+    if (!rows.length) return;
+    $('#deliveries').innerHTML = `<table>
+      <tr><th>מתי</th><th>ערוץ</th><th>סטטוס</th><th>הודעה</th></tr>
+      ${rows.map(r => `<tr>
+        <td class="ltr num">${esc(r.delivered_at)}</td>
+        <td class="ltr">${esc(r.channel)}</td>
+        <td>${r.status === 'ok' ? '✅' : r.status === 'skipped' ? '⏭' : '❌'} ${esc(r.status)}</td>
+        <td class="muted">${esc((r.message || '').slice(0, 80))}</td>
+      </tr>`).join('')}</table>`;
+  } catch {}
+}
+
 // ---- monitors ----
 async function loadMonitors() {
+  loadDeliveries();
   const [searches, alerts] = await Promise.all([api('/api/searches'), api('/api/alerts')]);
   if (!searches.length) return;
   $('#monitors').innerHTML = `<table>

@@ -12,17 +12,27 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 echo "==> Installing Flight Deal Intelligence from $APP_DIR"
 
+# run without sudo when already root (common on fresh VPSes)
+if [[ $EUID -eq 0 ]]; then SUDO=""; else SUDO="sudo"; fi
+
 # --- system deps ---
 if ! command -v node >/dev/null || [[ "$(node -v | cut -c2-3)" -lt 22 ]]; then
   echo "==> Installing Node.js 22"
-  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-  sudo apt-get install -y nodejs
+  curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO -E bash -
+  $SUDO apt-get install -y nodejs
 fi
-sudo apt-get install -y python3 python3-pip pipx
+$SUDO apt-get update -y || true
+$SUDO apt-get install -y python3 python3-pip || true
+$SUDO apt-get install -y pipx || true   # not present in older Debian repos — pip fallback below
 python3 -m pip install --break-system-packages -q fast-flights typing_extensions || \
   python3 -m pip install -q fast-flights typing_extensions
-pipx install 'flights[mcp]' 2>/dev/null || true
-pipx ensurepath || true
+if command -v pipx >/dev/null; then
+  pipx install 'flights[mcp]' 2>/dev/null || true
+  pipx ensurepath || true
+else
+  python3 -m pip install --break-system-packages -q 'flights[mcp]' || \
+    python3 -m pip install -q 'flights[mcp]' || true
+fi
 
 # --- app deps ---
 cd "$APP_DIR"
@@ -32,8 +42,14 @@ npm i tsx typescript
 mkdir -p data
 
 # --- systemd services ---
+if ! command -v systemctl >/dev/null; then
+  echo "!! systemd not found — this must run on a real VPS (Ubuntu/Debian)."
+  echo "   App deps are installed; you can still start manually with:"
+  echo "   npm run dev   and   npm run worker"
+  exit 1
+fi
 echo "==> Creating systemd services"
-sudo tee /etc/systemd/system/flight-intel-api.service > /dev/null <<EOF
+$SUDO tee /etc/systemd/system/flight-intel-api.service > /dev/null <<EOF
 [Unit]
 Description=Flight Deal Intelligence API + dashboard
 After=network-online.target
@@ -50,7 +66,7 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-sudo tee /etc/systemd/system/flight-intel-worker.service > /dev/null <<EOF
+$SUDO tee /etc/systemd/system/flight-intel-worker.service > /dev/null <<EOF
 [Unit]
 Description=Flight Deal Intelligence monitoring worker (24/7 price agent)
 After=network-online.target
@@ -67,21 +83,21 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
 
-sudo systemctl daemon-reload
-sudo systemctl enable --now flight-intel-api flight-intel-worker
+$SUDO systemctl daemon-reload
+$SUDO systemctl enable --now flight-intel-api flight-intel-worker
 echo "==> Services running: flight-intel-api (port 3010), flight-intel-worker"
 
 # --- optional HTTPS with Caddy ---
 if [[ -n "${DOMAIN:-}" ]]; then
   echo "==> Setting up Caddy for https://$DOMAIN"
   if ! command -v caddy >/dev/null; then
-    sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-    sudo apt-get update && sudo apt-get install -y caddy
+    $SUDO apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | $SUDO gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | $SUDO tee /etc/apt/sources.list.d/caddy-stable.list
+    $SUDO apt-get update && $SUDO apt-get install -y caddy
   fi
-  printf '%s {\n\treverse_proxy localhost:3010\n}\n' "$DOMAIN" | sudo tee /etc/caddy/Caddyfile
-  sudo systemctl reload caddy
+  printf '%s {\n\treverse_proxy localhost:3010\n}\n' "$DOMAIN" | $SUDO tee /etc/caddy/Caddyfile
+  $SUDO systemctl reload caddy
   echo "==> Done: https://$DOMAIN"
 else
   echo "==> Done: http://$(hostname -I | awk '{print $1}'):3010"

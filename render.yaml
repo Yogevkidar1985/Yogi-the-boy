@@ -1,0 +1,31 @@
+# Render Blueprint — one-click deploy for Flight Deal Intelligence.
+# Deploys a single service that serves the dashboard AND runs the 24/7
+# price-monitoring agent (RUN_WORKER=1). SQLite price history lives on a
+# persistent disk so it survives restarts and deploys.
+services:
+  - type: web
+    name: flight-deal-intelligence
+    runtime: docker
+    rootDir: flight-deal-intelligence
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /api/health
+    disk:
+      name: flight-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: RUN_WORKER
+        value: "1"
+      - key: DATABASE_PATH
+        value: /app/data/flight-intel.db
+      - key: DEFAULT_CURRENCY
+        value: ILS
+      - key: DEFAULT_ORIGIN
+        value: TLV
+      - key: MOCK_PROVIDER
+        value: "0"
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false

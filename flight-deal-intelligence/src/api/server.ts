@@ -300,4 +300,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   app.listen(port, () => {
     console.log(`Flight Deal Intelligence API + dashboard: http://localhost:${port}`);
   });
+  // Single-service deployments (Render/Railway free tiers): RUN_WORKER=1 runs
+  // the 24/7 monitoring agent inside the web process instead of a second service.
+  if (process.env.RUN_WORKER === '1') {
+    const { MonitorWorker } = await import('../worker/monitor.js');
+    new MonitorWorker().start(Number(process.env.WORKER_POLL_SECONDS ?? 60));
+  }
 }

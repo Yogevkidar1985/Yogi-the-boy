@@ -1,0 +1,14 @@
+# Railway config — deploy this directory as a single service.
+# Set root directory to flight-deal-intelligence in the Railway dashboard.
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+restartPolicyType = "always"
+
+# RUN_WORKER=1 runs the 24/7 monitoring agent inside the web process.
+# Set env vars in the dashboard: RUN_WORKER=1, DEFAULT_CURRENCY=ILS,
+# DEFAULT_ORIGIN=TLV, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID.
+# Attach a volume mounted at /app/data for persistent price history.

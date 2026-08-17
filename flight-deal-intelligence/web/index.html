@@ -1900,6 +1900,8 @@ function renderCompare(fs) {
     </div>
     <table class="cmp">
     ${row('', fs.map(f => `<td class="colhead">${esc(f.airlineName || f.airline)}<br><span class="muted ltr">${esc(f.flightNumber || '')}</span>${f === v.best ? '<br><span class="badge badge-success">הבחירה המומלצת</span>' : ''}</td>`))}
+    ${row('מסלול', fs.map(f => `<td class="ltr">${esc(f.origin)} → ${esc(f.destination)}</td>`))}
+    ${row('תאריך', fs.map(f => `<td class="ltr num">${esc(f.departureDate)}${f.returnDate ? `<br>${esc(f.returnDate)}` : ''}</td>`))}
     ${row('מחיר', fs.map((f, i) => td(`<span class="cmp-price num" data-cmpprice="${i}">${fmt(f.normalizedPrice, f.normalizedCurrency)}</span>${f.normalizedPrice > minPrice ? `<br><span class="muted num">+${fmt(f.normalizedPrice - minPrice)}</span>` : '<br><span class="muted">הזול ביותר</span>'}`, f.normalizedPrice === minPrice)))}
     ${row('ציון עסקה', fs.map(f => td(f.analysis ? `${f.analysis.dealScore}/100` : '—', (f.analysis?.dealScore ?? -1) === maxScore)))}
     ${row('עצירות', fs.map(f => td(f.stops === 0 ? 'ישירה' : f.stops, f.stops === minStops)))}
@@ -2061,12 +2063,33 @@ $('#findBetterBtn').addEventListener('click', async () => {
     <b style="color:var(--success-ink)">נמצא מחיר טוב יותר בתאריך סמוך</b>
     <div class="muted" style="margin:4px 0 8px">יציאה <span class="ltr">${esc(b.dep)}</span>${b.ret ? ` · חזרה <span class="ltr">${esc(b.ret)}</span>` : ''} — <b class="num" style="color:var(--success-ink)">${fmt(b.low)}</b> במקום <span class="num">${fmt(curLow)}</span> (חיסכון ${fmt(curLow - b.low)})</div>
     <button class="btn btn-primary btn-sm" id="applyBetter">חפש בתאריך הזה</button>
+    <button class="btn btn-ghost btn-sm" id="compareBetter">השווה מול הטיסה הנוכחית</button>
   </div>`;
   $('#applyBetter').addEventListener('click', () => {
     setDate('fDep', b.dep);
     if (b.ret) setDate('fRet', b.ret);
     $('#betterBox').innerHTML = '';
     $('#searchForm').requestSubmit();
+  });
+  // cross-date comparison: current best vs the cheaper date's best, side by side
+  $('#compareBetter').addEventListener('click', async () => {
+    const btn2 = $('#compareBetter');
+    btn2.disabled = true; btn2.textContent = 'טוען…';
+    const p = new URLSearchParams({
+      origin: lastSearch.origin, destination: lastSearch.dest, departureDate: b.dep,
+      adults: lastSearch.pax, cabin: lastSearch.cabin,
+    });
+    if (b.ret) p.set('returnDate', b.ret);
+    try {
+      const d = await api('/api/flights/search?' + p);
+      const altBest = [...(d.flights || [])].sort((x, y) => x.normalizedPrice - y.normalizedPrice)[0];
+      btn2.disabled = false; btn2.textContent = 'השווה מול הטיסה הנוכחית';
+      if (!cur || !altBest) { toast('לא ניתן להשוות כרגע', 'err'); return; }
+      renderCompare([cur, altBest]);
+    } catch {
+      btn2.disabled = false; btn2.textContent = 'השווה מול הטיסה הנוכחית';
+      toast('טעינת ההשוואה נכשלה', 'err');
+    }
   });
 });
 
@@ -2132,6 +2155,26 @@ window.track = async (origin, destination, departureDate, returnDate) => {
 /* ---- live deal board ---- */
 let dealSort = 'score';
 let lastDeals = [];
+/** Deals selected for cross-route comparison (index into lastDeals). */
+const dealCompare = new Set();
+/** Shape a board deal into the comparison table's flight format. */
+function dealAsFlight(d) {
+  return {
+    origin: d.origin, destination: d.destination,
+    departureDate: d.departure_date, returnDate: d.return_date || null,
+    airline: d.airline, airlineName: d.airline_name || d.airline, flightNumber: '',
+    stops: d.stops ?? 0, durationMinutes: d.duration_minutes || 0,
+    departureTime: '', arrivalTime: '',
+    normalizedPrice: d.normalized_price, normalizedCurrency: d.normalized_currency,
+    bookingUrl: d.booking_url,
+    analysis: {
+      dealScore: Math.round(d.score),
+      vsAverage: d.typical_price ? (d.normalized_price - d.typical_price) / d.typical_price : null,
+      explanation: [],
+    },
+    freshnessMinutes: d.freshness_minutes,
+  };
+}
 $$('.dsort').forEach(b => b.addEventListener('click', () => {
   dealSort = b.dataset.dsort;
   $$('.dsort').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
@@ -2163,12 +2206,24 @@ async function loadDeals() {
     <span>${st ? `<span class="badge ${st[1]}">${st[0]} · ${Math.round(d.score)}</span>` : ''}
       ${d.drop_pct > 0 ? `<span class="badge badge-success">ירידה של ${d.drop_pct}%</span>` : d.savings > 0 ? `<span class="badge badge-success">חיסכון ${fmt(d.savings, d.normalized_currency)}</span>` : ''}</span>
     <span class="muted">${esc(d.airline_name || d.airline)} · ${d.stops === 0 ? 'ישירה' : d.stops + ' עצירות'} · <span class="ltr">${esc(d.departure_date)}</span></span>
-    <span style="display:flex; gap:10px; align-items:center">
+    <span style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
       <a href="${esc(d.booking_url)}" target="_blank" rel="noopener">להזמנה</a>
       <button class="btn btn-ghost btn-sm" data-dverify="${i}">בדוק מחיר</button>
+      <button class="btn btn-ghost btn-sm cmpbtn" data-dcmp="${i}" aria-pressed="${dealCompare.has(i)}">השווה</button>
     </span>
     <span data-dfresh="${i}">${freshnessLabel(d)}</span>
   </div>`; }).join('');
+  // cross-route deal comparison: pick 2-3 deals from the live board
+  $$('#deals [data-dcmp]').forEach(b => b.addEventListener('click', () => {
+    const i = Number(b.dataset.dcmp);
+    if (dealCompare.has(i)) dealCompare.delete(i);
+    else if (dealCompare.size >= 3) { toast('אפשר להשוות עד 3 דילים', 'err'); return; }
+    else dealCompare.add(i);
+    b.setAttribute('aria-pressed', String(dealCompare.has(i)));
+    if (dealCompare.size >= 2) {
+      renderCompare([...dealCompare].map(k => dealAsFlight(lastDeals[k])));
+    }
+  }));
   $$('#deals [data-dverify]').forEach(b => b.addEventListener('click', async () => {
     const d = lastDeals[Number(b.dataset.dverify)];
     b.disabled = true; b.textContent = 'בודק…';

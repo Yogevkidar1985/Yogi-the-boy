@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Flight Deal Intelligence</title>
+<script>
+  /* Runs before first paint: Light is the default, dark only if the user
+     chose it earlier. Prevents a flash of the wrong theme on load. */
+  try {
+    document.documentElement.dataset.theme =
+      localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
+  } catch (_) { document.documentElement.dataset.theme = 'light'; }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -65,39 +73,9 @@
     --line-low: #1a63d4;
     --line-avg: #c2571f;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --page: #0c1220;
-      --surface: #151d2e;
-      --surface-2: #1c2638;
-      --border: #2a3750;
-      --ink: #eef2f8;
-      --ink-2: #b3bfd2;
-      --ink-3: #8391a8;
-      --hero: #0b1f3a;
-      --hero-ink: #ffffff;
-      --hero-ink-2: #aebdd2;
-      --primary: #4d8ce8;
-      --primary-hover: #6ba1ee;
-      --primary-ink: #0b1f3a;
-      --primary-soft: #1c2c47;
-      --success: #2fae7f;
-      --success-bg: #123528;
-      --success-ink: #7fd6b3;
-      --warning-bg: #382c12;
-      --warning-ink: #e5c07b;
-      --error-bg: #3d2020;
-      --error-ink: #f1a1a1;
-      --info-bg: #1c2c47;
-      --info-ink: #9dc0f0;
-      --line-low: #4d8ce8;
-      --line-avg: #d97f4a;
-      --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
-      --shadow-md: 0 4px 16px rgba(0,0,0,.45);
-      --shadow-lg: 0 12px 32px rgba(0,0,0,.55);
-    }
-  }
+  /* Dark is opt-in only. The product always starts in Light mode; the OS
+     preference is deliberately NOT consulted, so the first paint is identical
+     for every visitor. Dark applies only after the user picks it. */
   :root[data-theme="dark"] {
     color-scheme: dark;
     --page: #0c1220;
@@ -1108,24 +1086,25 @@ $('#bnDeals').innerHTML = icon('down', 18);
 $('#bnSaved').innerHTML = icon('heart', 18);
 $('#bnAlerts').innerHTML = icon('bell', 18);
 
-/* ---- theme toggle: light / dark, persisted ---- */
+/* ---- theme toggle: light by default, dark only by explicit choice ----
+   The default is LIGHT for everyone, regardless of the operating system
+   setting. Dark mode is applied only when the user picked it, and that
+   choice persists across sessions. */
 (() => {
   const btn = $('#themeBtn');
   const apply = (t) => {
-    if (t) document.documentElement.dataset.theme = t;
-    else delete document.documentElement.dataset.theme;
-    const dark = t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches);
+    const dark = t === 'dark';
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
     btn.innerHTML = icon(dark ? 'sun' : 'moon', 16);
     btn.title = dark ? 'מעבר למצב בהיר' : 'מעבר למצב כהה';
+    btn.setAttribute('aria-label', btn.title);
+    btn.setAttribute('aria-pressed', String(dark));
   };
-  let theme = localStorage.getItem('theme') || '';
-  apply(theme);
+  apply(localStorage.getItem('theme') === 'dark' ? 'dark' : 'light');
   btn.addEventListener('click', () => {
-    const dark = document.documentElement.dataset.theme === 'dark' ||
-      (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
-    theme = dark ? 'light' : 'dark';
-    localStorage.setItem('theme', theme);
-    apply(theme);
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('theme', next);
+    apply(next);
   });
 })();
 

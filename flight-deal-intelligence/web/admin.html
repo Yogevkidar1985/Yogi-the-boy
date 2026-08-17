@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ניהול מנועי חיפוש — Flight Deal Intelligence</title>
+<script>
+  try {
+    document.documentElement.dataset.theme =
+      localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
+  } catch (_) { document.documentElement.dataset.theme = 'light'; }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -17,14 +23,15 @@
     --ok-bg:#e3f4ec; --ok-ink:#0a6b4a; --warn-bg:#fbf1dc; --warn-ink:#7a5300;
     --err-bg:#fbe7e7; --err-ink:#a33636; --radius:12px;
   }
-  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  /* Light is the default everywhere; dark applies only to the explicit choice. */
+  :root[data-theme="dark"]{
     color-scheme: dark;
     --page:#0c1220; --surface:#151d2e; --surface-2:#1c2638; --border:#2a3750;
     --ink:#eef2f8; --ink-2:#b3bfd2; --ink-3:#8391a8;
     --primary:#4d8ce8; --primary-ink:#0b1f3a;
     --ok-bg:#123528; --ok-ink:#7fd6b3; --warn-bg:#382c12; --warn-ink:#e5c07b;
     --err-bg:#3d2020; --err-ink:#f1a1a1;
-  }}
+  }
   *{box-sizing:border-box}
   body{margin:0;background:var(--page);color:var(--ink);font-family:var(--font-family);font-size:14.5px;line-height:1.6;overflow-x:clip}
   .ltr{direction:ltr;unicode-bidi:isolate}

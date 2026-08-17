@@ -720,6 +720,22 @@ export class FlightDatabase {
     }));
   }
 
+  /**
+   * Calendar grid data: lowest observed price per DEPARTURE date for a month,
+   * from recent observations only — a day with no fresh data stays unknown,
+   * never an invented price.
+   */
+  lowsByDepartureDate(route: string, monthPrefix: string, freshDays = 7): { day: string; low: number; seen: string }[] {
+    return this.db
+      .prepare(
+        `SELECT departure_date AS day, MIN(price) AS low, MAX(collected_at) AS seen
+         FROM price_snapshots
+         WHERE route = ? AND departure_date LIKE ? AND collected_at >= datetime('now', ?)
+         GROUP BY departure_date ORDER BY day`
+      )
+      .all(route, `${monthPrefix}%`, `-${freshDays} days`) as { day: string; low: number; seen: string }[];
+  }
+
   // ---- live deal events (price drops, new deals) --------------------------
 
   recordDealEvent(e: {

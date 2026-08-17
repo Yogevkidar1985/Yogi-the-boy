@@ -201,6 +201,39 @@ app.post('/api/flights/search', async (req, res) => {
   res.json({ provider: outcome.provider, count: scored.length, flights: scored });
 });
 
+/**
+ * Calendar API (date grid): real lowest price per departure date for a month.
+ * Days without fresh observations return status "unknown" — no fake prices.
+ */
+app.get('/api/flights/calendar', (req, res) => {
+  const schema = z.object({
+    origin: z.string().length(3),
+    destination: z.string().length(3),
+    month: z.string().regex(/^\d{4}-\d{2}$/),
+  });
+  const parsed = schema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const route = routeKey(parsed.data.origin, parsed.data.destination);
+  const rows = db.lowsByDepartureDate(route, parsed.data.month);
+  const prices = rows.map((r) => r.low).sort((a, b) => a - b);
+  const min = prices[0];
+  const p25 = prices[Math.floor(prices.length * 0.25)];
+  const p75 = prices[Math.floor(prices.length * 0.75)];
+  const days = rows.map((r) => ({
+    date: r.day,
+    lowestPrice: r.low,
+    currency: currencyService.systemCurrency,
+    status:
+      prices.length < 3 ? 'average'
+      : r.low === min ? 'cheapest'
+      : r.low <= p25! ? 'good'
+      : r.low >= p75! ? 'expensive'
+      : 'average',
+    lastUpdated: r.seen,
+  }));
+  res.json({ route, month: parsed.data.month, days });
+});
+
 app.get('/api/flights/:id', (req, res) => {
   const row = db.db.prepare(`SELECT * FROM flight_results WHERE id = ?`).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'not found' });

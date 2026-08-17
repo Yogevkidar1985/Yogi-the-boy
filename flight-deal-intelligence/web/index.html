@@ -282,9 +282,15 @@
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
   .cal-grid .dow { font-size: 11px; color: var(--ink-3); padding: 4px 0; font-weight: 600; }
   .cal-grid button {
-    background: none; border: none; border-radius: var(--radius-sm); padding: 7px 0; font-family: inherit;
+    background: none; border: none; border-radius: var(--radius-sm); padding: 4px 0 3px; font-family: inherit;
     font-size: var(--fs-sm); color: var(--ink); cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 0; min-height: 34px;
   }
+  .cal-pr { font-size: 9.5px; line-height: 1.2; color: var(--ink-3); min-height: 11px; }
+  .cal-pr.st-cheapest { color: var(--success-ink); font-weight: 700; }
+  .cal-pr.st-good { color: var(--success-ink); }
+  .cal-pr.st-expensive { color: var(--error-ink); }
+  .cal-grid button.sel .cal-pr { color: var(--primary-ink); }
   .cal-grid button:hover:not(:disabled) { background: var(--surface-2); }
   .cal-grid button:disabled { color: var(--border); cursor: default; }
   .cal-grid button.sel { background: var(--primary); color: var(--primary-ink); font-weight: 700; }
@@ -358,7 +364,8 @@
   .datestrip button[aria-pressed="true"] { border-color: var(--primary); background: var(--surface-2); }
 
   /* sort tabs + results */
-  .sorttabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); }
+  .sorttabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); }
+  @media (max-width: 560px) { .sorttabs { grid-template-columns: repeat(2, 1fr); } }
   .sorttabs button { background: var(--surface); border: none; font-family: inherit; padding: 12px 8px; cursor: pointer; color: var(--ink-2); }
   .sorttabs button .t { font-weight: 700; color: var(--ink); display: block; font-size: var(--fs-body); }
   .sorttabs button .v { font-size: var(--fs-caption); }
@@ -638,10 +645,15 @@
   <section id="resultsSec" hidden>
     <h3 class="sec" id="resultsTitle">תוצאות</h3>
     <div id="priceLevel" style="margin-bottom:10px"></div>
+    <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" id="findBetterBtn" hidden>מצא מחיר טוב יותר — בדיקת תאריכים סמוכים</button>
+    </div>
+    <div id="betterBox"></div>
     <div class="sorttabs" role="tablist" aria-label="מיון">
       <button data-sort="best" aria-selected="true"><span class="t">מומלץ</span><span class="v" id="vBest">—</span></button>
       <button data-sort="cheap" aria-selected="false"><span class="t">הכי זול</span><span class="v" id="vCheap">—</span></button>
       <button data-sort="fast" aria-selected="false"><span class="t">הכי מהיר</span><span class="v" id="vFast">—</span></button>
+      <button data-sort="deal" aria-selected="false"><span class="t">הדיל הטוב ביותר</span><span class="v" id="vDeal">—</span></button>
     </div>
     <div class="filters" id="quickFilters" role="group" aria-label="סינון">
       <button class="chip qf" data-k="stops" data-v="0" aria-pressed="false">ישירה בלבד</button>
@@ -990,20 +1002,36 @@ function setDate(inputId, iso) {
   el.dataset.iso = iso;
   el.value = fmtHe(iso);
 }
+/** Calendar price grid: real per-departure-date lows, cached per route+month. */
+const calPriceCache = new Map();
+async function calendarPrices(month) {
+  const o = $('#fOrigin').dataset.code, d = $('#fDest').dataset.code;
+  if (!o || !d) return null;
+  const key = `${o}-${d}:${month}`;
+  if (calPriceCache.has(key)) return calPriceCache.get(key);
+  try {
+    const data = await api(`/api/flights/calendar?origin=${o}&destination=${d}&month=${month}`);
+    const map = Object.fromEntries(data.days.map(x => [x.date, x]));
+    calPriceCache.set(key, map);
+    return map;
+  } catch { return null; }
+}
+
 function wireCalendar(inputId, calId, onPick) {
   const input = document.getElementById(inputId);
   const cal = document.getElementById(calId);
   let view = new Date();
   function render() {
     const y = view.getFullYear(), m = view.getMonth();
+    const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`;
     const first = new Date(y, m, 1).getDay();
     const days = new Date(y, m + 1, 0).getDate();
     let cells = HE_DOW.map(d => `<span class="dow">${d}</span>`).join('');
     for (let i = 0; i < first; i++) cells += '<span></span>';
     for (let d = 1; d <= days; d++) {
-      const iso = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const iso = `${monthKey}-${String(d).padStart(2, '0')}`;
       const cls = [iso === input.dataset.iso ? 'sel' : '', iso === TODAY_ISO ? 'today' : ''].join(' ');
-      cells += `<button type="button" data-iso="${iso}" class="${cls}" ${iso < TODAY_ISO ? 'disabled' : ''}>${d}</button>`;
+      cells += `<button type="button" data-iso="${iso}" class="${cls}" ${iso < TODAY_ISO ? 'disabled' : ''}><span>${d}</span><span class="cal-pr num" data-pr="${iso}"></span></button>`;
     }
     cal.innerHTML = `<div class="cal-head">
         <button type="button" class="cal-nav" data-nav="-1">‹</button>
@@ -1011,7 +1039,21 @@ function wireCalendar(inputId, calId, onPick) {
         <button type="button" class="cal-nav" data-nav="1">›</button>
       </div>
       <div class="cal-grid">${cells}</div>
-      <div class="cal-foot"><button type="button" data-today="1">היום</button></div>`;
+      <div class="cal-foot"><button type="button" data-today="1">היום</button><span class="muted" id="${calId}Note" style="margin-inline-start:auto; font-size:11px"></span></div>`;
+    // progressive price fill from real observations — days without fresh data stay blank
+    calendarPrices(monthKey).then((map) => {
+      if (!map) return;
+      let any = false;
+      cal.querySelectorAll('[data-pr]').forEach((el) => {
+        const day = map[el.dataset.pr];
+        if (!day) return;
+        any = true;
+        el.textContent = fmt(day.lowestPrice, day.currency);
+        el.classList.add('st-' + day.status);
+      });
+      const note = document.getElementById(calId + 'Note');
+      if (note) note.textContent = any ? 'מחירים לפי תצפיות אחרונות' : '';
+    });
     cal.querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', (ev) => {
       ev.stopPropagation();
       view = new Date(y, m + Number(b.dataset.nav), 1);
@@ -1215,6 +1257,7 @@ function sorted() {
   const f = [...flights];
   if (currentSort === 'cheap') return f.sort((a, b) => a.normalizedPrice - b.normalizedPrice);
   if (currentSort === 'fast') return f.sort((a, b) => (a.durationMinutes || 1e9) - (b.durationMinutes || 1e9));
+  if (currentSort === 'deal') return f.sort((a, b) => (b.analysis?.dealScore ?? 0) - (a.analysis?.dealScore ?? 0));
   return f.sort((a, b) => b.valueScore - a.valueScore);
 }
 
@@ -1367,9 +1410,11 @@ function renderFlights() {
   const cheap = [...flights].sort((x, y) => x.normalizedPrice - y.normalizedPrice)[0];
   const fast = [...flights].sort((x, y) => (x.durationMinutes||1e9) - (y.durationMinutes||1e9))[0];
   const best = [...flights].sort((x, y) => y.valueScore - x.valueScore)[0];
+  const deal = [...flights].sort((x, y) => (y.analysis?.dealScore ?? 0) - (x.analysis?.dealScore ?? 0))[0];
   $('#vBest').textContent = best ? `${fmt(best.normalizedPrice)} · ${durTxt(best.durationMinutes)}` : '—';
   $('#vCheap').textContent = cheap ? `${fmt(cheap.normalizedPrice)} · ${durTxt(cheap.durationMinutes)}` : '—';
   $('#vFast').textContent = fast ? `${fmt(fast.normalizedPrice)} · ${durTxt(fast.durationMinutes)}` : '—';
+  $('#vDeal').textContent = deal?.analysis ? `${fmt(deal.normalizedPrice)} · ציון ${deal.analysis.dealScore}` : '—';
 }
 
 $$('.sorttabs button').forEach(b => b.addEventListener('click', () => {
@@ -1447,6 +1492,17 @@ $('#searchForm').addEventListener('submit', async (ev) => {
     }
     flights = data.flights;
     activeAirlines.clear();
+    lastSearch = {
+      origin: p.get('origin'), dest: p.get('destination'),
+      dep: p.get('departureDate'), ret: p.get('returnDate') || null,
+      pax: p.get('adults'), cabin: p.get('cabin'),
+    };
+    $('#findBetterBtn').hidden = false;
+    $('#betterBox').innerHTML = '';
+    // shareable URL: the search state lives in the address bar
+    const urlP = new URLSearchParams({ from: lastSearch.origin, to: lastSearch.dest, dep: lastSearch.dep, pax: lastSearch.pax, cabin: lastSearch.cabin });
+    if (lastSearch.ret) urlP.set('ret', lastSearch.ret);
+    history.pushState(lastSearch, '', '?' + urlP);
     const tried = data.attempted || [];
     const answered = tried.filter(a => a.ok).length;
     const srcLine = tried.length > 1 ? ` · נבדקו ${tried.length} מקורות, ${answered} ענו` : ` · מקור ${esc(data.provider)}`;
@@ -1562,6 +1618,50 @@ async function runDiscovery(prompt) {
     $('#flightList').innerHTML = '';
   }
 }
+
+/* ---- Find Better Price: real search expansion over nearby dates ---- */
+let lastSearch = null;
+function shiftDate(iso, days) { return new Date(Date.parse(iso) + days * 864e5).toISOString().slice(0, 10); }
+
+$('#findBetterBtn').addEventListener('click', async () => {
+  if (!lastSearch) return;
+  const btn = $('#findBetterBtn');
+  btn.disabled = true; btn.textContent = 'בודק 4 תאריכים סמוכים במקביל…';
+  const cur = [...flights].sort((a, b) => a.normalizedPrice - b.normalizedPrice)[0];
+  const curLow = cur?.normalizedPrice ?? Infinity;
+  const offsets = [-2, -1, 1, 2].filter(o => shiftDate(lastSearch.dep, o) >= TODAY_ISO);
+  const checks = await Promise.all(offsets.map(async (o) => {
+    const p = new URLSearchParams({
+      origin: lastSearch.origin, destination: lastSearch.dest,
+      departureDate: shiftDate(lastSearch.dep, o),
+      adults: lastSearch.pax, cabin: lastSearch.cabin,
+    });
+    if (lastSearch.ret) p.set('returnDate', shiftDate(lastSearch.ret, o));
+    try {
+      const d = await api('/api/flights/search?' + p);
+      const low = d.flights?.length ? Math.min(...d.flights.map(f => f.normalizedPrice)) : null;
+      return low ? { offset: o, dep: p.get('departureDate'), ret: p.get('returnDate'), low } : null;
+    } catch { return null; }
+  }));
+  const better = checks.filter(Boolean).filter(c => c.low < curLow * 0.97).sort((a, b) => a.low - b.low);
+  btn.disabled = false; btn.textContent = 'מצא מחיר טוב יותר — בדיקת תאריכים סמוכים';
+  if (!better.length) {
+    $('#betterBox').innerHTML = `<div class="card" style="padding:10px 14px; margin-bottom:10px"><b>התאריך שבחרת הוא הזול ביותר</b> <span class="muted">בטווח של יומיים לכל כיוון (נבדק כרגע מול המקורות).</span></div>`;
+    return;
+  }
+  const b = better[0];
+  $('#betterBox').innerHTML = `<div class="card" style="padding:12px 14px; margin-bottom:10px; border-inline-start:4px solid var(--success)">
+    <b style="color:var(--success-ink)">נמצא מחיר טוב יותר בתאריך סמוך</b>
+    <div class="muted" style="margin:4px 0 8px">יציאה <span class="ltr">${esc(b.dep)}</span>${b.ret ? ` · חזרה <span class="ltr">${esc(b.ret)}</span>` : ''} — <b class="num" style="color:var(--success-ink)">${fmt(b.low)}</b> במקום <span class="num">${fmt(curLow)}</span> (חיסכון ${fmt(curLow - b.low)})</div>
+    <button class="btn btn-primary btn-sm" id="applyBetter">חפש בתאריך הזה</button>
+  </div>`;
+  $('#applyBetter').addEventListener('click', () => {
+    setDate('fDep', b.dep);
+    if (b.ret) setDate('fRet', b.ret);
+    $('#betterBox').innerHTML = '';
+    $('#searchForm').requestSubmit();
+  });
+});
 
 /* ---- fresh price verification (meta-search: never trust a stale price) ---- */
 async function verifyPrice(idx, btn) {
@@ -2079,6 +2179,29 @@ function drawChart(series) {
   };
   svg.onmouseleave = () => { tip.style.display = 'none'; $('#xhair').style.display = 'none'; $('#dot').style.display = 'none'; };
 }
+
+/* ---- URL state: load a shared search, honor back/forward ---- */
+function applyUrlSearch(s) {
+  if (!s?.from || !s?.to || !s?.dep) return false;
+  $('#fOrigin').value = s.from; $('#fOrigin').dataset.code = s.from;
+  $('#fDest').value = s.to; $('#fDest').dataset.code = s.to;
+  setDate('fDep', s.dep);
+  if (s.ret) { setDate('fRet', s.ret); } else { $('#fRet').value = ''; delete $('#fRet').dataset.iso; }
+  if (s.pax) $('#fPax').value = s.pax;
+  if (s.cabin) $('#fCabin').value = s.cabin;
+  $('#searchForm').requestSubmit();
+  return true;
+}
+window.addEventListener('popstate', (ev) => {
+  const st = ev.state;
+  if (st?.origin) applyUrlSearch({ from: st.origin, to: st.dest, dep: st.dep, ret: st.ret, pax: st.pax, cabin: st.cabin });
+});
+(() => {
+  const q = new URLSearchParams(location.search);
+  if (q.get('from')) {
+    applyUrlSearch({ from: q.get('from'), to: q.get('to'), dep: q.get('dep'), ret: q.get('ret'), pax: q.get('pax'), cabin: q.get('cabin') });
+  }
+})();
 
 loadDeals(); loadMonitors(); loadAlerts(); loadWatches(); loadChart();
 try {

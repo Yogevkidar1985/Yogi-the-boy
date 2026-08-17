@@ -102,6 +102,14 @@
   .hero h2 { font-size: clamp(26px, 4.5vw, 40px); margin: 26px 0 4px; font-weight: 800; letter-spacing: -.02em; text-wrap: balance; }
   .hero p.lead { margin: 0 0 20px; color: var(--hero-ink-2); font-size: 16px; }
 
+  .tg-top {
+    margin-inline-start: auto; background: rgba(255,255,255,.12); color: var(--hero-ink);
+    border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 8px 18px;
+    font: inherit; font-weight: 700; cursor: pointer;
+  }
+  .tg-top:hover { background: rgba(255,255,255,.22); }
+  .tg-top.ok { background: var(--good); border-color: var(--good); }
+
   /* ---- search panel ---- */
   .panel {
     max-width: 1060px; margin: -62px auto 0; padding: 0 20px;
@@ -295,6 +303,7 @@
     <div class="brand">
       <h1>✈️ Flight Deal Intelligence</h1>
       <span class="sub">המנוע הפרטי שלך למחירי טיסות · <span id="health">מתחבר…</span></span>
+      <button id="tgTopBtn" class="tg-top" type="button">🔔 התראות טלגרם</button>
     </div>
     <h2>לאן טסים? המנוע כבר יודע אם המחיר באמת זול.</h2>
     <p class="lead">כל תוצאה מגיעה עם הוכחה: ציון עסקה, השוואה להיסטוריה, וכמה חסכת.</p>
@@ -484,8 +493,9 @@ async function api(path, opts) {
 }
 
 // defaults
-$('#fDep').value = new Date(Date.now() + 21 * 864e5).toISOString().slice(0, 10);
-$('#fRet').value = new Date(Date.now() + 28 * 864e5).toISOString().slice(0, 10);
+$('#fDep').value = new Date().toISOString().slice(0, 10);
+$('#fRet').value = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+$('#fDep').min = new Date().toISOString().slice(0, 10);
 $('#awMonth').value = new Date(Date.now() + 40 * 864e5).toISOString().slice(0, 7);
 
 // ---- tabs ----
@@ -602,12 +612,16 @@ $$('.triptype .chip').forEach(b => b.addEventListener('click', () => {
     SYSTEM_CURRENCY = h.currency.system;
     $('#health').textContent = `מחובר · מטבע ${h.currency.system}`;
     const tg = $('#tgStatus');
+    const top = $('#tgTopBtn');
     if (h.telegram?.configured) {
       tg.textContent = 'טלגרם: מחובר ✓';
       tg.className = 'badge score';
+      top.textContent = '🔔 התראות טלגרם פעילות';
+      top.classList.add('ok');
     } else {
       tg.textContent = 'טלגרם: לא מוגדר';
       tg.className = 'badge warn';
+      top.textContent = '🔔 חבר התראות טלגרם';
     }
     const provs = await api('/api/providers');
     $('#providers').innerHTML = 'מקורות: ' + provs.map(p =>
@@ -933,6 +947,18 @@ async function loadDeals() {
     <span class="muted">נבדק לפני ${d.freshness_minutes} דק׳</span>
   </div>`).join('');
 }
+
+$('#tgTopBtn').addEventListener('click', async () => {
+  if ($('#tgTopBtn').classList.contains('ok')) {
+    try {
+      const res = await fetch('/api/alerts/test', { method: 'POST' });
+      const d = await res.json();
+      alert(d.ok ? '✅ הודעת בדיקה נשלחה לטלגרם שלך!' : '❌ ' + d.error);
+    } catch { alert('❌ שגיאה בשליחה'); }
+  } else {
+    $('#tgStatus').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+});
 
 // ---- telegram test ----
 $('#tgTest').addEventListener('click', async () => {

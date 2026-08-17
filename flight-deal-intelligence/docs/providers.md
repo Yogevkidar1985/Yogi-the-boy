@@ -67,7 +67,7 @@
 
 ```
 {KEY} {origin} {destination} {departureDate} {returnDate}
-{adults} {children} {infants} {cabin} {currency}
+{adults} {children} {infants} {cabin} {cabinTitle} {cabinLower} {currency}
 ```
 
 ### מיפוי שדות

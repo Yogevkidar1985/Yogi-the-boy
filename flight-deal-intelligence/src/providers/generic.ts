@@ -114,6 +114,13 @@ export class GenericHttpAdapter implements FlightSearchAdapter {
       children: String(q.passengers.children),
       infants: String(q.passengers.infants),
       cabin: q.cabin,
+      // APIs disagree on how the cabin is spelled; offer the common casings
+      // so a URL template never has to hardcode a single class.
+      cabinTitle: q.cabin
+        .split('_')
+        .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
+        .join('_'),
+      cabinLower: q.cabin.toLowerCase(),
       currency: q.currency,
     };
     return this.spec.urlTemplate.replace(/\{(\w+)\}/g, (_, k: string) =>

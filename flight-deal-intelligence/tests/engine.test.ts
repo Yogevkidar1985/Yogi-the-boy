@@ -351,6 +351,28 @@ describe('generic adapter: connect any flight API by configuration', () => {
     }
   });
 
+  it('offers the cabin in every casing a provider might expect', async () => {
+    const calls: string[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string) => {
+      calls.push(String(url));
+      return { ok: true, status: 200, json: async () => body } as never;
+    }) as never;
+    try {
+      const adapter = new GenericHttpAdapter({
+        ...spec,
+        // path-style API that wants "Premium_Economy", not "PREMIUM_ECONOMY"
+        urlTemplate: 'https://x.test/{KEY}/{origin}/{destination}/{cabin}/{cabinTitle}/{cabinLower}',
+      });
+      await adapter.search(buildQuery({
+        origin: 'TLV', destination: 'ATH', departureDate: '2026-10-12', cabin: 'PREMIUM_ECONOMY',
+      }));
+      expect(calls[0]).toBe('https://x.test/secret-key/TLV/ATH/PREMIUM_ECONOMY/Premium_Economy/premium_economy');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
   it('is not registered when its slot is unconfigured', () => {
     expect(readGenericSpec('CUSTOM_NOT_SET')).toBeUndefined();
   });

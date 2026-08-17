@@ -392,6 +392,14 @@
       <button data-sort="cheap" aria-selected="false"><span class="t">הכי זול</span><span class="v" id="vCheap">—</span></button>
       <button data-sort="fast" aria-selected="false"><span class="t">הכי מהיר</span><span class="v" id="vFast">—</span></button>
     </div>
+    <div class="filters" id="quickFilters" role="group" aria-label="סינון">
+      <button class="chip qf" data-k="stops" data-v="0" aria-pressed="false">ישירה בלבד</button>
+      <button class="chip qf" data-k="stops" data-v="1" aria-pressed="false">עד עצירה אחת</button>
+      <button class="chip qf" data-k="dep" data-v="morning" aria-pressed="false">🌅 המראה בבוקר (5-12)</button>
+      <button class="chip qf" data-k="dep" data-v="afternoon" aria-pressed="false">☀️ צהריים (12-18)</button>
+      <button class="chip qf" data-k="dep" data-v="evening" aria-pressed="false">🌙 ערב (18-24)</button>
+      <button class="chip qf" data-k="dur" data-v="short" aria-pressed="false">⏱ עד 8 שעות</button>
+    </div>
     <div class="filters" id="airlineChips"></div>
     <div id="flightList"></div>
     <div id="recsBox"></div>
@@ -706,10 +714,27 @@ function renderPriceLevel() {
   }
 }
 
+const quick = { stops: null, dep: null, dur: null };
+$$('#quickFilters .qf').forEach(b => b.addEventListener('click', () => {
+  const k = b.dataset.k, v = b.dataset.v;
+  quick[k] = quick[k] === v ? null : v;
+  $$('#quickFilters .qf').forEach(x =>
+    x.setAttribute('aria-pressed', String(quick[x.dataset.k] === x.dataset.v)));
+  renderFlights();
+}));
+
+function depHour(f) { const m = String(f.departureTime).match(/T(\d{2})/); return m ? Number(m[1]) : null; }
+
 function renderFlights() {
   renderPriceLevel();
   let list = sorted();
   if (activeAirlines.size) list = list.filter(f => activeAirlines.has(f.airline));
+  if (quick.stops !== null) list = list.filter(f => f.stops <= Number(quick.stops));
+  if (quick.dep) list = list.filter(f => {
+    const h = depHour(f); if (h === null) return true;
+    return quick.dep === 'morning' ? h >= 5 && h < 12 : quick.dep === 'afternoon' ? h >= 12 && h < 18 : h >= 18;
+  });
+  if (quick.dur === 'short') list = list.filter(f => !f.durationMinutes || f.durationMinutes <= 480);
   $('#flightList').innerHTML = list.slice(0, 12).map(flightRow).join('') ||
     '<p class="muted">אין תוצאות מתאימות לסינון.</p>';
   const cheap = [...flights].sort((x, y) => x.normalizedPrice - y.normalizedPrice)[0];

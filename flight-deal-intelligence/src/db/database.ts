@@ -219,6 +219,18 @@ CREATE TABLE IF NOT EXISTS search_preferences (
   preferences_json TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS search_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  query TEXT,
+  total_queries INTEGER NOT NULL DEFAULT 1,
+  total_results INTEGER NOT NULL DEFAULT 0,
+  best_price REAL,
+  providers TEXT,
+  elapsed_ms INTEGER,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS system_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   level TEXT NOT NULL,
@@ -628,6 +640,65 @@ export class FlightDatabase {
       lastErrorAt: (row.lastErrorAt as string) ?? null,
       lastError: lastError?.error ?? null,
     };
+  }
+
+  // ---- meta-search KPIs ---------------------------------------------------
+
+  recordSearchSession(s: {
+    kind: 'structured' | 'agent' | 'verify' | 'monitor';
+    query?: string;
+    totalQueries?: number;
+    totalResults: number;
+    bestPrice?: number | null;
+    providers?: string[];
+    elapsedMs?: number;
+  }): void {
+    this.db
+      .prepare(
+        `INSERT INTO search_sessions (kind, query, total_queries, total_results, best_price, providers, elapsed_ms)
+         VALUES (?,?,?,?,?,?,?)`
+      )
+      .run(
+        s.kind, s.query ?? null, s.totalQueries ?? 1, s.totalResults,
+        s.bestPrice ?? null, s.providers ? JSON.stringify(s.providers) : null, s.elapsedMs ?? null
+      );
+  }
+
+  searchMetrics(windowHours = 24): Record<string, unknown> {
+    const agg = this.db
+      .prepare(
+        `SELECT COUNT(*) AS sessions, SUM(total_queries) AS queries, SUM(total_results) AS results,
+                AVG(elapsed_ms) AS avgElapsedMs, MIN(best_price) AS bestPrice
+         FROM search_sessions WHERE created_at >= datetime('now', ?)`
+      )
+      .get(`-${windowHours} hours`) as Record<string, unknown>;
+    const recent = this.db
+      .prepare(`SELECT * FROM search_sessions ORDER BY id DESC LIMIT 20`)
+      .all();
+    return { windowHours, ...agg, recent };
+  }
+
+  /**
+   * Deal probability 0-100 per route from accumulated history: how often does
+   * this route show prices well below its average, plus trend/volatility hints.
+   * Used to focus Freestyle/Everything search budget on high-yield routes.
+   */
+  dealProbability(route: string): number {
+    const stats = this.db
+      .prepare(`SELECT average, volatility, trend, sample_count FROM price_statistics WHERE route = ?`)
+      .get(route) as { average: number; volatility: number; trend: string; sample_count: number } | undefined;
+    if (!stats || !stats.average || stats.sample_count < 5) return 50; // unknown → neutral (explore)
+    const dealRow = this.db
+      .prepare(
+        `SELECT AVG(CASE WHEN price < ? THEN 1.0 ELSE 0 END) AS dealShare
+         FROM price_snapshots WHERE route = ? AND collected_at >= datetime('now', '-90 days')`
+      )
+      .get(stats.average * 0.85, route) as { dealShare: number | null };
+    let score = 40 + (dealRow.dealShare ?? 0) * 45; // routes that often dip below 85% of average
+    if (stats.trend === 'FALLING') score += 10;
+    if (stats.trend === 'RISING') score -= 5;
+    score += Math.min(10, stats.volatility * 40); // volatile routes produce more windows
+    return Math.max(0, Math.min(100, Math.round(score)));
   }
 
   // ---- observability (§48) ------------------------------------------------

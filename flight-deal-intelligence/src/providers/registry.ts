@@ -123,8 +123,9 @@ export class ProviderRegistry {
    * provider, not the sum. Local/synthetic providers (mock) are used only when
    * every live source came back empty, so demo data never pollutes real data.
    */
-  async search(query: SearchQuery): Promise<SearchOutcome> {
+  async search(query: SearchQuery, opts: { fresh?: boolean } = {}): Promise<SearchOutcome> {
     const cacheKey = JSON.stringify(query);
+    if (opts.fresh) return this.searchLive(query, cacheKey); // verification: never serve cache
     const cached = this.cache.get(cacheKey);
     if (cached) {
       const age = Date.now() - cached.at;

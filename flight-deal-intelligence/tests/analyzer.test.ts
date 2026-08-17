@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { computeConsensus, computePriceConfidence } from '../src/analyzer/service.js';
 import { mean, median, stdDev, percentileRank, detectTrend, computeRouteStatistics, isAnomalouslyLow } from '../src/analyzer/statistics.js';
 import { computeDealScore, computeValueScore } from '../src/analyzer/dealscore.js';
 import { dedupe, fingerprint } from '../src/analyzer/dedup.js';
@@ -106,5 +107,45 @@ describe('deduplication (§37)', () => {
     const a = flight({ id: 'a' });
     const b = flight({ id: 'b', flightNumber: 'LY316', departureTime: '2026-10-12T15:00:00' });
     expect(dedupe([a, b])).toHaveLength(2);
+  });
+
+  it('records every provider observation as a source (meta-search)', () => {
+    const a = flight({ id: 'a', provider: 'p1', normalizedPrice: 300 });
+    const b = flight({ id: 'b', provider: 'p2', normalizedPrice: 280 });
+    const c = flight({ id: 'c', provider: 'p3', normalizedPrice: 305 });
+    const out = dedupe([a, b, c]);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.id).toBe('b'); // cheapest wins the booking source
+    expect(out[0]!.sources).toHaveLength(3);
+    expect(out[0]!.sources!.map((s) => s.provider).sort()).toEqual(['p1', 'p2', 'p3']);
+  });
+});
+
+describe('market consensus + price confidence (meta-search)', () => {
+  it('consensus summarizes cross-provider prices', () => {
+    const f = dedupe([
+      flight({ id: 'a', provider: 'p1', normalizedPrice: 290 }),
+      flight({ id: 'b', provider: 'p2', normalizedPrice: 289 }),
+      flight({ id: 'c', provider: 'p3', normalizedPrice: 292 }),
+    ])[0]!;
+    const c = computeConsensus(f)!;
+    expect(c.sourceCount).toBe(3);
+    expect(c.min).toBe(289);
+    expect(c.max).toBe(292);
+    expect(c.spread).toBeLessThan(0.02);
+  });
+
+  it('multi-source fresh agreement scores higher than lone stale price', () => {
+    const strong = computePriceConfidence(3, { sourceCount: 3, min: 289, median: 290, max: 292, spread: 0.01 }, 290, 289);
+    const weak = computePriceConfidence(120, undefined, 290, 289);
+    expect(strong).toBeGreaterThan(85);
+    expect(weak).toBeLessThan(60);
+    expect(strong).toBeGreaterThan(weak);
+  });
+
+  it('lone outlier far below market is penalized until verified', () => {
+    const outlier = computePriceConfidence(5, { sourceCount: 1, min: 120, median: 120, max: 120, spread: 0 }, 390, 120);
+    const normal = computePriceConfidence(5, { sourceCount: 1, min: 300, median: 300, max: 300, spread: 0 }, 390, 300);
+    expect(outlier).toBeLessThan(normal);
   });
 });

@@ -79,14 +79,27 @@ export class FlightAgent {
     private db: FlightDatabase = getDatabase()
   ) {}
 
+  /**
+   * Candidate generation: order the "anywhere" universe by learned deal
+   * probability so the bounded search budget is spent on routes where cheap
+   * fares actually appear — never a blind brute-force sweep.
+   */
+  private rankCandidates(origin: string, dests: string[]): string[] {
+    return dests
+      .map((d) => ({ d, p: this.db.dealProbability(routeKey(origin, d)) }))
+      .sort((a, b) => b.p - a.p)
+      .map((x) => x.d);
+  }
+
   /** Build the (bounded) list of concrete queries for a parsed request (§29 step 4). */
   buildSearchMatrix(req: ParsedTripRequest): SearchQuery[] {
     const queries: SearchQuery[] = [];
+    const origin0 = req.origins[0] ?? 'TLV';
     const destinations = req.mode === 'ANYWHERE'
-      ? ANYWHERE_DESTINATIONS
+      ? this.rankCandidates(origin0, ANYWHERE_DESTINATIONS)
       : req.destinations.length
         ? req.destinations
-        : ANYWHERE_DESTINATIONS.slice(0, 10);
+        : this.rankCandidates(origin0, ANYWHERE_DESTINATIONS).slice(0, 10);
 
     const { from, to } = req.departureWindow;
     // Sample departure dates across the window; density depends on how many
@@ -213,6 +226,16 @@ export class FlightAgent {
     }
 
     const recommendations = this.buildRecommendations(best, allScored);
+
+    this.db.recordSearchSession({
+      kind: 'agent',
+      query: request.raw.slice(0, 200),
+      totalQueries: queries.length,
+      totalResults: allScored.length,
+      bestPrice: best?.normalizedPrice ?? null,
+      providers: [...providersUsed],
+      elapsedMs: Date.now() - started,
+    });
 
     return {
       request,

@@ -1127,6 +1127,8 @@ function flightRow(f, idx) {
       <div>
         ${state ? `<span class="badge ${state[1]}">${state[0]} · ${a.dealScore}</span>` : ''}
         ${a.vsAverage != null && a.vsAverage < -0.05 ? `<span class="badge badge-success">${Math.round(Math.abs(a.vsAverage) * 100)}% מתחת לממוצע</span>` : ''}
+        ${f.consensus && f.consensus.sourceCount > 1 ? `<span class="badge badge-info" title="אותה טיסה נמצאה ביותר ממקור אחד">אושר ב-${f.consensus.sourceCount} מקורות</span>` : ''}
+        ${f.priceConfidence != null ? `<span class="badge ${f.priceConfidence >= 80 ? 'badge-success' : f.priceConfidence >= 55 ? 'badge-neutral' : 'badge-warning'}" title="עד כמה אפשר לסמוך על המחיר המוצג: טריות, מספר מקורות והסכמה ביניהם">אמון מחיר ${f.priceConfidence}</span>` : ''}
         ${a.isErrorFareCandidate ? '<span class="badge badge-warning">מומלץ לוודא מול חברת התעופה</span>' : ''}
       </div>
       ${why ? `<ul class="whylist">${why}</ul>` : ''}
@@ -1144,8 +1146,8 @@ function flightRow(f, idx) {
       </details>` : ''}
     </div>
     <div class="buy">
-      <span class="pr num ${isCheap ? 'cheap' : ''}">${fmt(f.normalizedPrice, f.normalizedCurrency)}</span>
-      <span class="per">נבדק לפני ${f.freshnessMinutes ?? '?'} דק׳ · ${esc(f.provider)}</span>
+      <span class="pr num ${isCheap ? 'cheap' : ''}" data-price="${idx}">${fmt(f.normalizedPrice, f.normalizedCurrency)}</span>
+      <span class="per" data-per="${idx}">נבדק לפני ${f.freshnessMinutes ?? '?'} דק׳ · ${esc(f.provider)}</span>
       <div class="buyrow">
         <a class="btn btn-primary btn-sm" href="${esc(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה ${icon('external', 13)}</a>
         <button class="heart ${saved ? 'saved' : ''}" data-watch="${idx}" title="שמירה למעקב מחיר" aria-label="שמירה למעקב מחיר">${icon('heart', 17)}</button>
@@ -1163,7 +1165,10 @@ function flightRow(f, idx) {
           ].map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${n}</a>`).join('');
         })()}
       </div>
-      <button class="btn btn-ghost btn-sm" onclick='track(${JSON.stringify(f.origin)},${JSON.stringify(f.destination)},${JSON.stringify(f.departureDate)},${JSON.stringify(f.returnDate ?? null)})'>${icon('bell', 13)} עקוב אחרי המסלול</button>
+      <div class="buyrow">
+        <button class="btn btn-ghost btn-sm" onclick='track(${JSON.stringify(f.origin)},${JSON.stringify(f.destination)},${JSON.stringify(f.departureDate)},${JSON.stringify(f.returnDate ?? null)})'>${icon('bell', 13)} עקוב אחרי המסלול</button>
+        <button class="btn btn-ghost btn-sm" data-verify="${idx}" title="בדיקה טרייה מול המקורות — האם המחיר עדיין בתוקף">${icon('check', 13)} אימות מחיר</button>
+      </div>
     </div>
   </div>`;
 }
@@ -1215,6 +1220,7 @@ function renderFlights() {
   $('#flightList').innerHTML = renderedList.map((f, i) => flightRow(f, i)).join('') ||
     '<p class="muted">אין תוצאות מתאימות לסינון. נסו תאריכים גמישים, שדות תעופה סמוכים או Freestyle.</p>';
   $$('#flightList [data-watch]').forEach(b => b.addEventListener('click', () => openWatchDialog(renderedList[Number(b.dataset.watch)])));
+  $$('#flightList [data-verify]').forEach(b => b.addEventListener('click', () => verifyPrice(Number(b.dataset.verify), b)));
   const cheap = [...flights].sort((x, y) => x.normalizedPrice - y.normalizedPrice)[0];
   const fast = [...flights].sort((x, y) => (x.durationMinutes||1e9) - (y.durationMinutes||1e9))[0];
   const best = [...flights].sort((x, y) => y.valueScore - x.valueScore)[0];
@@ -1408,6 +1414,44 @@ async function runDiscovery(prompt) {
     statusOff();
     $('#resultsTitle').textContent = 'הסריקה נכשלה — נסו שוב.';
     $('#flightList').innerHTML = '';
+  }
+}
+
+/* ---- fresh price verification (meta-search: never trust a stale price) ---- */
+async function verifyPrice(idx, btn) {
+  const f = renderedList[idx];
+  if (!f) return;
+  btn.disabled = true;
+  btn.textContent = 'בודק מול המקורות…';
+  try {
+    const r = await api('/api/flights/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        origin: f.origin, destination: f.destination,
+        departureDate: f.departureDate, returnDate: f.returnDate ?? undefined,
+        airline: f.airline, flightNumber: f.flightNumber || undefined,
+        expectedPrice: f.normalizedPrice,
+      }),
+    });
+    const per = document.querySelector(`[data-per="${idx}"]`);
+    const pr = document.querySelector(`[data-price="${idx}"]`);
+    if (!r.available) {
+      if (per) per.textContent = 'הטיסה לא נמצאה בבדיקה טרייה — ייתכן שההצעה פגה';
+      toast('ההצעה לא נמצאה בבדיקה טרייה', 'err');
+    } else if (r.priceChanged) {
+      if (pr) pr.textContent = fmt(r.currentPrice, r.currency);
+      if (per) per.textContent = `המחיר עודכן כרגע (היה ${fmt(r.expectedPrice, r.currency)})`;
+      f.normalizedPrice = r.currentPrice;
+      toast(`המחיר השתנה: ${fmt(r.currentPrice, r.currency)} (${r.delta > 0 ? '+' : ''}${Math.round(r.delta)})`);
+    } else {
+      if (per) per.textContent = 'המחיר אומת כרגע מול המקורות';
+      toast('המחיר אומת — עדיין בתוקף');
+    }
+    btn.textContent = 'אומת כרגע';
+  } catch {
+    btn.disabled = false;
+    btn.textContent = 'אימות מחיר';
+    toast('האימות נכשל — נסו שוב', 'err');
   }
 }
 

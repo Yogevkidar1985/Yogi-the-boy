@@ -2,12 +2,52 @@
  * Analysis service: persists results + snapshots, computes route statistics
  * and scores every flight against history and the live market (§2, §14-§16).
  */
-import type { FlightResult, RouteStatistics, ScoredFlight } from '../core/types.js';
+import type { FlightResult, MarketConsensus, RouteStatistics, ScoredFlight } from '../core/types.js';
 import { routeKey } from '../core/types.js';
 import { getDatabase, type FlightDatabase } from '../db/database.js';
 import { computeRouteStatistics } from './statistics.js';
 import { dedupe, fingerprint } from './dedup.js';
 import { scoreFlight, type MarketContext } from './dealscore.js';
+
+/** Cross-provider consensus for one deduped itinerary. */
+export function computeConsensus(f: FlightResult): MarketConsensus | undefined {
+  const prices = (f.sources ?? []).map((s) => s.price).sort((a, b) => a - b);
+  if (!prices.length) return undefined;
+  const min = prices[0]!;
+  const max = prices[prices.length - 1]!;
+  const median = prices[Math.floor(prices.length / 2)]!;
+  return {
+    sourceCount: prices.length,
+    min,
+    median,
+    max,
+    spread: min > 0 ? (max - min) / min : 0,
+  };
+}
+
+/**
+ * Price confidence 0-100 (§37 of the meta-search spec): how much this shown
+ * price can be trusted. Freshness + independent-source agreement raise it;
+ * spread across sources, staleness and lone-outlier prices lower it.
+ */
+export function computePriceConfidence(
+  freshnessMinutes: number,
+  consensus: MarketConsensus | undefined,
+  marketMedian: number | null,
+  price: number
+): number {
+  let score = 55;
+  // freshness: full bonus under 10 minutes, fades to 0 at 90 minutes
+  score += Math.max(0, 25 * (1 - Math.max(0, freshnessMinutes - 10) / 80));
+  // independent confirmations
+  const n = consensus?.sourceCount ?? 1;
+  score += n >= 3 ? 20 : n === 2 ? 13 : 0;
+  // disagreement between sources
+  if (consensus && consensus.spread > 0.05) score -= Math.min(20, consensus.spread * 100);
+  // single-source price far below this search's market median → outlier caution
+  if (n === 1 && marketMedian && price < marketMedian * 0.6) score -= 25;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
 
 export class AnalysisService {
   constructor(private db: FlightDatabase = getDatabase()) {}
@@ -80,7 +120,14 @@ export class AnalysisService {
       history,
       previousLow: this.previousLow(route),
     };
-    const scored = unique.map((f) => scoreFlight(f, ctx));
+    const marketPrices = [...ctx.marketPrices].sort((a, b) => a - b);
+    const marketMedian = marketPrices.length ? marketPrices[Math.floor(marketPrices.length / 2)]! : null;
+    const scored = unique.map((f) => {
+      const s = scoreFlight(f, ctx);
+      s.consensus = computeConsensus(f);
+      s.priceConfidence = computePriceConfidence(s.freshnessMinutes, s.consensus, marketMedian, s.normalizedPrice);
+      return s;
+    });
     for (const s of scored) {
       this.db.db
         .prepare(

@@ -85,9 +85,18 @@ function toQuery(p: z.infer<typeof searchSchema>) {
 app.get('/api/flights/search', async (req, res) => {
   const parsed = searchSchema.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const started = Date.now();
   try {
     const outcome = await registry.search(toQuery(parsed.data));
     const scored = analysis.analyze(outcome.results);
+    db.recordSearchSession({
+      kind: 'structured',
+      query: `${parsed.data.origin}-${parsed.data.destination} ${parsed.data.departureDate}`,
+      totalResults: scored.length,
+      bestPrice: scored.length ? Math.min(...scored.map((s) => s.normalizedPrice)) : null,
+      providers: outcome.attempted.filter((a) => a.ok).map((a) => a.provider),
+      elapsedMs: Date.now() - started,
+    });
     res.json({
       provider: outcome.provider,
       attempted: outcome.attempted,
@@ -99,6 +108,88 @@ app.get('/api/flights/search', async (req, res) => {
     db.logEvent('error', 'search_failed', { error: String(err) }, res.locals.requestId);
     res.status(502).json({ error: 'all providers failed', detail: String(err) });
   }
+});
+
+/**
+ * Price verification (meta-search §33-§35): re-run the query FRESH (no cache),
+ * find the same itinerary, and report whether the shown price still holds.
+ * Used for top deals and before redirecting to booking.
+ */
+app.post('/api/flights/verify', async (req, res) => {
+  const schema = z.object({
+    origin: z.string().length(3),
+    destination: z.string().length(3),
+    departureDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    airline: z.string().max(3).optional(),
+    flightNumber: z.string().max(12).optional(),
+    expectedPrice: z.number().positive(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const d = parsed.data;
+  const started = Date.now();
+  try {
+    const outcome = await registry.search(
+      buildQuery({
+        origin: d.origin.toUpperCase(),
+        destination: d.destination.toUpperCase(),
+        departureDate: d.departureDate,
+        returnDate: d.returnDate,
+      }),
+      { fresh: true }
+    );
+    const scored = analysis.analyze(outcome.results);
+    // exact itinerary first; otherwise the route's current best price
+    const match =
+      scored.find(
+        (f) =>
+          (!d.airline || f.airline === d.airline) &&
+          (!d.flightNumber || f.flightNumber === d.flightNumber)
+      ) ?? [...scored].sort((a, b) => a.normalizedPrice - b.normalizedPrice)[0];
+    db.recordSearchSession({
+      kind: 'verify',
+      query: `${d.origin}-${d.destination} ${d.departureDate}`,
+      totalResults: scored.length,
+      bestPrice: match?.normalizedPrice ?? null,
+      providers: outcome.attempted.filter((a) => a.ok).map((a) => a.provider),
+      elapsedMs: Date.now() - started,
+    });
+    if (!match) {
+      return res.json({
+        verified: false,
+        available: false,
+        expectedPrice: d.expectedPrice,
+        currentPrice: null,
+        priceChanged: null,
+        message: 'itinerary not found in a fresh search',
+      });
+    }
+    const delta = match.normalizedPrice - d.expectedPrice;
+    res.json({
+      verified: true,
+      available: true,
+      exactMatch: Boolean(
+        (!d.airline || match.airline === d.airline) &&
+        (!d.flightNumber || match.flightNumber === d.flightNumber)
+      ),
+      expectedPrice: d.expectedPrice,
+      currentPrice: match.normalizedPrice,
+      currency: match.normalizedCurrency,
+      priceChanged: Math.abs(delta) > Math.max(2, d.expectedPrice * 0.01),
+      delta: Math.round(delta * 100) / 100,
+      priceConfidence: match.priceConfidence,
+      sources: match.sources,
+      flight: match,
+    });
+  } catch (err) {
+    res.status(502).json({ error: 'verification failed', detail: String(err) });
+  }
+});
+
+/** Meta-search KPI feed: sessions, volumes, latency (spec §75-§76, §101-§105). */
+app.get('/api/metrics/search', (req, res) => {
+  res.json(db.searchMetrics(Math.min(24 * 14, Number(req.query.hours ?? 24))));
 });
 
 app.post('/api/flights/search', async (req, res) => {

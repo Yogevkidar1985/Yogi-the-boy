@@ -54,6 +54,15 @@ export interface FlightSegment {
   durationMinutes: number;
 }
 
+/** One provider's observation of the same itinerary (meta-search source). */
+export interface PriceSource {
+  provider: string;
+  price: number;
+  currency: string;
+  collectedAt: string;
+  bookingUrl?: string;
+}
+
 /** Normalized flight result — spec §13. */
 export interface FlightResult {
   id: string;
@@ -87,6 +96,18 @@ export interface FlightResult {
   segments: FlightSegment[];
   collectedAt: string; // ISO
   rawProviderData?: unknown;
+  /** Every provider that returned this same itinerary (filled by dedup). */
+  sources?: PriceSource[];
+}
+
+/** Cross-provider agreement for one itinerary (meta-search consensus). */
+export interface MarketConsensus {
+  sourceCount: number;
+  min: number;
+  median: number;
+  max: number;
+  /** relative spread (max-min)/min — small spread = strong agreement */
+  spread: number;
 }
 
 /** Statistics for a route's price history — §14, §44. */
@@ -120,6 +141,9 @@ export interface ScoredFlight extends FlightResult {
   analysis: DealAnalysis;
   valueScore: number; // §46
   freshnessMinutes: number; // §69
+  /** 0-100: how much to trust this price (freshness, source count, agreement). */
+  priceConfidence?: number;
+  consensus?: MarketConsensus;
 }
 
 /** Parsed natural-language request — §17, §30. */

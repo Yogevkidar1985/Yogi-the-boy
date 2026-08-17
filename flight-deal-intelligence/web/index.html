@@ -86,6 +86,30 @@
   }
 
   * { box-sizing: border-box; }
+  h1, h2, h3, h4, button, input, select, textarea { font-family: inherit; font-weight: inherit; }
+  h1, h2, h3, .brand h1, .hero h2 { font-weight: 700; }
+  .cal {
+    position: absolute; top: calc(100% + 6px); inset-inline-start: 0; z-index: 40;
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px; width: 280px; user-select: none;
+  }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .cal-head b { font-size: 14.5px; }
+  .cal-nav { background: var(--card-2); border: 1px solid var(--border); border-radius: 8px;
+    width: 30px; height: 30px; cursor: pointer; color: var(--ink-2); font-size: 14px; }
+  .cal-nav:hover { color: var(--accent); border-color: var(--accent); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+  .cal-grid .dow { font-size: 11px; color: var(--ink-3); padding: 4px 0; font-weight: 600; }
+  .cal-grid button {
+    background: none; border: none; border-radius: 8px; padding: 7px 0; font: inherit;
+    font-size: 13.5px; color: var(--ink); cursor: pointer;
+  }
+  .cal-grid button:hover:not(:disabled) { background: var(--card-2); }
+  .cal-grid button:disabled { color: var(--border); cursor: default; }
+  .cal-grid button.sel { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .cal-grid button.today:not(.sel) { border: 1px solid var(--accent); color: var(--accent); }
+  .cal-foot { display: flex; justify-content: flex-start; margin-top: 8px; }
+  .cal-foot button { background: none; border: none; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; font-weight: 650; }
   body {
     margin: 0; background: var(--page); color: var(--ink);
     font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -351,11 +375,13 @@
         </div>
         <div class="field dates">
           <label for="fDep">יציאה</label>
-          <input id="fDep" type="date" name="departureDate" required>
+          <input id="fDep" readonly required autocomplete="off" style="cursor:pointer">
+          <div class="cal" id="calDep" hidden></div>
         </div>
         <div class="field dates" id="retField">
           <label for="fRet">חזרה</label>
-          <input id="fRet" type="date" name="returnDate">
+          <input id="fRet" readonly autocomplete="off" style="cursor:pointer">
+          <div class="cal" id="calRet" hidden></div>
         </div>
         <button class="cta" type="submit">חיפוש</button>
       </div>
@@ -493,9 +519,73 @@ async function api(path, opts) {
 }
 
 // defaults
-$('#fDep').value = new Date().toISOString().slice(0, 10);
-$('#fRet').value = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
-$('#fDep').min = new Date().toISOString().slice(0, 10);
+// ---- custom flat Hebrew calendar ----
+const HE_MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+const HE_DOW = ['א','ב','ג','ד','ה','ו','ש'];
+const TODAY_ISO = new Date().toISOString().slice(0, 10);
+function fmtHe(iso) { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; }
+function setDate(inputId, iso) {
+  const el = document.getElementById(inputId);
+  el.dataset.iso = iso;
+  el.value = fmtHe(iso);
+}
+function wireCalendar(inputId, calId, onPick) {
+  const input = document.getElementById(inputId);
+  const cal = document.getElementById(calId);
+  let view = new Date();
+  function render() {
+    const y = view.getFullYear(), m = view.getMonth();
+    const first = new Date(y, m, 1).getDay();
+    const days = new Date(y, m + 1, 0).getDate();
+    let cells = HE_DOW.map(d => `<span class="dow">${d}</span>`).join('');
+    for (let i = 0; i < first; i++) cells += '<span></span>';
+    for (let d = 1; d <= days; d++) {
+      const iso = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const cls = [iso === input.dataset.iso ? 'sel' : '', iso === TODAY_ISO ? 'today' : ''].join(' ');
+      cells += `<button type="button" data-iso="${iso}" class="${cls}" ${iso < TODAY_ISO ? 'disabled' : ''}>${d}</button>`;
+    }
+    cal.innerHTML = `<div class="cal-head">
+        <button type="button" class="cal-nav" data-nav="-1">‹</button>
+        <b>${HE_MONTHS[m]} ${y}</b>
+        <button type="button" class="cal-nav" data-nav="1">›</button>
+      </div>
+      <div class="cal-grid">${cells}</div>
+      <div class="cal-foot"><button type="button" data-today="1">היום</button></div>`;
+    cal.querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      view = new Date(y, m + Number(b.dataset.nav), 1);
+      render();
+    }));
+    cal.querySelectorAll('[data-iso]').forEach(b => b.addEventListener('click', () => {
+      setDate(inputId, b.dataset.iso);
+      cal.hidden = true;
+      if (onPick) onPick(b.dataset.iso);
+    }));
+    cal.querySelector('[data-today]').addEventListener('click', () => {
+      setDate(inputId, TODAY_ISO);
+      view = new Date();
+      cal.hidden = true;
+      if (onPick) onPick(TODAY_ISO);
+    });
+  }
+  input.addEventListener('click', () => {
+    document.querySelectorAll('.cal').forEach(c => { if (c !== cal) c.hidden = true; });
+    view = input.dataset.iso ? new Date(input.dataset.iso) : new Date();
+    render();
+    cal.hidden = !cal.hidden;
+  });
+  document.addEventListener('click', (ev) => {
+    if (!cal.contains(ev.target) && ev.target !== input) cal.hidden = true;
+  });
+}
+setDate('fDep', TODAY_ISO);
+setDate('fRet', new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10));
+wireCalendar('fDep', 'calDep', (iso) => {
+  if (tripType === 'round' && (!$('#fRet').dataset.iso || $('#fRet').dataset.iso < iso)) {
+    setDate('fRet', new Date(Date.parse(iso) + 7 * 864e5).toISOString().slice(0, 10));
+  }
+});
+wireCalendar('fRet', 'calRet');
 $('#awMonth').value = new Date(Date.now() + 40 * 864e5).toISOString().slice(0, 7);
 
 // ---- tabs ----
@@ -595,12 +685,13 @@ $$('.triptype .chip').forEach(b => b.addEventListener('click', () => {
   const ret = $('#retField');
   if (tripType === 'oneway') {
     ret.style.display = 'none';
+    delete $('#fRet').dataset.iso;
     $('#fRet').value = '';
   } else {
     ret.style.display = '';
-    if (!$('#fRet').value) {
-      const dep = $('#fDep').value;
-      if (dep) $('#fRet').value = new Date(Date.parse(dep) + 7 * 864e5).toISOString().slice(0, 10);
+    const dep = $('#fDep').dataset.iso;
+    if (dep && !$('#fRet').dataset.iso) {
+      setDate('fRet', new Date(Date.parse(dep) + 7 * 864e5).toISOString().slice(0, 10));
     }
   }
 }));
@@ -800,11 +891,11 @@ $('#searchForm').addEventListener('submit', async (ev) => {
   const p = new URLSearchParams({
     origin: originCode,
     destination: destCode,
-    departureDate: $('#fDep').value,
+    departureDate: $('#fDep').dataset.iso,
     adults: $('#fPax').value.replace('+', ''),
     cabin: $('#fCabin').value,
   });
-  if (tripType === 'round' && $('#fRet').value) p.set('returnDate', $('#fRet').value);
+  if (tripType === 'round' && $('#fRet').dataset.iso) p.set('returnDate', $('#fRet').dataset.iso);
   if ($('#fDirect').checked) p.set('stops', 'NON_STOP');
   if ($('#fMax').value) p.set('maxPrice', $('#fMax').value);
   try {

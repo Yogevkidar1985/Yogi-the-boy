@@ -675,6 +675,32 @@ app.get('/api/providers', (_req, res) => {
   );
 });
 
+/**
+ * Test Connection (§51): a real minimal search against ONE provider. A
+ * provider is never "connected" because a key exists — only a live call
+ * proves it. Returns latency and result count or the actual failure.
+ */
+app.post('/api/providers/:name/test', async (req, res) => {
+  const adapter = registry.list().find((a) => a.name === req.params.name);
+  if (!adapter) return res.status(404).json({ error: 'unknown provider' });
+  const dep = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const started = Date.now();
+  try {
+    if (!(await adapter.isAvailable())) {
+      return res.json({ ok: false, status: 'NOT_CONFIGURED', error: 'credentials not configured' });
+    }
+    const results = await adapter.search(buildQuery({ origin: 'TLV', destination: 'ATH', departureDate: dep }));
+    res.json({ ok: true, status: 'AUTHENTICATED', latencyMs: Date.now() - started, results: results.length });
+  } catch (err) {
+    res.json({
+      ok: false,
+      status: /auth|401|403/i.test(String(err)) ? 'AUTH_ERROR' : 'FAILED',
+      latencyMs: Date.now() - started,
+      error: err instanceof Error ? err.message.slice(0, 300) : String(err),
+    });
+  }
+});
+
 app.get('/api/links', (req, res) => {
   const schema = z.object({
     origin: z.string().length(3),

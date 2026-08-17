@@ -14,6 +14,8 @@ import { SerpApiAdapter } from './serpapi.js';
 import { AmadeusAdapter } from './amadeus.js';
 import { DuffelAdapter } from './duffel.js';
 import { KiwiAdapter } from './kiwi.js';
+import { TravelpayoutsAdapter } from './travelpayouts.js';
+import { buildGenericAdapters } from './generic.js';
 import { getDatabase, type FlightDatabase } from '../db/database.js';
 import { routeKey } from '../core/types.js';
 import { configFor, ProviderRateLimiter } from './config.js';
@@ -328,6 +330,9 @@ export function buildDefaultRegistry(db?: FlightDatabase): ProviderRegistry {
   registry.register(new AmadeusAdapter()); // active when AMADEUS_CLIENT_ID/SECRET are set
   registry.register(new DuffelAdapter()); // active when DUFFEL_API_TOKEN is set
   registry.register(new KiwiAdapter()); // active when KIWI_API_KEY is set
+  registry.register(new TravelpayoutsAdapter()); // active when TRAVELPAYOUTS_TOKEN is set
+  // any API configured through CUSTOM1_/CUSTOM2_/CUSTOM3_ environment slots
+  for (const custom of buildGenericAdapters()) registry.register(custom);
   if (process.env.MOCK_PROVIDER === '1' || process.env.ALLOW_MOCK_FALLBACK === '1') {
     registry.register(new MockFlightProvider());
   }

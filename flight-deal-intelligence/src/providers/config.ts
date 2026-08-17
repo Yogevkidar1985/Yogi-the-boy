@@ -42,6 +42,13 @@ export const providerInfo: Record<string, ProviderInfo> = {
     signupUrl: 'https://serpapi.com/users/sign_up',
     note: 'ההמלצה הראשונה: הרשמה עצמית מיידית, מחזיר תוצאות Google Flights אמיתיות, ויש מכסה חינמית חודשית. עובד גם משרתי ענן.',
   },
+  travelpayouts: {
+    label: 'Travelpayouts / Aviasales — מחירים זולים',
+    envVars: ['TRAVELPAYOUTS_TOKEN'],
+    access: 'SELF_SERVE',
+    signupUrl: 'https://www.travelpayouts.com/',
+    note: 'הרשמה עצמית וחינמית. מחזיר את המחירים הזולים שנצפו למסלול — נתונים מטמון ולא חיפוש זמינות חי, ולכן מסומנים ככאלה ואינם משמשים לאימות מחיר. מצוין להזנת לוח הדילים, לוח התאריכים והיסטוריית המחירים.',
+  },
   duffel: {
     label: 'Duffel — NDC / חברות תעופה',
     envVars: ['DUFFEL_API_TOKEN'],
@@ -74,6 +81,12 @@ export const providerInfo: Record<string, ProviderInfo> = {
     envVars: [],
     access: 'NONE_NEEDED',
     note: 'כמו fast-flights — ללא מפתח, וכפוף לאותן חסימות מצד Google בסביבת ענן.',
+  },
+  custom1: {
+    label: 'מקור מותאם 1 (כל API של טיסות)',
+    envVars: ['CUSTOM1_URL', 'CUSTOM1_KEY'],
+    access: 'SELF_SERVE',
+    note: 'חיבור של כל API בהגדרות בלבד, בלי לכתוב קוד: כתובת עם תבנית, מפתח, נתיב למערך התוצאות ומיפוי שדות. מתאים ל-FlightAPI.io, RapidAPI וכל ספק אחר שתקבלו אליו גישה.',
   },
   mock: {
     label: 'Mock (נתוני הדגמה)',

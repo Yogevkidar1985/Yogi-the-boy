@@ -11,6 +11,7 @@ import { currencyService } from '../src/core/currency.js';
 import type { FlightSearchAdapter } from '../src/providers/adapter.js';
 import { ProviderError } from '../src/providers/adapter.js';
 import { ProviderRateLimiter } from '../src/providers/config.js';
+import { GenericHttpAdapter, readGenericSpec } from '../src/providers/generic.js';
 
 class FailingProvider implements FlightSearchAdapter {
   readonly name = 'failing';
@@ -273,5 +274,83 @@ describe('malformed provider responses (§60)', () => {
       stops: 'NON_STOP', maxPrice: 100000,
     }));
     expect(results.every((r) => r.stops === 0)).toBe(true);
+  });
+});
+
+describe('generic adapter: connect any flight API by configuration', () => {
+  const spec = {
+    slot: 'CUSTOM1', name: 'demo-api',
+    urlTemplate: 'https://example.test/s?k={KEY}&from={origin}&to={destination}&d={departureDate}',
+    key: 'secret-key',
+    headers: { Authorization: 'Bearer {KEY}' },
+    itemsPath: 'data.itineraries',
+    map: {
+      price: 'fare.total', currency: 'fare.currency', airline: 'carrier.iata',
+      flightNumber: 'carrier.number', departureTime: 'dep', arrivalTime: 'arr',
+      stops: 'stopCount', durationMinutes: 'durationMin', bookingUrl: 'link',
+    },
+    timeoutMs: 5000, costTier: 'PAID' as const,
+  };
+  const body = {
+    data: {
+      itineraries: [
+        { fare: { total: 312.5, currency: 'EUR' }, carrier: { iata: 'LY', number: 'LY315' },
+          dep: '2026-10-12T08:00:00', arr: '2026-10-12T13:00:00', stopCount: 0,
+          durationMin: 300, link: 'https://book.example.test/1' },
+        { fare: { total: 275, currency: 'EUR' }, carrier: { iata: 'W6', number: 'W6202' },
+          dep: '2026-10-12T15:00:00', arr: '2026-10-12T22:30:00', stopCount: 1,
+          durationMin: 450, link: 'https://book.example.test/2' },
+        { carrier: { iata: 'XX' } }, // no price → must be skipped, never invented
+      ],
+    },
+  };
+
+  it('maps a nested provider response into normalized flights', async () => {
+    const calls: { url: string; headers: Record<string, string> }[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init: { headers: Record<string, string> }) => {
+      calls.push({ url: String(url), headers: init.headers });
+      return { ok: true, status: 200, json: async () => body } as never;
+    }) as never;
+    try {
+      const adapter = new GenericHttpAdapter(spec);
+      const out = await adapter.search(buildQuery({ origin: 'TLV', destination: 'ATH', departureDate: '2026-10-12' }));
+      // the key reaches the URL and the header template, never the result
+      expect(calls[0]!.url).toContain('k=secret-key');
+      expect(calls[0]!.url).toContain('from=TLV');
+      expect(calls[0]!.headers.Authorization).toBe('Bearer secret-key');
+      // only priced offers survive; nothing is fabricated for the third item
+      expect(out).toHaveLength(2);
+      expect(out[0]!.airline).toBe('LY');
+      expect(out[0]!.totalPrice).toBe(312.5);
+      expect(out[0]!.stops).toBe(0);
+      expect(out[0]!.durationMinutes).toBe(300);
+      expect(out[0]!.bookingUrl).toBe('https://book.example.test/1');
+      expect(out[1]!.airline).toBe('W6');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it('honours query filters against the mapped fields', async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () => ({ ok: true, status: 200, json: async () => body })) as never;
+    try {
+      const adapter = new GenericHttpAdapter(spec);
+      const direct = await adapter.search(buildQuery({
+        origin: 'TLV', destination: 'ATH', departureDate: '2026-10-12', stops: 'NON_STOP',
+      }));
+      expect(direct.every((f) => f.stops === 0)).toBe(true);
+      const cheap = await adapter.search(buildQuery({
+        origin: 'TLV', destination: 'ATH', departureDate: '2026-10-12', maxPrice: 300,
+      }));
+      expect(cheap.every((f) => f.totalPrice <= 300)).toBe(true);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it('is not registered when its slot is unconfigured', () => {
+    expect(readGenericSpec('CUSTOM_NOT_SET')).toBeUndefined();
   });
 });

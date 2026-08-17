@@ -109,6 +109,26 @@ describe('deduplication (§37)', () => {
     expect(dedupe([a, b])).toHaveLength(2);
   });
 
+  it('keeps different fare products on the same flight apart', () => {
+    // same aircraft and times, but a hand-luggage economy fare and a
+    // two-bag business fare are different products — merging them would
+    // advertise the cheap price with the expensive product's inclusions
+    const basic = flight({ id: 'a', normalizedPrice: 610, bags: 0, cabin: 'ECONOMY' });
+    const withBag = flight({ id: 'b', normalizedPrice: 645, bags: 1, cabin: 'ECONOMY' });
+    const business = flight({ id: 'c', normalizedPrice: 1900, bags: 2, cabin: 'BUSINESS' });
+    expect(fingerprint(basic)).not.toBe(fingerprint(withBag));
+    expect(fingerprint(withBag)).not.toBe(fingerprint(business));
+    expect(dedupe([basic, withBag, business])).toHaveLength(3);
+  });
+
+  it('still merges the identical fare product across providers', () => {
+    const a = flight({ id: 'a', provider: 'p1', normalizedPrice: 300, bags: 1 });
+    const b = flight({ id: 'b', provider: 'p2', normalizedPrice: 280, bags: 1 });
+    const out = dedupe([a, b]);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.normalizedPrice).toBe(280);
+  });
+
   it('records every provider observation as a source (meta-search)', () => {
     const a = flight({ id: 'a', provider: 'p1', normalizedPrice: 300 });
     const b = flight({ id: 'b', provider: 'p2', normalizedPrice: 280 });

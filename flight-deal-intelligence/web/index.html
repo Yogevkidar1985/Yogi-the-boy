@@ -1020,7 +1020,48 @@ const fmt = (n, c) => {
   return `${SYM[d.c] ?? d.c + ' '}${Math.round(d.n).toLocaleString('en')}`;
 };
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+/**
+ * Booking links come from external providers, so they are untrusted input:
+ * only http(s) may ever reach an href (blocks javascript:/data: injection).
+ */
+const safeUrl = (u) => {
+  try {
+    const p = new URL(String(u ?? ''), location.origin);
+    return (p.protocol === 'http:' || p.protocol === 'https:') ? esc(p.href) : '';
+  } catch { return ''; }
+};
 const hhmm = (t) => { const m = String(t).match(/T?(\d{2}:\d{2})/); return m ? m[1] : '—'; };
+const dayOf = (t) => { const m = String(t).match(/(\d{4}-\d{2}-\d{2})/); return m ? m[1] : null; };
+/** Days the arrival falls after departure — shown as +1 so times never mislead. */
+function dayOffset(dep, arr) {
+  const a = dayOf(dep), b = dayOf(arr);
+  if (!a || !b) return 0;
+  return Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
+}
+/** Minutes on the ground between two consecutive segments. */
+function layoverMinutes(prev, next) {
+  const a = Date.parse(prev.arrivalTime), b = Date.parse(next.departureTime);
+  return Number.isFinite(a) && Number.isFinite(b) ? Math.round((b - a) / 60000) : null;
+}
+/**
+ * Connection risk flags, computed from the itinerary itself — short/long/
+ * overnight layovers and airport changes materially affect whether a cheap
+ * fare is actually usable.
+ */
+function layoverFlags(prev, next, selfTransfer) {
+  const mins = layoverMinutes(prev, next);
+  const flags = [];
+  const airportChange = prev.destination !== next.origin;
+  if (airportChange) flags.push(['החלפת שדה תעופה', 'badge-warning']);
+  if (mins !== null) {
+    if (mins < 60) flags.push(['חיבור קצר מאוד', 'badge-warning']);
+    else if (mins > 360) flags.push(['עצירה ארוכה', 'badge-neutral']);
+    const h = Number(hhmm(prev.arrivalTime).slice(0, 2));
+    if (mins > 300 && (h >= 22 || h < 5)) flags.push(['עצירת לילה', 'badge-neutral']);
+  }
+  if (selfTransfer) flags.push(['הרכבה עצמית', 'badge-warning']);
+  return { mins, airportChange, flags };
+}
 const durTxt = (m) => m ? `${Math.floor(m/60)} שע׳ ${m%60} דק׳` : '—';
 
 /* ---- icon system: one library (Lucide outline), inline SVG only ---- */
@@ -1434,7 +1475,10 @@ function flightRow(f, idx) {
     <div class="itin">
       <div class="leg">
         <span class="avlogo">${esc((f.airline || '?').slice(0, 2))}</span>
-        <span class="times ltr num">${hhmm(f.departureTime)} – ${hhmm(f.arrivalTime)}</span>
+        <span class="times ltr num">${hhmm(f.departureTime)} – ${hhmm(f.arrivalTime)}${(() => {
+          const d = dayOffset(f.departureTime, f.arrivalTime);
+          return d > 0 ? `<sup style="color:var(--warning-ink); font-size:11px">+${d}</sup>` : '';
+        })()}</span>
         <span class="airline">${esc(f.airlineName || f.airline)} <span class="ltr muted">${esc(f.flightNumber || '')}</span></span>
       </div>
       <div class="stops-line">
@@ -1451,6 +1495,15 @@ function flightRow(f, idx) {
         ${f.priceConfidence != null ? `<span class="badge ${f.priceConfidence >= 80 ? 'badge-success' : f.priceConfidence >= 55 ? 'badge-neutral' : 'badge-warning'}" title="עד כמה אפשר לסמוך על המחיר המוצג: טריות, מספר מקורות והסכמה ביניהם">אמון מחיר ${f.priceConfidence}</span>` : ''}
         ${(() => { const v = buyVerdict(a); return v ? `<span class="badge ${v[1]}" title="הערכת מערכת על בסיס היסטוריית המחירים — לא הבטחה">${v[0]}</span>` : ''; })()}
         ${f.selfTransfer ? '<span class="badge badge-warning" title="מסלול המורכב מכרטיסים נפרדים — הקישור בין הטיסות באחריותך, לא באחריות חברת התעופה">הרכבה עצמית — כרטיסים נפרדים</span>' : ''}
+        ${(() => {
+          // surface connection risks on the collapsed card, not only in details
+          const segs = f.segments || [];
+          const risks = new Map();
+          for (let i = 0; i < segs.length - 1; i++) {
+            for (const [t, c] of layoverFlags(segs[i], segs[i + 1], false).flags) risks.set(t, c);
+          }
+          return [...risks].map(([t, c]) => `<span class="badge ${c}">${t}</span>`).join('');
+        })()}
         ${a.isErrorFareCandidate ? '<span class="badge badge-warning">מומלץ לוודא מול חברת התעופה</span>' : ''}
       </div>
       ${why ? `<ul class="whylist">${why}</ul>` : ''}
@@ -1463,7 +1516,12 @@ function flightRow(f, idx) {
             <span class="muted">${esc(s.airlineName || s.airline || '')} ${esc(s.flightNumber || '')}</span>
             <span class="muted">${durTxt(s.durationMinutes)}${s.aircraft ? ' · ' + esc(s.aircraft) : ''}</span>
           </div>
-          ${si < f.segments.length - 1 ? `<div class="layover">עצירת ביניים ב-${esc(s.destination)}</div>` : ''}`).join('')}
+          ${si < f.segments.length - 1 ? (() => {
+            const lay = layoverFlags(s, f.segments[si + 1], f.selfTransfer);
+            return `<div class="layover">עצירת ביניים ב-${esc(s.destination)}${lay.mins !== null ? ` · ${durTxt(lay.mins)}` : ''}
+              ${lay.airportChange ? `<span class="ltr">(מעבר ל-${esc(f.segments[si + 1].origin)})</span>` : ''}
+              ${lay.flags.map(([t, c]) => `<span class="badge ${c}" style="margin-inline-start:4px">${t}</span>`).join('')}</div>`;
+          })() : ''}`).join('')}
         </div>
       </details>` : ''}
     </div>
@@ -1471,7 +1529,7 @@ function flightRow(f, idx) {
       <span class="pr num ${isCheap ? 'cheap' : ''}" data-price="${idx}">${fmt(f.normalizedPrice, f.normalizedCurrency)}</span>
       <span class="per" data-per="${idx}">נבדק לפני ${f.freshnessMinutes ?? '?'} דק׳ · ${esc(f.provider)}</span>
       <div class="buyrow">
-        <a class="btn btn-primary btn-sm" href="${esc(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה ${icon('external', 13)}</a>
+        <a class="btn btn-primary btn-sm" href="${safeUrl(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה ${icon('external', 13)}</a>
         <button class="heart ${saved ? 'saved' : ''}" data-watch="${idx}" title="שמירה למעקב מחיר" aria-label="שמירה למעקב מחיר">${icon('heart', 17)}</button>
         <button class="btn btn-ghost btn-sm" data-details="${idx}">פרטים</button>
         <button class="btn btn-ghost btn-sm cmpbtn" data-cmp="${idx}" aria-pressed="${compareSet.has(flightKey(f))}">השווה</button>
@@ -1486,7 +1544,7 @@ function flightRow(f, idx) {
             ['Momondo', `https://www.momondo.com/flight-search/${r.origin}-${r.destination}/${dep}${ret}`],
             ['Skyscanner', `https://www.skyscanner.com/transport/flights/${r.origin.toLowerCase()}/${r.destination.toLowerCase()}/${d6}${r6}/`],
             ['Kiwi', `https://www.kiwi.com/en/search/results/${r.origin.toLowerCase()}/${r.destination.toLowerCase()}/${dep}${r.returnDate ? '/' + r.returnDate : '/no-return'}`],
-          ].map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${n}</a>`).join('');
+          ].map(([n, u]) => `<a href="${safeUrl(u)}" target="_blank" rel="noopener">${n}</a>`).join('');
         })()}
       </div>
       <div class="buyrow">
@@ -1792,7 +1850,7 @@ function renderAiReport(r) {
       <span class="pr num">${fmt(d.best.normalizedPrice, d.best.normalizedCurrency)}</span>
       ${st ? `<span><span class="badge ${st[1]}">${st[0]}</span></span>` : ''}
       <span class="muted ltr">${esc(d.best.departureDate)}</span>
-      <a href="${esc(d.best.bookingUrl)}" target="_blank" rel="noopener">להזמנה</a>
+      <a href="${safeUrl(d.best.bookingUrl)}" target="_blank" rel="noopener">להזמנה</a>
     </div>`; }).join('');
     $('#destsSec').hidden = false;
   }
@@ -1911,7 +1969,7 @@ function renderCompare(fs) {
     ${row('אמון מחיר', fs.map(f => `<td>${f.priceConfidence ?? '—'}</td>`))}
     ${row('מקורות', fs.map(f => `<td>${f.consensus?.sourceCount ?? 1}</td>`))}
     ${row('בדיקה חיה', fs.map((f, i) => `<td><button class="btn btn-ghost btn-sm" data-cmpverify="${i}">בדוק מחיר</button><div class="muted" data-cmpstatus="${i}"></div></td>`))}
-    ${row('', fs.map(f => `<td><a class="btn btn-primary btn-sm" href="${esc(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה</a></td>`))}
+    ${row('', fs.map(f => `<td><a class="btn btn-primary btn-sm" href="${safeUrl(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה</a></td>`))}
   </table>`;
   $$('#compareBody [data-cmpverify]').forEach(b => b.addEventListener('click', async () => {
     const i = Number(b.dataset.cmpverify);
@@ -2006,7 +2064,7 @@ async function openFlightDrawer(idx) {
       `<span class="ltr">${esc(s.provider)} — <b class="num">${fmt(s.price, s.currency)}</b>${i === 0 ? ' · המחיר הטוב ביותר' : ''}</span>`).join('')}</div>` : ''}
     <div id="fdHist" class="dlg-sum"><b>היסטוריית המסלול</b><span class="muted">טוען…</span></div>
     <div class="drawer-cta">
-      <a class="btn btn-primary" style="flex:1" href="${esc(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה ${icon('external', 14)}</a>
+      <a class="btn btn-primary" style="flex:1" href="${safeUrl(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה ${icon('external', 14)}</a>
       <button class="btn btn-ghost btn-sm" id="fdVerify">בדוק מחיר</button>
       <button class="btn btn-ghost btn-sm" id="fdSave">${icon('heart', 14)} שמור</button>
     </div>`;
@@ -2207,7 +2265,7 @@ async function loadDeals() {
       ${d.drop_pct > 0 ? `<span class="badge badge-success">ירידה של ${d.drop_pct}%</span>` : d.savings > 0 ? `<span class="badge badge-success">חיסכון ${fmt(d.savings, d.normalized_currency)}</span>` : ''}</span>
     <span class="muted">${esc(d.airline_name || d.airline)} · ${d.stops === 0 ? 'ישירה' : d.stops + ' עצירות'} · <span class="ltr">${esc(d.departure_date)}</span></span>
     <span style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
-      <a href="${esc(d.booking_url)}" target="_blank" rel="noopener">להזמנה</a>
+      <a href="${safeUrl(d.booking_url)}" target="_blank" rel="noopener">להזמנה</a>
       <button class="btn btn-ghost btn-sm" data-dverify="${i}">בדוק מחיר</button>
       <button class="btn btn-ghost btn-sm cmpbtn" data-dcmp="${i}" aria-pressed="${dealCompare.has(i)}">השווה</button>
     </span>

@@ -5,7 +5,13 @@
  */
 import type { FlightResult } from '../core/types.js';
 
-export function fingerprint(f: FlightResult): string {
+/**
+ * An itinerary key identifies the JOURNEY (same aircraft, same times).
+ * The fare product on top of it — cabin and baggage — is a different thing:
+ * economy hand-luggage-only and business with two bags are NOT the same offer
+ * and must never be merged, or the cheaper row would misrepresent what you get.
+ */
+export function itineraryKey(f: FlightResult): string {
   if (f.flightNumber) {
     return [f.airline, f.flightNumber, f.departureDate, f.departureTime.slice(0, 16)].join('|');
   }
@@ -13,6 +19,11 @@ export function fingerprint(f: FlightResult): string {
   const hour = f.departureTime.match(/T(\d{2})/)?.[1] ?? 'xx';
   const durBucket = Math.round(f.durationMinutes / 30);
   return ['~', f.origin, f.destination, f.departureDate, hour, durBucket, f.stops].join('|');
+}
+
+/** Full offer fingerprint: itinerary + the fare product sold on it. */
+export function fingerprint(f: FlightResult): string {
+  return [itineraryKey(f), f.cabin ?? 'ECONOMY', `bags${f.bags ?? 0}`].join('|');
 }
 
 /**

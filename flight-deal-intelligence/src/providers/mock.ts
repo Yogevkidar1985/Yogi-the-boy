@@ -135,18 +135,39 @@ export class MockFlightProvider implements FlightSearchAdapter {
         exchangeRateTimestamp: conv.timestamp,
         bookingUrl: links.googleFlights,
         deepLink: links.kiwi,
-        segments: [
-          {
-            origin: query.origin,
-            destination: query.destination,
-            departureTime,
-            arrivalTime: arrival.toISOString().slice(0, 19),
-            airline: airline.code,
-            airlineName: airline.name,
-            flightNumber: `${airline.code}${100 + Math.round(rnd * 899)}`,
-            durationMinutes,
-          },
-        ],
+        // Realistic multi-leg segments: a flight with N stops must expose N+1
+        // legs with real ground time between them, otherwise connection
+        // intelligence (layovers, airport changes) cannot be exercised.
+        segments: (() => {
+          const hubs = ['VIE', 'FCO', 'ATH', 'IST', 'CDG'];
+          const legs: FlightResult['segments'] = [];
+          let cursor = Date.parse(departureTime + 'Z');
+          let from = query.origin;
+          const flightNo = 100 + Math.round(rnd * 899);
+          // split the total time into flight legs plus ground time per stop
+          const groundEach = stops ? Math.round((60 + rnd * 150)) : 0;
+          const flying = durationMinutes - groundEach * stops;
+          const legMinutes = Math.max(45, Math.round(flying / (stops + 1)));
+          for (let leg = 0; leg <= stops; leg++) {
+            const to = leg === stops
+              ? query.destination
+              : hubs[(leg + Math.round(rnd * 4)) % hubs.length]!;
+            const legArrive = cursor + legMinutes * 60000;
+            legs.push({
+              origin: from,
+              destination: to,
+              departureTime: new Date(cursor).toISOString().slice(0, 19),
+              arrivalTime: new Date(legArrive).toISOString().slice(0, 19),
+              airline: airline.code,
+              airlineName: airline.name,
+              flightNumber: `${airline.code}${flightNo + leg}`,
+              durationMinutes: legMinutes,
+            });
+            cursor = legArrive + groundEach * 60000;
+            from = to;
+          }
+          return legs;
+        })(),
         collectedAt: now.toISOString(),
         rawProviderData: { mock: true, airportNames: [airportName(query.origin), airportName(query.destination)] },
       });

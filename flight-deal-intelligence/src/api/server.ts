@@ -92,6 +92,19 @@ const searchSchema = z.object({
   currency: z.string().length(3).default(currencyService.systemCurrency),
 });
 
+/**
+ * Date sanity (§17): a return before departure, or a departure in the past,
+ * can never produce a bookable result — reject it before burning provider
+ * quota, with a message the UI can show as-is.
+ */
+function validateDates(p: { departureDate: string; returnDate?: string }): string | null {
+  const today = new Date().toISOString().slice(0, 10);
+  if (p.departureDate < today) return 'תאריך היציאה כבר עבר';
+  if (p.returnDate && p.returnDate < p.departureDate) return 'תאריך החזרה מוקדם מתאריך היציאה';
+  if (!Number.isFinite(Date.parse(p.departureDate))) return 'תאריך יציאה לא תקין';
+  return null;
+}
+
 function toQuery(p: z.infer<typeof searchSchema>) {
   return buildQuery({
     origin: p.origin.toUpperCase(),
@@ -112,6 +125,8 @@ function toQuery(p: z.infer<typeof searchSchema>) {
 app.get('/api/flights/search', async (req, res) => {
   const parsed = searchSchema.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const dateError = validateDates(parsed.data);
+  if (dateError) return res.status(400).json({ error: dateError });
   const started = Date.now();
   try {
     const outcome = await registry.search(toQuery(parsed.data));

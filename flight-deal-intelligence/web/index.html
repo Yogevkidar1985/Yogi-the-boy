@@ -747,6 +747,13 @@
     </div>
     <button class="btn btn-ghost btn-sm" id="filterSheetBtn" style="margin:10px 0">סינון <span id="filterCount"></span></button>
     <div id="filterZone">
+      <div class="filters" id="presets" role="group" aria-label="סינון מהיר">
+        <button class="chip preset" data-preset="cheapest">הכי זול</button>
+        <button class="chip preset" data-preset="direct">ישירות בלבד</button>
+        <button class="chip preset" data-preset="deal">הדילים הטובים</button>
+        <button class="chip preset" data-preset="short">מסע קצר</button>
+        <button class="chip preset" data-preset="clear">ניקוי הכל</button>
+      </div>
       <div class="filters" id="quickFilters" role="group" aria-label="סינון">
         <button class="chip qf" data-k="stops" data-v="0" aria-pressed="false">ישירה בלבד</button>
         <button class="chip qf" data-k="stops" data-v="1" aria-pressed="false">עד עצירה אחת</button>
@@ -764,6 +771,7 @@
       </div>
       <div class="filters" id="airlineChips"></div>
     </div>
+    <div id="relaxBox"></div>
     <div id="flightList"></div>
     <div id="recsBox"></div>
   </section>
@@ -1443,8 +1451,10 @@ function sorted() {
 const activeAirlines = new Set();
 function renderAirlineChips() {
   const names = [...new Map(flights.map(f => [f.airline, f.airlineName || f.airline])).entries()];
-  $('#airlineChips').innerHTML = names.map(([code, name]) =>
-    `<button class="chip" data-al="${esc(code)}" aria-pressed="${activeAirlines.size === 0 || activeAirlines.has(code)}">${esc(name)}</button>`).join('');
+  $('#airlineChips').innerHTML = names.map(([code, name]) => {
+    const n = flights.filter(f => f.airline === code).length;
+    return `<button class="chip" data-al="${esc(code)}" aria-pressed="${activeAirlines.size === 0 || activeAirlines.has(code)}">${esc(name)} (${n})</button>`;
+  }).join('');
   $$('#airlineChips .chip').forEach(c => c.addEventListener('click', () => {
     const code = c.dataset.al;
     if (activeAirlines.has(code)) activeAirlines.delete(code); else activeAirlines.add(code);
@@ -1589,24 +1599,178 @@ $$('#quickFilters .qf').forEach(b => b.addEventListener('click', () => {
   renderFlights();
 }));
 
+/** One-click presets: a whole filter+sort combination in a single tap. */
+const PRESETS = {
+  cheapest: () => { resetFilters(); currentSort = 'cheap'; },
+  direct: () => { resetFilters(); quick.stops = '0'; },
+  deal: () => { resetFilters(); currentSort = 'deal'; },
+  short: () => { resetFilters(); quick.dur = 'short'; quick.stops = '1'; },
+  clear: () => { resetFilters(); currentSort = 'best'; },
+};
+function resetFilters() {
+  quick.stops = quick.dep = quick.arr = quick.dur = null;
+  maxPriceFilter = null;
+  activeAirlines.clear();
+  const sl = $('#priceSlider');
+  if (sl && !$('#priceFilter').hidden) { sl.value = sl.max; $('#priceSliderVal').textContent = fmt(Number(sl.max)); }
+}
+$$('.preset').forEach(b => b.addEventListener('click', () => {
+  PRESETS[b.dataset.preset]?.();
+  $$('#quickFilters .qf').forEach(x => x.setAttribute('aria-pressed', String(quick[x.dataset.k] === x.dataset.v)));
+  $$('.sorttabs button').forEach(x => x.setAttribute('aria-selected', String(x.dataset.sort === currentSort)));
+  renderAirlineChips();
+  renderFlights();
+}));
+
+/** Filters live in the address bar too, so a filtered view is shareable. */
+function syncFiltersToUrl() {
+  if (!lastSearch) return;
+  const p = new URLSearchParams(location.search);
+  const put = (k, v) => { if (v === null || v === undefined || v === '') p.delete(k); else p.set(k, v); };
+  put('stops', quick.stops); put('dep', quick.dep); put('arr', quick.arr); put('dur', quick.dur);
+  put('max', maxPriceFilter); put('sort', currentSort === 'best' ? null : currentSort);
+  put('al', activeAirlines.size ? [...activeAirlines].join(',') : null);
+  history.replaceState(history.state, '', '?' + p);
+}
+/**
+ * Restore filters from a shared link. The caller passes the query snapshot
+ * taken BEFORE the search rewrote the address bar, otherwise the filter
+ * params would already be gone.
+ */
+function applyFiltersFromUrl(snapshot) {
+  const q = snapshot ?? new URLSearchParams(location.search);
+  if (!q.get('from')) return;
+  quick.stops = q.get('stops'); quick.dep = q.get('dep'); quick.arr = q.get('arr'); quick.dur = q.get('dur');
+  maxPriceFilter = q.get('max') ? Number(q.get('max')) : null;
+  if (q.get('sort')) currentSort = q.get('sort');
+  activeAirlines.clear();
+  for (const a of (q.get('al') || '').split(',').filter(Boolean)) activeAirlines.add(a);
+  $$('#quickFilters .qf').forEach(x => x.setAttribute('aria-pressed', String(quick[x.dataset.k] === x.dataset.v)));
+  $$('.sorttabs button').forEach(x => x.setAttribute('aria-selected', String(x.dataset.sort === currentSort)));
+}
+
 function depHour(f) { const m = String(f.departureTime).match(/T(\d{2})/); return m ? Number(m[1]) : null; }
 function arrHour(f) { const m = String(f.arrivalTime).match(/T(\d{2})/); return m ? Number(m[1]) : null; }
 
+/**
+ * One predicate per filter, so filtering, impact counts and relaxation
+ * suggestions can never drift apart — they all read the same rules.
+ * Each entry: [id, human label, isActive(state), passes(flight, state)].
+ */
+const FILTER_RULES = [
+  ['airlines', 'חברות תעופה', (s) => s.airlines.size > 0, (f, s) => s.airlines.has(f.airline)],
+  ['stops', 'מספר עצירות', (s) => s.stops !== null, (f, s) => f.stops <= Number(s.stops)],
+  ['dep', 'שעת המראה', (s) => Boolean(s.dep), (f, s) => {
+    const h = depHour(f); if (h === null) return true;
+    return s.dep === 'morning' ? h >= 5 && h < 12 : s.dep === 'afternoon' ? h >= 12 && h < 18 : h >= 18;
+  }],
+  ['arr', 'שעת נחיתה', (s) => Boolean(s.arr), (f, s) => {
+    const h = arrHour(f); if (h === null) return true;
+    return s.arr === 'day' ? h >= 6 && h < 18 : h >= 18 || h < 6;
+  }],
+  ['dur', 'משך הטיסה', (s) => s.dur === 'short', (f) => !f.durationMinutes || f.durationMinutes <= 480],
+  ['price', 'מחיר מקסימלי', (s) => s.maxPrice !== null, (f, s) => f.normalizedPrice <= s.maxPrice],
+];
+
+function filterState() {
+  return { airlines: activeAirlines, stops: quick.stops, dep: quick.dep, arr: quick.arr, dur: quick.dur, maxPrice: maxPriceFilter };
+}
+
+/** Apply every active rule, optionally skipping one (for impact analysis). */
+function applyFilters(list, state, skipId) {
+  return list.filter((f) =>
+    FILTER_RULES.every(([id, , isActive, passes]) =>
+      id === skipId || !isActive(state) || passes(f, state)));
+}
+
+/** How many results a not-yet-chosen option would leave, given current filters. */
+function countIfChosen(patch) {
+  const s = { ...filterState(), ...patch };
+  return applyFilters(flights, s).length;
+}
+
+/**
+ * When filters leave nothing, find which single constraint is responsible and
+ * say so — the user should never face a bare "no results".
+ */
+function renderRelaxation(list, state) {
+  const box = $('#relaxBox');
+  if (list.length || !flights.length) { box.innerHTML = ''; return; }
+  const blockers = FILTER_RULES
+    .filter(([id, , isActive]) => isActive(state))
+    .map(([id, label]) => ({ id, label, without: applyFilters(flights, state, id).length }))
+    .filter((b) => b.without > 0)
+    .sort((a, b) => b.without - a.without);
+  if (!blockers.length) {
+    // no single removal is enough — show how restrictive each filter is on its
+    // own, so the user can see which combination is impossible
+    const alone = FILTER_RULES
+      .filter(([, , isActive]) => isActive(state))
+      .map(([id, label, , passes]) => ({
+        id, label,
+        n: flights.filter((f) => passes(f, state)).length,
+      }))
+      .sort((a, b) => a.n - b.n);
+    box.innerHTML = `<div class="card" style="padding:12px 14px; margin-bottom:10px; border-inline-start:4px solid var(--warning-ink)">
+      <b>שילוב הסינונים אינו אפשרי יחד</b>
+      <div class="muted" style="margin:4px 0 8px">כמה טיסות עומדות בכל תנאי בנפרד:
+        ${alone.map(a => `${esc(a.label)} — ${a.n}`).join(' · ')}.
+        המגביל ביותר הוא <b>${esc(alone[0].label)}</b>.</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        ${alone.slice(0, 3).map(a => `<button class="btn btn-ghost btn-sm" data-relax="${a.id}">בטל ${esc(a.label)}</button>`).join('')}
+        <button class="btn btn-primary btn-sm" data-relax="__all">ניקוי כל הסינונים</button>
+      </div></div>`;
+    $$('#relaxBox [data-relax]').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.relax === '__all') {
+        resetFilters();
+        $$('#quickFilters .qf').forEach(x => x.setAttribute('aria-pressed', 'false'));
+        renderAirlineChips(); renderFlights();
+      } else clearFilter(b.dataset.relax);
+    }));
+    return;
+  }
+  const top = blockers[0];
+  box.innerHTML = `<div class="card" style="padding:12px 14px; margin-bottom:10px; border-inline-start:4px solid var(--warning-ink)">
+    <b>הסינון הנוכחי לא מותיר תוצאות</b>
+    <div class="muted" style="margin:4px 0 8px">האילוץ המשמעותי ביותר הוא <b>${esc(top.label)}</b> — ביטולו לבדו יחזיר
+      ${top.without} טיסות.</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap">
+      ${blockers.slice(0, 3).map(b =>
+        `<button class="btn btn-ghost btn-sm" data-relax="${b.id}">בטל ${esc(b.label)} (${b.without})</button>`).join('')}
+    </div></div>`;
+  $$('#relaxBox [data-relax]').forEach(b => b.addEventListener('click', () => clearFilter(b.dataset.relax)));
+}
+
+function clearFilter(id) {
+  if (id === 'airlines') activeAirlines.clear();
+  else if (id === 'price') {
+    maxPriceFilter = null;
+    const sl = $('#priceSlider');
+    if (sl && !$('#priceFilter').hidden) { sl.value = sl.max; $('#priceSliderVal').textContent = fmt(Number(sl.max)); }
+  } else quick[id] = null;
+  $$('#quickFilters .qf').forEach(x => x.setAttribute('aria-pressed', String(quick[x.dataset.k] === x.dataset.v)));
+  renderAirlineChips();
+  renderFlights();
+}
+
 function renderFlights() {
   renderPriceLevel();
-  let list = sorted();
-  if (activeAirlines.size) list = list.filter(f => activeAirlines.has(f.airline));
-  if (quick.stops !== null) list = list.filter(f => f.stops <= Number(quick.stops));
-  if (quick.dep) list = list.filter(f => {
-    const h = depHour(f); if (h === null) return true;
-    return quick.dep === 'morning' ? h >= 5 && h < 12 : quick.dep === 'afternoon' ? h >= 12 && h < 18 : h >= 18;
+  const state = filterState();
+  const list = applyFilters(sorted(), state);
+  renderRelaxation(list, state);
+  syncFiltersToUrl();
+  // live impact counts on every option, so the effect of a choice is visible.
+  // The pressed state is re-synced here too, so a filter restored from a
+  // shared URL always shows as selected.
+  $$('#quickFilters .qf').forEach((b) => {
+    const k = b.dataset.k, v = b.dataset.v;
+    const active = quick[k] === v;
+    b.setAttribute('aria-pressed', String(active));
+    const n = countIfChosen({ [k]: active ? null : v });
+    let label = b.dataset.label;
+    if (!label) { label = b.textContent.replace(/\s*\(\d+\)\s*$/, ''); b.dataset.label = label; }
+    b.textContent = `${label} (${n})`;
   });
-  if (quick.arr) list = list.filter(f => {
-    const h = arrHour(f); if (h === null) return true;
-    return quick.arr === 'day' ? h >= 6 && h < 18 : h >= 18 || h < 6;
-  });
-  if (quick.dur === 'short') list = list.filter(f => !f.durationMinutes || f.durationMinutes <= 480);
-  if (maxPriceFilter !== null) list = list.filter(f => f.normalizedPrice <= maxPriceFilter);
   const btn = $('#sheetApply');
   if (btn) btn.textContent = `הצג ${list.length} טיסות`;
   $('#filterCount').textContent = list.length !== flights.length ? `(${list.length}/${flights.length})` : '';
@@ -1777,6 +1941,8 @@ $('#searchForm').addEventListener('submit', async (ev) => {
       dep: p.get('departureDate'), ret: p.get('returnDate') || null,
       pax: p.get('adults'), cabin: p.get('cabin'),
     };
+    // keep the incoming filter params before the address bar is rewritten
+    const incomingQuery = new URLSearchParams(location.search);
     $('#findBetterBtn').hidden = false;
     $('#smartCompareBtn').hidden = data.count < 2;
     $('#betterBox').innerHTML = '';
@@ -1788,7 +1954,7 @@ $('#searchForm').addEventListener('submit', async (ev) => {
     const answered = tried.filter(a => a.ok).length;
     const srcLine = tried.length > 1 ? ` · נבדקו ${tried.length} מקורות, ${answered} ענו` : ` · מקור ${esc(data.provider)}`;
     $('#resultsTitle').innerHTML = `תוצאות <span class="ltr">${p.get('origin')} → ${p.get('destination')}</span> <span class="muted">(${data.count} טיסות${srcLine})</span>`;
-    initPriceSlider(); renderAirlineChips(); renderFlights();
+    initPriceSlider(); applyFiltersFromUrl(incomingQuery); renderAirlineChips(); renderFlights();
     $('#resultsSec').hidden = false;
     $('#routeInput').value = `${p.get('origin')}-${p.get('destination')}`;
     loadDateStrip(p.get('origin'), p.get('destination'), p.get('departureDate'));

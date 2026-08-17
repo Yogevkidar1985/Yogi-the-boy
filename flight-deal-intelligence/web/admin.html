@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ניהול מנועי חיפוש — Flight Deal Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --font-family: 'Heebo', system-ui, sans-serif;
+    --page:#f4f6f9; --surface:#fff; --surface-2:#f0f3f7; --border:#dde3ea;
+    --ink:#101725; --ink-2:#48556a; --ink-3:#77839a;
+    --hero:#0b1f3a; --primary:#1a63d4; --primary-ink:#fff;
+    --ok-bg:#e3f4ec; --ok-ink:#0a6b4a; --warn-bg:#fbf1dc; --warn-ink:#7a5300;
+    --err-bg:#fbe7e7; --err-ink:#a33636; --radius:12px;
+  }
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+    color-scheme: dark;
+    --page:#0c1220; --surface:#151d2e; --surface-2:#1c2638; --border:#2a3750;
+    --ink:#eef2f8; --ink-2:#b3bfd2; --ink-3:#8391a8;
+    --primary:#4d8ce8; --primary-ink:#0b1f3a;
+    --ok-bg:#123528; --ok-ink:#7fd6b3; --warn-bg:#382c12; --warn-ink:#e5c07b;
+    --err-bg:#3d2020; --err-ink:#f1a1a1;
+  }}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);font-family:var(--font-family);font-size:14.5px;line-height:1.6;overflow-x:clip}
+  .ltr{direction:ltr;unicode-bidi:isolate}
+  header{background:var(--hero);color:#fff;padding:14px 16px}
+  header .in{max-width:1000px;margin:0 auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{font-size:20px;margin:0}
+  header a{color:#aebdd2;text-decoration:none;font-size:13px}
+  header a:hover{color:#fff}
+  main{max-width:1000px;margin:0 auto;padding:22px 16px 80px}
+  h2{font-size:17px;margin:24px 0 10px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .grow{flex:1;min-width:180px}
+  label{display:block;font-size:12px;font-weight:600;color:var(--ink-3);margin-bottom:3px}
+  input,select,textarea{width:100%;background:var(--surface-2);color:var(--ink);border:1px solid var(--border);
+    border-radius:8px;padding:9px 10px;font-family:inherit;font-size:13.5px;min-height:40px}
+  textarea{min-height:64px;resize:vertical;font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+  .field{margin-bottom:10px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  @media(max-width:700px){.grid2,.grid4{grid-template-columns:1fr}}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:8px;
+    cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;padding:9px 16px;min-height:42px;text-decoration:none}
+  .btn-p{background:var(--primary);color:var(--primary-ink)}
+  .btn-g{background:transparent;border:1px solid var(--border);color:var(--ink-2)}
+  .btn-d{background:transparent;border:1px solid var(--border);color:var(--err-ink)}
+  .badge{display:inline-flex;border-radius:999px;font-size:12px;font-weight:600;padding:3px 10px}
+  .b-ok{background:var(--ok-bg);color:var(--ok-ink)} .b-warn{background:var(--warn-bg);color:var(--warn-ink)}
+  .b-err{background:var(--err-bg);color:var(--err-ink)} .b-n{background:var(--surface-2);color:var(--ink-2)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:start;padding:9px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{font-size:12px;color:var(--ink-3);font-weight:600}
+  .muted{color:var(--ink-3);font-size:12.5px}
+  .wrap{overflow-x:auto}
+  details summary{cursor:pointer;font-weight:600;font-size:13.5px}
+  .tpl{background:var(--surface-2);border-radius:8px;padding:10px;margin-top:8px}
+  .tpl code{font-family:ui-monospace,Menlo,monospace;font-size:12px;word-break:break-all}
+  #gate{max-width:420px;margin:60px auto}
+</style>
+</head>
+<body>
+<header><div class="in">
+  <h1>ניהול מנועי חיפוש</h1>
+  <a href="/">מנוע החיפוש</a><a href="/providers.html">מקורות מובנים</a>
+</div></header>
+
+<main>
+  <div id="gate" class="card" hidden>
+    <h2 style="margin-top:0">כניסת מנהל</h2>
+    <p class="muted" id="gateNote"></p>
+    <div class="field">
+      <label for="tok">Admin token</label>
+      <input id="tok" type="password" class="ltr" placeholder="הערך של ADMIN_TOKEN">
+    </div>
+    <button class="btn btn-p" id="gateGo">כניסה</button>
+  </div>
+
+  <div id="app" hidden>
+    <div class="card" style="border-inline-start:4px solid var(--primary)">
+      <b>איך זה עובד</b>
+      <p class="muted">כל מנוע שמוסיפים כאן נשמר בבסיס הנתונים, מצטרף מיד לחיפוש המקבילי (בלי פריסה מחדש),
+        ומקבל מגבלות קצב משלו. מפתחות ה-API נשמרים מוצפנים (AES-256-GCM) ואינם מוחזרים לדפדפן — רק סימון שקיים מפתח.</p>
+    </div>
+
+    <h2>המנועים שלי (<span id="count">0</span>)</h2>
+    <div class="card wrap">
+      <table id="tbl"><thead><tr>
+        <th>שם</th><th>כתובת</th><th>מפתח</th><th>קצב</th><th>סטטוס</th><th></th>
+      </tr></thead><tbody id="tbody"></tbody></table>
+      <p class="muted" id="empty">עוד לא הוגדרו מנועים. הוסיפו את הראשון בטופס שמתחת.</p>
+    </div>
+
+    <h2 id="formTitle">הוספת מנוע חדש</h2>
+    <div class="card">
+      <div class="grid2">
+        <div class="field"><label for="fName">שם מזהה (באנגלית)</label><input id="fName" class="ltr" placeholder="flightapi"></div>
+        <div class="field"><label for="fTier">דרגת עלות</label>
+          <select id="fTier"><option>PAID</option><option>FREE</option><option>LOW_COST</option><option>PREMIUM</option></select></div>
+      </div>
+      <div class="field"><label for="fUrl">כתובת ה-API (עם תבניות)</label>
+        <input id="fUrl" class="ltr" placeholder="https://api.example.com/search?key={KEY}&from={origin}&to={destination}&date={departureDate}"></div>
+      <div class="grid2">
+        <div class="field"><label for="fKey">מפתח API</label><input id="fKey" type="password" class="ltr" placeholder="נשמר מוצפן"></div>
+        <div class="field"><label for="fItems">נתיב למערך התוצאות</label><input id="fItems" class="ltr" placeholder="data.itineraries"></div>
+      </div>
+      <div class="field"><label for="fHeaders">כותרות (JSON, אפשר להשתמש ב-{KEY})</label>
+        <textarea id="fHeaders" class="ltr" placeholder='{"Authorization":"Bearer {KEY}"}'></textarea></div>
+      <div class="field"><label for="fMap">מיפוי שדות (JSON)</label>
+        <textarea id="fMap" class="ltr" placeholder='{"price":"fare.total","currency":"fare.currency","airline":"carrier.iata","flightNumber":"carrier.number","departureTime":"dep","arrivalTime":"arr","stops":"stopCount","durationMinutes":"durationMin","bookingUrl":"link"}'></textarea></div>
+      <div class="grid4">
+        <div class="field"><label for="fRpm">בקשות לדקה</label><input id="fRpm" type="number" value="30"></div>
+        <div class="field"><label for="fConc">מקביליות</label><input id="fConc" type="number" value="4"></div>
+        <div class="field"><label for="fTimeout">Timeout (ms)</label><input id="fTimeout" type="number" value="20000"></div>
+        <div class="field"><label for="fEnabled">מצב</label>
+          <select id="fEnabled"><option value="1">פעיל</option><option value="0">מושהה</option></select></div>
+      </div>
+      <div class="row">
+        <button class="btn btn-p" id="save">שמירה</button>
+        <button class="btn btn-g" id="cancel" hidden>ביטול עריכה</button>
+        <span id="msg" class="muted"></span>
+      </div>
+
+      <details style="margin-top:14px">
+        <summary>תבניות זמינות ודוגמה מלאה</summary>
+        <div class="tpl">
+          <div class="muted">בכתובת ובכותרות אפשר להשתמש ב:</div>
+          <code class="ltr">{KEY} {origin} {destination} {departureDate} {returnDate} {adults} {children} {infants} {cabin} {currency}</code>
+          <div class="muted" style="margin-top:10px">דוגמה למיפוי — כל ערך הוא נתיב בתוך אובייקט התוצאה:</div>
+          <code class="ltr">{"price":"fare.total","currency":"fare.currency","airline":"carrier.iata","stops":"stopCount","departureTime":"dep","arrivalTime":"arr","durationMinutes":"durationMin","bookingUrl":"link"}</code>
+          <div class="muted" style="margin-top:10px">שדה שה-API לא מחזיר פשוט יישאר ריק — המערכת לא ממציאה ערכים.
+            תוצאה בלי מחיר נזרקת.</div>
+        </div>
+      </details>
+    </div>
+  </div>
+</main>
+
+<script>
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $ = (s) => document.querySelector(s);
+let TOKEN = sessionStorage.getItem('adminToken') || '';
+let editId = null;
+
+const api = async (path, opts = {}) => {
+  const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN, ...(opts.headers || {}) } });
+  if (res.status === 401) { TOKEN = ''; sessionStorage.removeItem('adminToken'); showGate('הטוקן שגוי.'); throw new Error('unauthorized'); }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.status);
+  return res.status === 204 ? null : res.json();
+};
+
+function showGate(note) {
+  $('#gate').hidden = false; $('#app').hidden = true;
+  if (note) $('#gateNote').textContent = note;
+}
+
+async function boot() {
+  const st = await (await fetch('/api/admin/status')).json();
+  if (!st.adminTokenConfigured) {
+    showGate('כדי להפעיל את מסך הניהול, הגדירו ב-Render את המשתנה ADMIN_TOKEN (סיסמה שתבחרו) וגם ADMIN_SECRET (מחרוזת ארוכה להצפנת המפתחות).');
+    $('#tok').disabled = true; $('#gateGo').disabled = true;
+    return;
+  }
+  if (!st.secretConfigured) {
+    $('#gateNote').textContent = 'שימו לב: ADMIN_SECRET לא מוגדר — לא ניתן יהיה לשמור מפתחות API עד שיוגדר.';
+  }
+  if (TOKEN) { try { await load(); return; } catch { /* fall through to gate */ } }
+  showGate();
+}
+
+$('#gateGo').addEventListener('click', async () => {
+  TOKEN = $('#tok').value.trim();
+  try { await load(); sessionStorage.setItem('adminToken', TOKEN); } catch {}
+});
+
+async function load() {
+  const list = await api('/api/admin/providers');
+  $('#gate').hidden = true; $('#app').hidden = false;
+  $('#count').textContent = list.length;
+  $('#empty').style.display = list.length ? 'none' : '';
+  $('#tbody').innerHTML = list.map(p => `<tr>
+    <td><b class="ltr">${esc(p.name)}</b>${p.note ? `<div class="muted">${esc(p.note)}</div>` : ''}</td>
+    <td class="ltr muted" style="max-width:280px;word-break:break-all">${esc(p.urlTemplate)}</td>
+    <td>${p.hasKey ? '<span class="badge b-ok">מוצפן</span>' : '<span class="badge b-n">ללא</span>'}</td>
+    <td class="muted ltr">${p.requestsPerMinute}/min · ${p.concurrency}x</td>
+    <td>${p.enabled ? '<span class="badge b-ok">פעיל</span>' : '<span class="badge b-warn">מושהה</span>'}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-g" data-test="${p.name}">בדיקה</button>
+      <button class="btn btn-g" data-edit="${p.id}">עריכה</button>
+      <button class="btn btn-g" data-toggle="${p.id}" data-on="${p.enabled ? 1 : 0}">${p.enabled ? 'השהיה' : 'הפעלה'}</button>
+      <button class="btn btn-d" data-del="${p.id}">מחיקה</button>
+      <div class="muted" data-res="${p.id}"></div>
+    </td></tr>`).join('');
+
+  document.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('למחוק את המנוע?')) return;
+    await api('/api/admin/providers/' + b.dataset.del, { method: 'DELETE' });
+    load();
+  }));
+  document.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', async () => {
+    await api('/api/admin/providers/' + b.dataset.toggle, { method: 'PATCH', body: JSON.stringify({ enabled: b.dataset.on !== '1' }) });
+    load();
+  }));
+  document.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
+    const p = list.find(x => String(x.id) === b.dataset.edit);
+    editId = p.id;
+    $('#fName').value = p.name; $('#fName').disabled = true;
+    $('#fUrl').value = p.urlTemplate; $('#fItems').value = p.itemsPath || '';
+    $('#fHeaders').value = JSON.stringify(p.headers || {});
+    $('#fMap').value = JSON.stringify(p.map || {});
+    $('#fRpm').value = p.requestsPerMinute; $('#fConc').value = p.concurrency;
+    $('#fTimeout').value = p.timeoutMs; $('#fTier').value = p.tier;
+    $('#fEnabled').value = p.enabled ? '1' : '0'; $('#fKey').value = '';
+    $('#formTitle').textContent = 'עריכת מנוע: ' + p.name;
+    $('#cancel').hidden = false;
+    $('#formTitle').scrollIntoView({ behavior: 'smooth' });
+  }));
+  document.querySelectorAll('[data-test]').forEach(b => b.addEventListener('click', async () => {
+    const row = b.closest('tr').querySelector('[data-res]');
+    b.disabled = true; b.textContent = 'בודק…';
+    try {
+      const r = await (await fetch(`/api/providers/${encodeURIComponent(b.dataset.test)}/test`, { method: 'POST' })).json();
+      row.innerHTML = r.ok
+        ? `<span class="badge b-ok">תקין</span> ${r.results} תוצאות · ${r.latencyMs}ms`
+        : `<span class="badge b-err">${esc(r.status)}</span> ${esc((r.error || '').slice(0, 120))}`;
+    } catch { row.innerHTML = '<span class="badge b-err">הבדיקה נכשלה</span>'; }
+    b.disabled = false; b.textContent = 'בדיקה';
+  }));
+}
+
+$('#cancel').addEventListener('click', () => {
+  editId = null; $('#fName').disabled = false;
+  $('#formTitle').textContent = 'הוספת מנוע חדש'; $('#cancel').hidden = true;
+  ['fName','fUrl','fKey','fItems','fHeaders','fMap'].forEach(id => $('#' + id).value = '');
+});
+
+$('#save').addEventListener('click', async () => {
+  const msg = $('#msg'); msg.textContent = '';
+  const parseJson = (v, label) => {
+    if (!v.trim()) return {};
+    try { return JSON.parse(v); } catch { throw new Error(`${label}: JSON לא תקין`); }
+  };
+  try {
+    const body = {
+      urlTemplate: $('#fUrl').value.trim(),
+      itemsPath: $('#fItems').value.trim() || undefined,
+      headers: parseJson($('#fHeaders').value, 'כותרות'),
+      map: parseJson($('#fMap').value, 'מיפוי'),
+      tier: $('#fTier').value,
+      timeoutMs: Number($('#fTimeout').value),
+      requestsPerMinute: Number($('#fRpm').value),
+      concurrency: Number($('#fConc').value),
+      enabled: $('#fEnabled').value === '1',
+    };
+    if ($('#fKey').value.trim()) body.apiKey = $('#fKey').value.trim();
+    if (editId) {
+      await api('/api/admin/providers/' + editId, { method: 'PATCH', body: JSON.stringify(body) });
+      msg.textContent = 'נשמר.';
+    } else {
+      body.name = $('#fName').value.trim();
+      await api('/api/admin/providers', { method: 'POST', body: JSON.stringify(body) });
+      msg.textContent = 'המנוע נוסף ומצטרף לחיפוש מיד.';
+    }
+    $('#cancel').click();
+    load();
+  } catch (e) { msg.innerHTML = `<span class="badge b-err">${esc(e.message)}</span>`; }
+});
+
+boot();
+</script>
+</body>
+</html>

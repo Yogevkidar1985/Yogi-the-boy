@@ -19,6 +19,7 @@ import { currencyService } from '../core/currency.js';
 import { bookingLinks } from '../core/links.js';
 import { bus, liveState } from '../core/bus.js';
 import { providerInfo } from '../providers/config.js';
+import { ProviderStore } from '../providers/store.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const db = getDatabase();
@@ -835,6 +836,93 @@ app.post('/api/providers/:name/test', async (req, res) => {
       error: err instanceof Error ? err.message.slice(0, 300) : String(err),
     });
   }
+});
+
+// ---- admin: manage search engines without redeploying ---------------------
+
+const store = new ProviderStore(db);
+
+/** Every admin route requires ADMIN_TOKEN; without it the API stays closed. */
+function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  const expected = process.env.ADMIN_TOKEN;
+  if (!expected) {
+    res.status(503).json({ error: 'ADMIN_TOKEN is not configured on the server' });
+    return;
+  }
+  const given = String(req.headers['x-admin-token'] ?? '');
+  if (given !== expected) {
+    res.status(401).json({ error: 'unauthorized' });
+    return;
+  }
+  next();
+}
+
+/** Rebuild the live registry so admin edits take effect immediately. */
+function refreshCustomProviders(previousNames: string[]): void {
+  registry.reloadDynamic(store.adapters(), previousNames);
+}
+
+const providerBody = z.object({
+  name: z.string().min(2).max(31),
+  urlTemplate: z.string().url().startsWith('https://'),
+  apiKey: z.string().max(500).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+  itemsPath: z.string().max(200).optional(),
+  map: z.record(z.string(), z.string()).optional(),
+  tier: z.enum(['FREE', 'LOW_COST', 'PAID', 'PREMIUM']).optional(),
+  timeoutMs: z.number().int().min(1000).max(60000).optional(),
+  requestsPerMinute: z.number().int().min(1).max(6000).optional(),
+  concurrency: z.number().int().min(1).max(50).optional(),
+  note: z.string().max(500).optional(),
+  enabled: z.boolean().optional(),
+});
+
+app.get('/api/admin/providers', requireAdmin, (_req, res) => {
+  res.json(store.list().map((p) => ({ ...p, apiKey: undefined, keyMask: p.hasKey ? '••••••••' : '' })));
+});
+
+app.post('/api/admin/providers', requireAdmin, (req, res) => {
+  const parsed = providerBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  try {
+    const names = store.list().map((p) => p.name);
+    const id = store.create(parsed.data);
+    refreshCustomProviders(names);
+    res.status(201).json({ id });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.patch('/api/admin/providers/:id', requireAdmin, (req, res) => {
+  const parsed = providerBody.partial().safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const id = Number(req.params.id);
+  if (!store.get(id)) return res.status(404).json({ error: 'not found' });
+  try {
+    const names = store.list().map((p) => p.name);
+    store.update(id, parsed.data);
+    refreshCustomProviders(names);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.delete('/api/admin/providers/:id', requireAdmin, (req, res) => {
+  const names = store.list().map((p) => p.name);
+  store.remove(Number(req.params.id));
+  refreshCustomProviders(names);
+  res.status(204).end();
+});
+
+/** Is the admin console usable on this deployment? (no secrets revealed) */
+app.get('/api/admin/status', (_req, res) => {
+  res.json({
+    adminTokenConfigured: Boolean(process.env.ADMIN_TOKEN),
+    secretConfigured: Boolean(process.env.ADMIN_SECRET && process.env.ADMIN_SECRET.length >= 8),
+    storedProviders: (() => { try { return store.list().length; } catch { return 0; } })(),
+  });
 });
 
 app.get('/api/links', (req, res) => {

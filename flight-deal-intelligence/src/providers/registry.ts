@@ -16,6 +16,7 @@ import { DuffelAdapter } from './duffel.js';
 import { KiwiAdapter } from './kiwi.js';
 import { TravelpayoutsAdapter } from './travelpayouts.js';
 import { buildGenericAdapters } from './generic.js';
+import { ProviderStore } from './store.js';
 import { getDatabase, type FlightDatabase } from '../db/database.js';
 import { routeKey } from '../core/types.js';
 import { configFor, ProviderRateLimiter } from './config.js';
@@ -55,7 +56,19 @@ export class ProviderRegistry {
 
   constructor(private db: FlightDatabase = getDatabase()) {}
 
+  /** Drop every adapter that came from the database, then re-add the current
+   *  set — called after an admin edit so changes apply without a restart. */
+  reloadDynamic(adapters: FlightSearchAdapter[], previousNames: string[]): void {
+    this.adapters = this.adapters.filter((a) => !previousNames.includes(a.name));
+    for (const a of adapters) this.register(a);
+    this.availability.clear();
+    this.breaker.clear();
+    this.cache.clear();
+  }
+
   register(adapter: FlightSearchAdapter): void {
+    // re-registering the same name replaces the old adapter
+    this.adapters = this.adapters.filter((a) => a.name !== adapter.name);
     this.adapters.push(adapter);
     this.db.db
       .prepare(`INSERT OR IGNORE INTO providers (name, kind, priority) VALUES (?,?,?)`)
@@ -333,6 +346,10 @@ export function buildDefaultRegistry(db?: FlightDatabase): ProviderRegistry {
   registry.register(new TravelpayoutsAdapter()); // active when TRAVELPAYOUTS_TOKEN is set
   // any API configured through CUSTOM1_/CUSTOM2_/CUSTOM3_ environment slots
   for (const custom of buildGenericAdapters()) registry.register(custom);
+  // plus every engine added from the admin screen (stored in the database)
+  try {
+    for (const custom of new ProviderStore(db ?? getDatabase()).adapters()) registry.register(custom);
+  } catch { /* store unavailable → environment providers still work */ }
   if (process.env.MOCK_PROVIDER === '1' || process.env.ALLOW_MOCK_FALLBACK === '1') {
     registry.register(new MockFlightProvider());
   }

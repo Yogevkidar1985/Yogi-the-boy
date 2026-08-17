@@ -12,6 +12,7 @@ import type { FlightSearchAdapter } from '../src/providers/adapter.js';
 import { ProviderError } from '../src/providers/adapter.js';
 import { ProviderRateLimiter } from '../src/providers/config.js';
 import { GenericHttpAdapter, readGenericSpec } from '../src/providers/generic.js';
+import { ProviderStore } from '../src/providers/store.js';
 
 class FailingProvider implements FlightSearchAdapter {
   readonly name = 'failing';
@@ -352,5 +353,69 @@ describe('generic adapter: connect any flight API by configuration', () => {
 
   it('is not registered when its slot is unconfigured', () => {
     expect(readGenericSpec('CUSTOM_NOT_SET')).toBeUndefined();
+  });
+});
+
+describe('provider store: many engines managed from the database', () => {
+  const withSecret = <T>(fn: () => T): T => {
+    const prev = { s: process.env.ADMIN_SECRET };
+    process.env.ADMIN_SECRET = 'test-admin-secret-long-enough';
+    try { return fn(); } finally {
+      if (prev.s === undefined) delete process.env.ADMIN_SECRET; else process.env.ADMIN_SECRET = prev.s;
+    }
+  };
+
+  it('encrypts API keys at rest and never returns them by default', () => {
+    withSecret(() => {
+      const db = new FlightDatabase(':memory:');
+      const store = new ProviderStore(db);
+      const id = store.create({
+        name: 'engine-a', urlTemplate: 'https://api.a.test/s?k={KEY}', apiKey: 'super-secret-key',
+      });
+      // the raw row must not contain the plaintext key
+      const raw = db.db.prepare('SELECT api_key_enc FROM custom_providers WHERE id=?').get(id) as { api_key_enc: string };
+      expect(raw.api_key_enc).not.toContain('super-secret-key');
+      // list output reports presence only
+      const listed = store.list()[0]!;
+      expect(listed.hasKey).toBe(true);
+      expect(listed.apiKey).toBeUndefined();
+      // explicit read decrypts correctly
+      expect(store.get(id, true)!.apiKey).toBe('super-secret-key');
+    });
+  });
+
+  it('refuses to store a key when no ADMIN_SECRET is configured', () => {
+    const prev = process.env.ADMIN_SECRET;
+    delete process.env.ADMIN_SECRET;
+    try {
+      const store = new ProviderStore(new FlightDatabase(':memory:'));
+      expect(() => store.create({ name: 'engine-b', urlTemplate: 'https://api.b.test/s', apiKey: 'k' }))
+        .toThrow(/ADMIN_SECRET/);
+    } finally { if (prev !== undefined) process.env.ADMIN_SECRET = prev; }
+  });
+
+  it('validates name and url, and builds adapters only for enabled rows', () => {
+    withSecret(() => {
+      const store = new ProviderStore(new FlightDatabase(':memory:'));
+      expect(() => store.create({ name: 'bad name!', urlTemplate: 'https://x.test' })).toThrow();
+      expect(() => store.create({ name: 'insecure', urlTemplate: 'http://x.test' })).toThrow(/https/);
+      store.create({ name: 'live-1', urlTemplate: 'https://a.test/s' });
+      const off = store.create({ name: 'paused-1', urlTemplate: 'https://b.test/s' });
+      store.update(off, { enabled: false });
+      const names = store.adapters().map((a) => a.name);
+      expect(names).toContain('live-1');
+      expect(names).not.toContain('paused-1');
+    });
+  });
+
+  it('supports many engines side by side', () => {
+    withSecret(() => {
+      const store = new ProviderStore(new FlightDatabase(':memory:'));
+      for (let i = 1; i <= 25; i++) {
+        store.create({ name: `engine-${i}`, urlTemplate: `https://api${i}.test/s?k={KEY}`, apiKey: `key-${i}` });
+      }
+      expect(store.list()).toHaveLength(25);
+      expect(store.adapters()).toHaveLength(25);
+    });
   });
 });

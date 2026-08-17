@@ -15,6 +15,74 @@ export interface ProviderConfig {
   concurrency: number;
 }
 
+/** How a provider is obtained today — surfaced on the setup screen. */
+export type AccessModel = 'SELF_SERVE' | 'INVITE_ONLY' | 'ENTERPRISE' | 'NONE_NEEDED' | 'DISCONTINUED';
+
+export interface ProviderInfo {
+  label: string;
+  /** Environment variables that switch this provider on. */
+  envVars: string[];
+  access: AccessModel;
+  signupUrl?: string;
+  /** Honest, current note about what it takes to use this source. */
+  note: string;
+}
+
+/**
+ * Provider availability as of August 2026. Kept next to the config so the
+ * setup screen never sends anyone to a dead end: Amadeus closed its
+ * Self-Service portal on 17 July 2026 and Kiwi's Tequila has been
+ * invite-only since 2024.
+ */
+export const providerInfo: Record<string, ProviderInfo> = {
+  serpapi: {
+    label: 'SerpAPI — Google Flights',
+    envVars: ['SERPAPI_API_KEY'],
+    access: 'SELF_SERVE',
+    signupUrl: 'https://serpapi.com/users/sign_up',
+    note: 'ההמלצה הראשונה: הרשמה עצמית מיידית, מחזיר תוצאות Google Flights אמיתיות, ויש מכסה חינמית חודשית. עובד גם משרתי ענן.',
+  },
+  duffel: {
+    label: 'Duffel — NDC / חברות תעופה',
+    envVars: ['DUFFEL_API_TOKEN'],
+    access: 'SELF_SERVE',
+    signupUrl: 'https://duffel.com/',
+    note: 'הרשמה עצמית זמינה. מצב הבדיקה מחזיר נתוני דמה של Duffel Airways בלבד — למחירים אמיתיים נדרש טוקן production (בתשלום לפי חיפוש/הזמנה).',
+  },
+  amadeus: {
+    label: 'Amadeus — GDS',
+    envVars: ['AMADEUS_CLIENT_ID', 'AMADEUS_CLIENT_SECRET'],
+    access: 'DISCONTINUED',
+    signupUrl: 'https://developers.amadeus.com/',
+    note: 'פורטל ה-Self-Service נסגר ב-17 ביולי 2026 ומפתחות ישנים הפסיקו לעבוד. המתאם נשאר פעיל עבור חשבון Amadeus Enterprise (דורש הסמכת IATA/ARC).',
+  },
+  kiwi: {
+    label: 'Kiwi.com Tequila',
+    envVars: ['KIWI_API_KEY'],
+    access: 'INVITE_ONLY',
+    signupUrl: 'https://tequila.kiwi.com/portal',
+    note: 'סגור להרשמה עצמית מאז 2024 — שותפות B2B בהזמנה בלבד. המתאם מוכן ויופעל מיד עם קבלת מפתח.',
+  },
+  'fast-flights': {
+    label: 'fast-flights (Google Flights, ללא מפתח)',
+    envVars: [],
+    access: 'NONE_NEEDED',
+    note: 'לא דורש מפתח, אך Google חוסם כתובות של שרתי ענן — בפרודקשן הוא ייכשל לעיתים קרובות. מתאים לשימוש מקומי.',
+  },
+  fli: {
+    label: 'fli CLI (Google Flights, ללא מפתח)',
+    envVars: [],
+    access: 'NONE_NEEDED',
+    note: 'כמו fast-flights — ללא מפתח, וכפוף לאותן חסימות מצד Google בסביבת ענן.',
+  },
+  mock: {
+    label: 'Mock (נתוני הדגמה)',
+    envVars: ['MOCK_PROVIDER'],
+    access: 'NONE_NEEDED',
+    note: 'נתונים סינתטיים לפיתוח ובדיקות בלבד. אין להפעיל בפרודקשן — התוצאות אינן אמיתיות.',
+  },
+};
+
 const flag = (name: string, dflt = true): boolean => {
   const v = process.env[name];
   if (v === undefined || v === '') return dflt;

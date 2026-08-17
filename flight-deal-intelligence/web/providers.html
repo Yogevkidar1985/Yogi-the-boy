@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מקורות החיפוש — Flight Deal Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --font-family: 'Heebo', system-ui, sans-serif;
+    --page: #f4f6f9; --surface: #fff; --surface-2: #f0f3f7; --border: #dde3ea;
+    --ink: #101725; --ink-2: #48556a; --ink-3: #77839a;
+    --hero: #0b1f3a; --primary: #1a63d4; --primary-ink: #fff; --primary-soft: #e8f0fc;
+    --success-bg: #e3f4ec; --success-ink: #0a6b4a;
+    --warn-bg: #fbf1dc; --warn-ink: #7a5300;
+    --err-bg: #fbe7e7; --err-ink: #a33636;
+    --radius: 12px; --shadow: 0 1px 2px rgba(15,23,42,.06);
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0c1220; --surface: #151d2e; --surface-2: #1c2638; --border: #2a3750;
+    --ink: #eef2f8; --ink-2: #b3bfd2; --ink-3: #8391a8;
+    --primary: #4d8ce8; --primary-ink: #0b1f3a; --primary-soft: #1c2c47;
+    --success-bg: #123528; --success-ink: #7fd6b3;
+    --warn-bg: #382c12; --warn-ink: #e5c07b;
+    --err-bg: #3d2020; --err-ink: #f1a1a1;
+  } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--font-family); font-size: 14.5px; line-height: 1.6; overflow-x: clip; }
+  .ltr { direction: ltr; unicode-bidi: isolate; }
+  header { background: var(--hero); color: #fff; padding: 14px 16px; }
+  header .in { max-width: 900px; margin: 0 auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  header a { color: #aebdd2; text-decoration: none; font-size: 13px; }
+  header a:hover { color: #fff; }
+  main { max-width: 900px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 22px; margin: 0; font-weight: 700; }
+  h2 { font-size: 18px; margin: 28px 0 10px; font-weight: 700; }
+  .lead { color: var(--ink-2); max-width: 70ch; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; margin-bottom: 12px; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .grow { flex: 1; min-width: 200px; }
+  .name { font-weight: 700; font-size: 16px; }
+  .badge { display: inline-flex; align-items: center; border-radius: 999px; font-size: 12px; font-weight: 600; padding: 3px 10px; }
+  .b-ok { background: var(--success-bg); color: var(--success-ink); }
+  .b-warn { background: var(--warn-bg); color: var(--warn-ink); }
+  .b-err { background: var(--err-bg); color: var(--err-ink); }
+  .b-neutral { background: var(--surface-2); color: var(--ink-2); }
+  .note { color: var(--ink-2); font-size: 13.5px; margin: 8px 0 0; }
+  .env { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; margin-top: 8px; font-size: 13px; }
+  .env code { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: none; border-radius: 8px;
+    cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; padding: 8px 14px; min-height: 40px; text-decoration: none; }
+  .btn-p { background: var(--primary); color: var(--primary-ink); }
+  .btn-g { background: transparent; border: 1px solid var(--border); color: var(--ink-2); }
+  .btn-g:hover { border-color: var(--primary); color: var(--ink); }
+  .steps { padding-inline-start: 20px; color: var(--ink-2); }
+  .steps li { margin-bottom: 6px; }
+  .muted { color: var(--ink-3); font-size: 13px; }
+  .result { margin-top: 8px; font-size: 13px; }
+</style>
+</head>
+<body>
+<header><div class="in">
+  <h1>מקורות החיפוש</h1>
+  <a href="/">חזרה למנוע החיפוש</a>
+</div></header>
+
+<main>
+  <p class="lead">כאן רואים אילו מקורות טיסה מחוברים בפועל, מה חסר כדי להפעיל כל אחד, ואפשר לבדוק חיבור בלחיצה.
+    בדיקת החיבור מריצה חיפוש אמיתי מול המקור — מקור לא מסומן כמחובר רק בגלל שקיים מפתח.</p>
+
+  <div class="card" style="border-inline-start:4px solid var(--primary)">
+    <b>מצב השוק, אוגוסט 2026</b>
+    <p class="note">חלק מהמקורות שהיו פתוחים בעבר נסגרו: פורטל ה-Self-Service של Amadeus נסגר ב-17 ביולי 2026,
+      ו-Tequila של Kiwi סגור להרשמה עצמית מאז 2024. שני המקורות שניתן לחבר היום בהרשמה עצמית הם
+      <b>SerpAPI</b> (תוצאות Google Flights אמיתיות, מכסה חינמית) ו-<b>Duffel</b> (תוכן NDC של חברות תעופה).</p>
+  </div>
+
+  <div id="list"></div>
+
+  <h2>איך מוסיפים מפתח ב-Render</h2>
+  <div class="card">
+    <ol class="steps">
+      <li>נכנסים ל-Dashboard של Render ובוחרים את השירות <span class="ltr">flight-deal-intelligence</span>.</li>
+      <li>לשונית <b>Environment</b> ← <b>Add Environment Variable</b>.</li>
+      <li>מוסיפים את שם המשתנה והערך מהטבלה למעלה (למשל <code class="ltr">SERPAPI_API_KEY</code>).</li>
+      <li>שומרים — Render יפרוס מחדש אוטומטית תוך כמה דקות.</li>
+      <li>חוזרים לעמוד הזה ולוחצים <b>בדיקת חיבור</b> כדי לוודא שהמקור באמת עונה.</li>
+    </ol>
+    <p class="muted">המפתחות נשמרים בצד השרת בלבד ואינם נחשפים לדפדפן. העמוד הזה מציג רק אם משתנה מוגדר או לא — לעולם לא את ערכו.</p>
+  </div>
+</main>
+
+<script>
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const STATUS_HE = {
+  ACTIVE: ['פעיל', 'b-ok'], DISABLED: ['לא מוגדר', 'b-neutral'], DEGRADED: ['לא יציב', 'b-warn'],
+  RATE_LIMITED: ['מוגבל זמנית', 'b-warn'], AUTH_ERROR: ['שגיאת הרשאה', 'b-err'],
+  CIRCUIT_OPEN: ['בהשהיה אוטומטית', 'b-warn'], UNKNOWN: ['לא נבדק', 'b-neutral'],
+};
+const ACCESS_HE = {
+  SELF_SERVE: ['הרשמה עצמית — זמין', 'b-ok'],
+  INVITE_ONLY: ['בהזמנה בלבד', 'b-warn'],
+  ENTERPRISE: ['חשבון ארגוני', 'b-warn'],
+  DISCONTINUED: ['הופסק', 'b-err'],
+  NONE_NEEDED: ['ללא מפתח', 'b-neutral'],
+};
+
+async function load() {
+  const provs = await (await fetch('/api/providers')).json();
+  // self-serve and ready-to-use sources first — that is the actionable list
+  const order = { SELF_SERVE: 0, NONE_NEEDED: 1, INVITE_ONLY: 2, ENTERPRISE: 3, DISCONTINUED: 4 };
+  provs.sort((a, b) => (order[a.access] ?? 9) - (order[b.access] ?? 9));
+  document.getElementById('list').innerHTML = provs.map((p, i) => {
+    const st = STATUS_HE[p.status] || STATUS_HE.UNKNOWN;
+    const ac = ACCESS_HE[p.access] || ACCESS_HE.SELF_SERVE;
+    const creds = (p.credentials || []).map(c =>
+      `<div><code class="ltr">${esc(c.name)}</code> — ${c.configured
+        ? '<span class="badge b-ok">מוגדר</span>'
+        : '<span class="badge b-neutral">חסר</span>'}</div>`).join('');
+    return `<div class="card">
+      <div class="row">
+        <span class="name grow">${esc(p.label || p.name)} <span class="muted ltr">${esc(p.name)}</span></span>
+        <span class="badge ${ac[1]}">${ac[0]}</span>
+        <span class="badge ${st[1]}">${st[0]}</span>
+      </div>
+      ${p.note ? `<p class="note">${esc(p.note)}</p>` : ''}
+      ${creds ? `<div class="env">${creds}</div>` : ''}
+      <div class="row" style="margin-top:10px">
+        ${p.signupUrl ? `<a class="btn btn-p" href="${esc(p.signupUrl)}" target="_blank" rel="noopener">קבלת מפתח</a>` : ''}
+        <button class="btn btn-g" data-test="${i}" data-name="${esc(p.name)}">בדיקת חיבור</button>
+        <span class="muted">${p.successCount + p.errorCount > 0
+          ? `הצלחות ${p.successCount} · שגיאות ${p.errorCount} · השהיה ממוצעת ${Math.round(p.avgLatencyMs)}ms`
+          : 'טרם בוצעו קריאות'}</span>
+      </div>
+      <div class="result" data-res="${i}"></div>
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('[data-test]').forEach(b => b.addEventListener('click', async () => {
+    const out = document.querySelector(`[data-res="${b.dataset.test}"]`);
+    b.disabled = true; b.textContent = 'בודק…'; out.textContent = '';
+    try {
+      const r = await (await fetch(`/api/providers/${encodeURIComponent(b.dataset.name)}/test`, { method: 'POST' })).json();
+      out.innerHTML = r.ok
+        ? `<span class="badge b-ok">חיבור תקין</span> <span class="muted">${r.results} תוצאות · ${r.latencyMs}ms</span>`
+        : `<span class="badge b-err">${esc(r.status)}</span> <span class="muted">${esc(r.error || '')}</span>`;
+    } catch (e) {
+      out.innerHTML = `<span class="badge b-err">הבדיקה נכשלה</span>`;
+    }
+    b.disabled = false; b.textContent = 'בדיקת חיבור';
+  }));
+}
+load();
+</script>
+</body>
+</html>

@@ -18,6 +18,7 @@ import { routeKey } from '../core/types.js';
 import { currencyService } from '../core/currency.js';
 import { bookingLinks } from '../core/links.js';
 import { bus, liveState } from '../core/bus.js';
+import { providerInfo } from '../providers/config.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const db = getDatabase();
@@ -787,15 +788,26 @@ app.get('/api/airlines', (_req, res) => {
 
 app.get('/api/providers', (_req, res) => {
   res.json(
-    registry.list().map((a) => ({
-      name: a.name,
-      priority: a.priority,
-      status: registry.status(a.name),
-      costTier: a.costTier ?? 'FREE',
-      capabilities: a.capabilities,
-      rateLimit: registry.rateStats(a.name),
-      ...registry.health(a.name),
-    }))
+    registry.list().map((a) => {
+      const info = providerInfo[a.name];
+      // report only whether each credential is present — never its value
+      const credentials = (info?.envVars ?? []).map((v) => ({ name: v, configured: Boolean(process.env[v]) }));
+      return {
+        name: a.name,
+        label: info?.label ?? a.name,
+        priority: a.priority,
+        status: registry.status(a.name),
+        costTier: a.costTier ?? 'FREE',
+        capabilities: a.capabilities,
+        rateLimit: registry.rateStats(a.name),
+        access: info?.access ?? 'SELF_SERVE',
+        signupUrl: info?.signupUrl,
+        note: info?.note,
+        credentials,
+        credentialsReady: credentials.length === 0 || credentials.every((c) => c.configured),
+        ...registry.health(a.name),
+      };
+    })
   );
 });
 

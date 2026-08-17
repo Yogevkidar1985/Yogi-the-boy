@@ -614,6 +614,7 @@
       <a href="#watchesSec">טיסות שמורות</a>
       <a href="#alertsSec">התראות</a>
       <a href="#historySec">היסטוריית מחירים</a>
+      <a href="/providers.html">מקורות</a>
     </nav>
     <select id="currencySel" aria-label="מטבע תצוגה" class="ltr" style="margin-inline-start:auto; background:rgba(255,255,255,.1); color:var(--hero-ink); border:1px solid rgba(255,255,255,.25); border-radius:var(--radius-full); padding:6px 12px; font-family:inherit; font-size:var(--fs-sm); cursor:pointer">
       <option value="">מטבע</option>
@@ -1761,12 +1762,9 @@ $('#searchForm').addEventListener('submit', async (ev) => {
       $('#flightList').innerHTML = `<div class="card" style="padding:16px">
         <p class="muted" style="margin-top:0">אחד או יותר מהמקורות לא ענה. מה כל מקור השיב:</p>
         <ul class="whylist ltr" style="direction:ltr">${attempts || '<li>אין מידע</li>'}</ul>
-        ${(data.attempted || []).some(a => (a.provider === 'serpapi' || a.provider === 'amadeus') && a.error === 'unavailable')
-          ? `<p class="muted" style="margin-bottom:0">פתרון: Google מגביל שרתי ענן. הוסיפו מפתח חינמי של
-             <a href="https://serpapi.com" target="_blank" rel="noopener">SerpAPI</a> או
-             <a href="https://developers.amadeus.com" target="_blank" rel="noopener">Amadeus</a>
-             במשתני הסביבה (SERPAPI_API_KEY / AMADEUS_CLIENT_ID+SECRET) — והחיפוש יעבוד באופן אמין.</p>`
-          : `<p class="muted">אם זה נמשך — ייתכן שהמקורות מוגבלים זמנית. נסו שוב בעוד כמה דקות.</p>`}</div>`;
+        <p class="muted" style="margin-bottom:0">מקורות ללא מפתח (fast-flights ו-fli) נשענים על Google, ש-חוסם כתובות של שרתי ענן —
+          ולכן הם נכשלים בפרודקשן. כדי שהחיפוש יעבוד באופן אמין צריך לחבר מקור עם מפתח.
+          <a href="/providers.html">פתיחת מסך מקורות החיפוש</a> — שם רואים מה חסר, מקבלים קישור להרשמה ובודקים חיבור.</p></div>`;
       $('#airlineChips').innerHTML = '';
       $('#resultsSec').hidden = false;
       return;

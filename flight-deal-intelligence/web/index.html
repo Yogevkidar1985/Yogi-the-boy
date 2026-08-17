@@ -177,6 +177,13 @@
   .legrow { display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline; font-size: 13px; }
   .layover { padding-inline-start: 8px; border-inline-start: 2px dashed var(--border); font-size: 12px; }
 
+  html { scroll-behavior: smooth; }
+  main > * { animation: rise .35s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .card { transition: box-shadow .15s ease, border-color .15s ease; }
+  .flight:hover, .dealcard:hover { box-shadow: 0 6px 22px rgba(7,31,61,.13); border-color: var(--accent); }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } main > * { animation: none; } }
+
   /* ---- layout ---- */
   main { max-width: 1060px; margin: 0 auto; padding: 26px 20px 80px; }
   h3.sec { font-size: 18px; margin: 34px 0 12px; font-weight: 750; }

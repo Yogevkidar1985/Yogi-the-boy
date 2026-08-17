@@ -2,6 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%231a63d4%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.4-.2c.5-.2.7-.6.6-1.2z%22/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Flight Deal Intelligence</title>
 <script>
@@ -109,6 +110,9 @@
   }
 
   * { box-sizing: border-box; }
+  /* a class-level `display` beats the browser's [hidden] rule, which would
+     leave hidden controls (price slider, "show more") on screen */
+  [hidden] { display: none !important; }
   html { scroll-behavior: smooth; }
   body {
     margin: 0; background: var(--page); color: var(--ink);
@@ -488,6 +492,13 @@
   .depgraph text { fill: var(--ink-3); font-size: 10px; font-family: var(--font-family); }
 
   /* price slider */
+  /* deal board filters — same controls as the search, applied to the board */
+  .dealfilters { padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-3); }
+  .dealfilters .filters { margin: var(--sp-2) 0 0; }
+  .dealfilters .filters:empty { display: none; }
+  .dfhead { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+  .dfhead .muted { flex: 1; }
+  .dealmore { display: flex; justify-content: center; margin: var(--sp-3) 0; }
   .pricefilter { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; font-size: var(--fs-sm); color: var(--ink-2); }
   .pricefilter input[type="range"] { flex: 1; max-width: 260px; accent-color: var(--primary); min-height: 24px; }
 
@@ -802,7 +813,33 @@
     <button class="chip dsort" data-dsort="drop" aria-pressed="false">ירידות המחיר הגדולות</button>
     <button class="chip dsort" data-dsort="new" aria-pressed="false">נבדקו לאחרונה</button>
   </div>
+  <div class="card dealfilters" id="dealFilterZone">
+    <div class="dfhead">
+      <b>סינון הדילים</b>
+      <span class="muted" id="dealCount"></span>
+      <button class="btn btn-ghost btn-sm" id="dealClear" hidden>ניקוי הסינון</button>
+    </div>
+    <div class="filters" id="dealQuick" role="group" aria-label="סינון דילים">
+      <button class="chip qf" data-dk="stops" data-dv="0" aria-pressed="false">ישירות בלבד</button>
+      <button class="chip qf" data-dk="stops" data-dv="1" aria-pressed="false">עד עצירה אחת</button>
+      <button class="chip qf" data-dk="dur" data-dv="short" aria-pressed="false">עד 8 שעות</button>
+      <button class="chip qf" data-dk="trip" data-dv="oneway" aria-pressed="false">כיוון אחד</button>
+      <button class="chip qf" data-dk="trip" data-dv="round" aria-pressed="false">הלוך ושוב</button>
+      <button class="chip qf" data-dk="when" data-dv="30" aria-pressed="false">30 הימים הקרובים</button>
+      <button class="chip qf" data-dk="when" data-dv="90" aria-pressed="false">3 החודשים הקרובים</button>
+      <button class="chip qf" data-dk="quality" data-dv="strong" aria-pressed="false">עסקאות חזקות בלבד</button>
+    </div>
+    <div class="pricefilter" id="dealPriceFilter" hidden>
+      <span>מחיר מקסימלי</span>
+      <input type="range" id="dealPriceSlider" aria-label="מחיר מקסימלי לדיל">
+      <b class="num" id="dealPriceVal"></b>
+    </div>
+    <div class="filters" id="dealOriginChips" role="group" aria-label="שדה מוצא"></div>
+    <div class="filters" id="dealAirlineChips" role="group" aria-label="חברות תעופה"></div>
+  </div>
+  <div id="dealRelax"></div>
   <div class="deals" id="deals"><p class="muted">עוד אין עסקאות — חפשו משהו והמנוע יתחיל ללמוד מחירים.</p></div>
+  <div class="dealmore"><button class="btn btn-ghost" id="dealMore" hidden></button></div>
 
   <section id="historySec">
     <h3 class="sec">היסטוריית מחירים</h3>
@@ -2390,8 +2427,13 @@ window.track = async (origin, destination, departureDate, returnDate) => {
 
 /* ---- live deal board ---- */
 let dealSort = 'score';
+/** Every deal returned by the server; the board renders a filtered page of it. */
+let dealPool = [];
 let lastDeals = [];
-/** Deals selected for cross-route comparison (index into lastDeals). */
+/** Identity of a deal, stable across re-renders and re-sorts. */
+const dealKey = (d) => `${d.route}|${d.departure_date}|${d.airline || ''}|${d.normalized_price}`;
+/** Deals picked for cross-route comparison, held by key so paging or
+    re-filtering can never point a selection at a different deal. */
 const dealCompare = new Set();
 /** Shape a board deal into the comparison table's flight format. */
 function dealAsFlight(d) {
@@ -2417,6 +2459,172 @@ $$('.dsort').forEach(b => b.addEventListener('click', () => {
   loadDeals();
 }));
 
+/* ---- deal board filters: the same controls as the search results, applied
+   to the board, so the board shows only deals worth looking at ---- */
+const dealQuick = { stops: null, dur: null, trip: null, when: null, quality: null };
+let dealMaxPrice = null;
+const dealAirlines = new Set();
+const dealOrigins = new Set();
+const DEAL_PAGE = 12;
+let dealShown = DEAL_PAGE;
+
+const dealPrice = (d) => Number(d.normalized_price);
+function daysUntil(iso) {
+  const t = Date.parse(String(iso) + 'T00:00:00');
+  return Number.isFinite(t) ? Math.round((t - Date.now()) / 86400000) : null;
+}
+
+/** Same rule shape as FILTER_RULES: [id, label, isActive(state), passes(deal, state)]. */
+const DEAL_FILTER_RULES = [
+  ['dairlines', 'חברות תעופה', (s) => s.airlines.size > 0, (d, s) => s.airlines.has(d.airline)],
+  ['dorigins', 'שדה מוצא', (s) => s.origins.size > 0, (d, s) => s.origins.has(d.origin)],
+  ['dstops', 'מספר עצירות', (s) => s.stops !== null, (d, s) => (d.stops ?? 0) <= Number(s.stops)],
+  ['ddur', 'משך הטיסה', (s) => s.dur === 'short', (d) => !d.duration_minutes || d.duration_minutes <= 480],
+  ['dtrip', 'סוג מסלול', (s) => Boolean(s.trip), (d, s) =>
+    s.trip === 'round' ? Boolean(d.return_date) : !d.return_date],
+  ['dwhen', 'טווח תאריכים', (s) => Boolean(s.when), (d, s) => {
+    const n = daysUntil(d.departure_date);
+    return n === null ? true : n >= 0 && n <= Number(s.when);
+  }],
+  ['dquality', 'איכות העסקה', (s) => s.quality === 'strong', (d) => Math.round(d.score) >= 80],
+  ['dprice', 'מחיר מקסימלי', (s) => s.maxPrice !== null, (d, s) => dealPrice(d) <= s.maxPrice],
+];
+
+const dealFilterState = () => ({
+  airlines: dealAirlines, origins: dealOrigins, stops: dealQuick.stops, dur: dealQuick.dur,
+  trip: dealQuick.trip, when: dealQuick.when, quality: dealQuick.quality, maxPrice: dealMaxPrice,
+});
+
+function applyDealFilters(list, state, skipId) {
+  return list.filter((d) =>
+    DEAL_FILTER_RULES.every(([id, , isActive, passes]) =>
+      id === skipId || !isActive(state) || passes(d, state)));
+}
+
+/** How many deals a not-yet-chosen option would leave. */
+function dealCountIfChosen(patch) {
+  const base = dealFilterState();
+  return applyDealFilters(dealPool, { ...base, ...patch }).length;
+}
+
+function clearDealFilters() {
+  for (const k of Object.keys(dealQuick)) dealQuick[k] = null;
+  dealAirlines.clear(); dealOrigins.clear();
+  dealMaxPrice = null;
+  const sl = $('#dealPriceSlider');
+  if (sl && !$('#dealPriceFilter').hidden) { sl.value = sl.max; $('#dealPriceVal').textContent = fmt(Number(sl.max)); }
+  dealShown = DEAL_PAGE;
+  renderDeals();
+}
+$('#dealClear').addEventListener('click', clearDealFilters);
+
+$$('#dealQuick .qf').forEach(b => b.addEventListener('click', () => {
+  const k = b.dataset.dk, v = b.dataset.dv;
+  dealQuick[k] = dealQuick[k] === v ? null : v;
+  dealShown = DEAL_PAGE;
+  renderDeals();
+}));
+
+$('#dealPriceSlider').addEventListener('input', () => {
+  const sl = $('#dealPriceSlider'), v = Number(sl.value);
+  dealMaxPrice = v >= Number(sl.max) ? null : v;
+  $('#dealPriceVal').textContent = fmt(v);
+  dealShown = DEAL_PAGE;
+  renderDeals();
+});
+
+$('#dealMore').addEventListener('click', () => { dealShown += DEAL_PAGE; renderDeals(); });
+
+/** Rebuild the option lists from the current pool — never invent an option. */
+function renderDealChips() {
+  const state = dealFilterState();
+  $$('#dealQuick .qf').forEach((b) => {
+    const k = b.dataset.dk, v = b.dataset.dv, active = dealQuick[k] === v;
+    b.setAttribute('aria-pressed', String(active));
+    const n = dealCountIfChosen({ [k]: active ? null : v });
+    const base = b.dataset.label || (b.dataset.label = b.textContent.replace(/\s*\(\d+\)$/, ''));
+    b.textContent = `${base} (${n})`;
+    b.disabled = !active && n === 0;
+  });
+
+  const origins = [...new Set(dealPool.map(d => d.origin))].sort();
+  $('#dealOriginChips').innerHTML = origins.length < 2 ? '' : origins.map((o) => {
+    const n = applyDealFilters(dealPool, { ...state, origins: new Set([o]) }).length;
+    return `<button class="chip ltr" data-dorigin="${esc(o)}" ${n === 0 && !dealOrigins.has(o) ? 'disabled' : ''}
+      aria-pressed="${dealOrigins.size === 0 || dealOrigins.has(o)}">${esc(o)} (${n})</button>`;
+  }).join('');
+  $$('#dealOriginChips .chip').forEach(c => c.addEventListener('click', () => {
+    const o = c.dataset.dorigin;
+    if (dealOrigins.has(o)) dealOrigins.delete(o); else dealOrigins.add(o);
+    if (dealOrigins.size === origins.length) dealOrigins.clear();
+    dealShown = DEAL_PAGE;
+    renderDeals();
+  }));
+
+  const airlines = [...new Map(dealPool.map(d => [d.airline, d.airline_name || d.airline])).entries()]
+    .filter(([code]) => code);
+  $('#dealAirlineChips').innerHTML = airlines.length < 2 ? '' : airlines.map(([code, name]) => {
+    const n = applyDealFilters(dealPool, { ...state, airlines: new Set([code]) }).length;
+    return `<button class="chip" data-dal="${esc(code)}" ${n === 0 && !dealAirlines.has(code) ? 'disabled' : ''}
+      aria-pressed="${dealAirlines.size === 0 || dealAirlines.has(code)}">${esc(name)} (${n})</button>`;
+  }).join('');
+  $$('#dealAirlineChips .chip').forEach(c => c.addEventListener('click', () => {
+    const code = c.dataset.dal;
+    if (dealAirlines.has(code)) dealAirlines.delete(code); else dealAirlines.add(code);
+    if (dealAirlines.size === airlines.length) dealAirlines.clear();
+    dealShown = DEAL_PAGE;
+    renderDeals();
+  }));
+}
+
+function initDealPriceSlider() {
+  const box = $('#dealPriceFilter'), sl = $('#dealPriceSlider');
+  const prices = dealPool.map(dealPrice).filter(Number.isFinite);
+  const min = Math.floor(Math.min(...prices)), max = Math.ceil(Math.max(...prices));
+  if (prices.length < 2 || min === max) { box.hidden = true; dealMaxPrice = null; return; }
+  box.hidden = false;
+  // keep the user's cap when the board refreshes, as long as it is still in range
+  const keep = dealMaxPrice !== null && dealMaxPrice >= min && dealMaxPrice <= max ? dealMaxPrice : null;
+  sl.min = min; sl.max = max; sl.step = Math.max(1, Math.round((max - min) / 60));
+  sl.value = keep ?? max;
+  dealMaxPrice = keep;
+  $('#dealPriceVal').textContent = fmt(Number(sl.value));
+}
+
+/** When the filters empty the board, name the constraint responsible. */
+function renderDealRelaxation(list, state) {
+  const box = $('#dealRelax');
+  if (list.length || !dealPool.length) { box.innerHTML = ''; return; }
+  const blockers = DEAL_FILTER_RULES
+    .filter(([, , isActive]) => isActive(state))
+    .map(([id, label]) => ({ id, label, without: applyDealFilters(dealPool, state, id).length }))
+    .filter((b) => b.without > 0)
+    .sort((a, b) => b.without - a.without);
+  box.innerHTML = `<div class="card" style="padding:12px 14px; margin-bottom:10px; border-inline-start:4px solid var(--warning-ink)">
+    <b>אין דילים שעונים על הסינון הנוכחי</b>
+    <div class="muted" style="margin:4px 0 8px">${blockers.length
+      ? `האילוץ המשמעותי ביותר הוא <b>${esc(blockers[0].label)}</b> — ביטולו לבדו יחזיר ${blockers[0].without} דילים.`
+      : 'שילוב הסינונים אינו אפשרי יחד על הדילים שנמצאו עד כה.'}</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap">
+      ${blockers.slice(0, 3).map(b =>
+        `<button class="btn btn-ghost btn-sm" data-drelax="${b.id}">בטל ${esc(b.label)} (${b.without})</button>`).join('')}
+      <button class="btn btn-primary btn-sm" data-drelax="__all">ניקוי כל הסינונים</button>
+    </div></div>`;
+  $$('#dealRelax [data-drelax]').forEach(b => b.addEventListener('click', () => {
+    const id = b.dataset.drelax;
+    if (id === '__all') return clearDealFilters();
+    if (id === 'dairlines') dealAirlines.clear();
+    else if (id === 'dorigins') dealOrigins.clear();
+    else if (id === 'dprice') {
+      dealMaxPrice = null;
+      const sl = $('#dealPriceSlider');
+      if (sl && !$('#dealPriceFilter').hidden) { sl.value = sl.max; $('#dealPriceVal').textContent = fmt(Number(sl.max)); }
+    } else dealQuick[id.replace(/^d/, '')] = null;
+    dealShown = DEAL_PAGE;
+    renderDeals();
+  }));
+}
+
 function freshnessLabel(d) {
   if (d.price_status === 'VERIFIED_RECENT') {
     return `<span class="badge badge-success">נבדק ${d.freshness_minutes <= 1 ? 'ממש עכשיו' : 'לפני ' + d.freshness_minutes + ' דק׳'}</span>`;
@@ -2427,10 +2635,33 @@ function freshnessLabel(d) {
 }
 
 async function loadDeals() {
-  const deals = await api('/api/deals?limit=24&sort=' + dealSort);
+  // a wide pool so the filters have something real to work on; the board
+  // itself pages through it rather than silently cutting the list off
+  const deals = await api('/api/deals?limit=200&sort=' + dealSort);
   if (!deals.length) return;
-  lastDeals = deals;
+  dealPool = deals;
   $('#dealsUpdated').textContent = `עודכן ${new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
+  initDealPriceSlider();
+  renderDeals();
+}
+
+function renderDeals() {
+  const state = dealFilterState();
+  const filtered = applyDealFilters(dealPool, state);
+  const deals = filtered.slice(0, dealShown);
+  lastDeals = deals;
+  renderDealChips();
+  renderDealRelaxation(filtered, state);
+
+  const anyFilter = DEAL_FILTER_RULES.some(([, , isActive]) => isActive(state));
+  $('#dealClear').hidden = !anyFilter;
+  $('#dealCount').textContent = !dealPool.length ? ''
+    : anyFilter ? `${filtered.length} מתוך ${dealPool.length} דילים תואמים`
+    : `${dealPool.length} דילים על הלוח`;
+  const more = $('#dealMore');
+  more.hidden = filtered.length <= deals.length;
+  more.textContent = `הצג עוד דילים (${filtered.length - deals.length} נוספים)`;
+
   $('#deals').innerHTML = deals.map((d, i) => {
     const st = dealState(Math.round(d.score));
     const stale = d.price_status === 'STALE';
@@ -2454,7 +2685,7 @@ async function loadDeals() {
       <a href="${safeUrl(d.booking_url)}" target="_blank" rel="noopener">להזמנה</a>
       <button class="btn btn-ghost btn-sm" data-dverify="${i}">בדוק מחיר</button>
       <button class="btn btn-ghost btn-sm" data-dmore="${i}">מצא עוד כאלה</button>
-      <button class="btn btn-ghost btn-sm cmpbtn" data-dcmp="${i}" aria-pressed="${dealCompare.has(i)}">השווה</button>
+      <button class="btn btn-ghost btn-sm cmpbtn" data-dcmp="${i}" aria-pressed="${dealCompare.has(dealKey(d))}">השווה</button>
     </span>
     <span data-dfresh="${i}">${freshnessLabel(d)}</span>
   </div>`; }).join('');
@@ -2475,14 +2706,15 @@ async function loadDeals() {
   }));
   // cross-route deal comparison: pick 2-3 deals from the live board
   $$('#deals [data-dcmp]').forEach(b => b.addEventListener('click', () => {
-    const i = Number(b.dataset.dcmp);
-    if (dealCompare.has(i)) dealCompare.delete(i);
+    const key = dealKey(lastDeals[Number(b.dataset.dcmp)]);
+    if (dealCompare.has(key)) dealCompare.delete(key);
     else if (dealCompare.size >= 3) { toast('אפשר להשוות עד 3 דילים', 'err'); return; }
-    else dealCompare.add(i);
-    b.setAttribute('aria-pressed', String(dealCompare.has(i)));
-    if (dealCompare.size >= 2) {
-      renderCompare([...dealCompare].map(k => dealAsFlight(lastDeals[k])));
-    }
+    else dealCompare.add(key);
+    b.setAttribute('aria-pressed', String(dealCompare.has(key)));
+    const picked = [...dealCompare]
+      .map(k => dealPool.find(x => dealKey(x) === k))
+      .filter(Boolean);
+    if (picked.length >= 2) renderCompare(picked.map(dealAsFlight));
   }));
   $$('#deals [data-dverify]').forEach(b => b.addEventListener('click', async () => {
     const d = lastDeals[Number(b.dataset.dverify)];

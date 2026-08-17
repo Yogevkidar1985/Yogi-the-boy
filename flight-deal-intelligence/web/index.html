@@ -1233,6 +1233,18 @@ function renderAirlineChips() {
   }));
 }
 
+/** Buy-now verdict from real analysis — an assessment, never a promise. */
+function buyVerdict(a) {
+  if (a.vsAverage == null && a.percentile == null) return null;
+  if ((a.vsAverage != null && a.vsAverage <= -0.15) || (a.percentile != null && a.percentile <= 15)) {
+    return ['זמן טוב לקנות — נמוך משמעותית מהרגיל', 'badge-success'];
+  }
+  if (a.vsAverage != null && a.vsAverage >= 0.15) {
+    return ['גבוה מהרגיל — שווה להפעיל התראה ולהמתין', 'badge-warning'];
+  }
+  return ['מחיר בטווח הרגיל למסלול', 'badge-neutral'];
+}
+
 function flightRow(f, idx) {
   const a = f.analysis || {};
   const why = (a.explanation || []).slice(0, 3).map(e => `<li>${esc(e)}</li>`).join('');
@@ -1258,6 +1270,7 @@ function flightRow(f, idx) {
         ${a.vsAverage != null && a.vsAverage < -0.05 ? `<span class="badge badge-success">${Math.round(Math.abs(a.vsAverage) * 100)}% מתחת לממוצע</span>` : ''}
         ${f.consensus && f.consensus.sourceCount > 1 ? `<span class="badge badge-info" title="אותה טיסה נמצאה ביותר ממקור אחד">אושר ב-${f.consensus.sourceCount} מקורות</span>` : ''}
         ${f.priceConfidence != null ? `<span class="badge ${f.priceConfidence >= 80 ? 'badge-success' : f.priceConfidence >= 55 ? 'badge-neutral' : 'badge-warning'}" title="עד כמה אפשר לסמוך על המחיר המוצג: טריות, מספר מקורות והסכמה ביניהם">אמון מחיר ${f.priceConfidence}</span>` : ''}
+        ${(() => { const v = buyVerdict(a); return v ? `<span class="badge ${v[1]}" title="הערכת מערכת על בסיס היסטוריית המחירים — לא הבטחה">${v[0]}</span>` : ''; })()}
         ${f.selfTransfer ? '<span class="badge badge-warning" title="מסלול המורכב מכרטיסים נפרדים — הקישור בין הטיסות באחריותך, לא באחריות חברת התעופה">הרכבה עצמית — כרטיסים נפרדים</span>' : ''}
         ${a.isErrorFareCandidate ? '<span class="badge badge-warning">מומלץ לוודא מול חברת התעופה</span>' : ''}
       </div>
@@ -2018,8 +2031,9 @@ async function loadChart() {
     ['הנמוך ביותר', fmt(stats.lowest)], ['ממוצע', fmt(stats.average)], ['חציון', fmt(stats.median)],
     ['הגבוה ביותר', fmt(stats.highest)], ['תנודתיות', (stats.volatility * 100).toFixed(0) + '%'],
     ['מגמה', trendHe[stats.trend] ?? stats.trend], ['תצפיות', stats.sampleCount],
+    ['רמת ביטחון בנתונים', stats.sampleCount >= 500 ? 'גבוהה' : stats.sampleCount >= 100 ? 'בינונית' : 'נמוכה — עוד אין מספיק תצפיות'],
   ].map(([k, v]) => `<div class="stat"><div class="v num">${v}</div><div class="k">${k}</div></div>`).join('')
-  : '<p class="muted">אין עדיין היסטוריה למסלול הזה — חפשו אותו והמנוע יתחיל לאסוף.</p>';
+  : '<p class="muted">אין עדיין מספיק נתונים היסטוריים למסלול הזה — המנוע אוסף תצפיות בכל חיפוש ובדיקה, והניתוח יופיע כשיהיה בסיס אמין.</p>';
 }
 
 function drawChart(series) {

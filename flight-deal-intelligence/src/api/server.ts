@@ -234,6 +234,33 @@ app.get('/api/flights/calendar', (req, res) => {
   res.json({ route, month: parsed.data.month, days });
 });
 
+/** Cheapest observed price per MONTH (and its exact day) for a route. */
+app.get('/api/flights/month-lows', (req, res) => {
+  const schema = z.object({ origin: z.string().length(3), destination: z.string().length(3) });
+  const parsed = schema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const route = routeKey(parsed.data.origin, parsed.data.destination);
+  const rows = db.db
+    .prepare(
+      `SELECT departure_date AS day, MIN(price) AS low
+       FROM price_snapshots
+       WHERE route = ? AND collected_at >= datetime('now', '-7 days') AND departure_date >= date('now')
+       GROUP BY departure_date`
+    )
+    .all(route) as { day: string; low: number }[];
+  const byMonth = new Map<string, { month: string; low: number; cheapestDay: string }>();
+  for (const r of rows) {
+    const m = r.day.slice(0, 7);
+    const cur = byMonth.get(m);
+    if (!cur || r.low < cur.low) byMonth.set(m, { month: m, low: r.low, cheapestDay: r.day });
+  }
+  res.json({
+    route,
+    currency: currencyService.systemCurrency,
+    months: [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month)).slice(0, 8),
+  });
+});
+
 /** Lows by DEPARTURE date over a horizon — feeds the departure-price graph. */
 app.get('/api/flights/departure-prices', (req, res) => {
   const schema = z.object({

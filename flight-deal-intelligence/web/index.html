@@ -537,6 +537,37 @@
     #resultsSec #filterZone { display: none; } /* moves into the bottom sheet */
   }
 
+  /* flight comparison */
+  .comparebar {
+    position: fixed; bottom: 12px; inset-inline-start: 50%; transform: translateX(50%);
+    z-index: 65; background: var(--surface); border: 1px solid var(--primary);
+    border-radius: var(--radius-full); box-shadow: var(--shadow-lg);
+    padding: 8px 10px 8px 16px; display: none; align-items: center; gap: 10px; font-size: var(--fs-sm);
+    max-width: calc(100vw - 24px);
+  }
+  .comparebar.on { display: flex; }
+  @media (max-width: 700px) { .comparebar { bottom: 72px; } }
+  #compareDialog { max-width: 720px; }
+  .cmp-wrap { overflow-x: auto; }
+  .cmp { border-collapse: collapse; width: 100%; min-width: 460px; font-size: var(--fs-sm); }
+  .cmp th, .cmp td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: start; vertical-align: top; }
+  .cmp th:first-child, .cmp td:first-child { color: var(--ink-3); font-weight: 600; font-size: var(--fs-caption); white-space: nowrap; }
+  .cmp .win { background: var(--success-bg); color: var(--success-ink); font-weight: 700; border-radius: var(--radius-sm); }
+  .cmp .colhead { font-weight: 700; }
+  .cmp-price { font-size: 20px; font-weight: 800; }
+  .cmpbtn[aria-pressed="true"] { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+
+  /* cheapest month strip */
+  .monthstrip { display: flex; gap: var(--sp-2); overflow-x: auto; padding: 4px 2px 8px; }
+  .monthstrip button {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 8px 14px; font-family: inherit; cursor: pointer; color: var(--ink-2);
+    display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 86px; min-height: 44px;
+  }
+  .monthstrip button.cheapest { border-color: var(--success); }
+  .monthstrip button.cheapest .p { color: var(--success-ink); }
+  .monthstrip .p { font-weight: 700; color: var(--ink); }
+
   /* flight details drawer: side panel on desktop, full screen on mobile */
   #flightDrawer {
     margin: 0 0 0 auto; inset-inline-end: 0; inset-inline-start: auto;
@@ -692,6 +723,10 @@
     <h3 class="sec">מחירים לפי תאריך <span class="muted">(מהתצפיות שנאספו — מודגש בירוק הזול ביותר)</span></h3>
     <div class="datestrip" id="dateStrip"></div>
     <div class="card depgraph" id="depGraph" hidden></div>
+    <div id="monthSec" hidden>
+      <h3 class="sec" style="margin-top:18px">החודש הזול ביותר <span class="muted">(לפי התצפיות שנאספו — לחיצה קופצת ליום הזול בחודש)</span></h3>
+      <div class="monthstrip" id="monthStrip"></div>
+    </div>
   </section>
 
   <section id="resultsSec" hidden>
@@ -920,6 +955,17 @@
       <button class="btn btn-ghost" type="button" data-close="alertDialog">ביטול</button>
     </div>
   </form>
+</dialog>
+
+<div class="comparebar" id="compareBar">
+  <span id="compareCount"></span>
+  <button class="btn btn-primary btn-sm" id="compareGo">השווה</button>
+  <button class="btn btn-ghost btn-sm" id="compareClear">נקה</button>
+</div>
+
+<dialog id="compareDialog">
+  <div class="dlg-head"><h3>השוואת טיסות</h3><button class="dlg-close" data-close="compareDialog" aria-label="סגירה"></button></div>
+  <div class="dlg-body"><div class="cmp-wrap" id="compareBody"></div></div>
 </dialog>
 
 <dialog id="filterSheet">
@@ -1427,6 +1473,7 @@ function flightRow(f, idx) {
         <a class="btn btn-primary btn-sm" href="${esc(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה ${icon('external', 13)}</a>
         <button class="heart ${saved ? 'saved' : ''}" data-watch="${idx}" title="שמירה למעקב מחיר" aria-label="שמירה למעקב מחיר">${icon('heart', 17)}</button>
         <button class="btn btn-ghost btn-sm" data-details="${idx}">פרטים</button>
+        <button class="btn btn-ghost btn-sm cmpbtn" data-cmp="${idx}" aria-pressed="${compareSet.has(flightKey(f))}">השווה</button>
       </div>
       <div class="linkrow">
         ${(() => {
@@ -1508,6 +1555,7 @@ function renderFlights() {
   $$('#flightList [data-watch]').forEach(b => b.addEventListener('click', () => openWatchDialog(renderedList[Number(b.dataset.watch)])));
   $$('#flightList [data-verify]').forEach(b => b.addEventListener('click', () => verifyPrice(Number(b.dataset.verify), b)));
   $$('#flightList [data-details]').forEach(b => b.addEventListener('click', () => openFlightDrawer(Number(b.dataset.details))));
+  $$('#flightList [data-cmp]').forEach(b => b.addEventListener('click', () => toggleCompare(renderedList[Number(b.dataset.cmp)])));
   const cheap = [...flights].sort((x, y) => x.normalizedPrice - y.normalizedPrice)[0];
   const fast = [...flights].sort((x, y) => (x.durationMinutes||1e9) - (y.durationMinutes||1e9))[0];
   const best = [...flights].sort((x, y) => y.valueScore - x.valueScore)[0];
@@ -1598,6 +1646,7 @@ async function renderDepGraph(origin, destination) {
 /* ---- date strip ---- */
 async function loadDateStrip(origin, destination, selectedDate) {
   renderDepGraph(origin, destination);
+  loadMonthStrip(origin, destination);
   try {
     const { dates } = await api(`/api/routes/${origin}-${destination}/cheapest-dates?days=90`);
     if (!dates.length) { $('#dateStripSec').hidden = true; return; }
@@ -1790,6 +1839,65 @@ async function runDiscovery(prompt) {
     $('#resultsTitle').textContent = 'הסריקה נכשלה — נסו שוב.';
     $('#flightList').innerHTML = '';
   }
+}
+
+/* ---- flight comparison: up to 3 side by side, winners marked per row ---- */
+const compareSet = new Map();
+function toggleCompare(f) {
+  if (!f) return;
+  const k = flightKey(f);
+  if (compareSet.has(k)) compareSet.delete(k);
+  else if (compareSet.size >= 3) { toast('אפשר להשוות עד 3 טיסות', 'err'); return; }
+  else compareSet.set(k, f);
+  const bar = $('#compareBar');
+  bar.classList.toggle('on', compareSet.size > 0);
+  $('#compareCount').textContent = `נבחרו ${compareSet.size} להשוואה`;
+  renderFlights();
+}
+$('#compareClear').addEventListener('click', () => { compareSet.clear(); $('#compareBar').classList.remove('on'); renderFlights(); });
+$('#compareGo').addEventListener('click', () => {
+  const fs = [...compareSet.values()];
+  if (fs.length < 2) { toast('בחרו לפחות 2 טיסות להשוואה', 'err'); return; }
+  const minPrice = Math.min(...fs.map(f => f.normalizedPrice));
+  const maxScore = Math.max(...fs.map(f => f.analysis?.dealScore ?? 0));
+  const minDur = Math.min(...fs.map(f => f.durationMinutes || 1e9));
+  const minStops = Math.min(...fs.map(f => f.stops));
+  const row = (label, cells) => `<tr><td>${label}</td>${cells.join('')}</tr>`;
+  const td = (html, win) => `<td class="${win ? 'win' : ''}">${html}</td>`;
+  $('#compareBody').innerHTML = `<table class="cmp">
+    ${row('', fs.map(f => `<td class="colhead">${esc(f.airlineName || f.airline)}<br><span class="muted ltr">${esc(f.flightNumber || '')}</span></td>`))}
+    ${row('מחיר', fs.map(f => td(`<span class="cmp-price num">${fmt(f.normalizedPrice, f.normalizedCurrency)}</span>${f.normalizedPrice > minPrice ? `<br><span class="muted num">+${fmt(f.normalizedPrice - minPrice)}</span>` : '<br><span class="muted">הזול ביותר</span>'}`, f.normalizedPrice === minPrice)))}
+    ${row('ציון עסקה', fs.map(f => td(f.analysis ? `${f.analysis.dealScore}/100` : '—', (f.analysis?.dealScore ?? -1) === maxScore)))}
+    ${row('עצירות', fs.map(f => td(f.stops === 0 ? 'ישירה' : f.stops, f.stops === minStops)))}
+    ${row('משך', fs.map(f => td(durTxt(f.durationMinutes), (f.durationMinutes || 1e9) === minDur)))}
+    ${row('שעות', fs.map(f => `<td class="ltr num">${hhmm(f.departureTime)}–${hhmm(f.arrivalTime)}</td>`))}
+    ${row('מול הממוצע', fs.map(f => `<td>${f.analysis?.vsAverage != null ? Math.round(f.analysis.vsAverage * -100) + '% מתחת' : '—'}</td>`))}
+    ${row('אמון מחיר', fs.map(f => `<td>${f.priceConfidence ?? '—'}</td>`))}
+    ${row('מקורות', fs.map(f => `<td>${f.consensus?.sourceCount ?? 1}</td>`))}
+    ${row('', fs.map(f => `<td><a class="btn btn-primary btn-sm" href="${esc(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה</a></td>`))}
+  </table>`;
+  $('#compareDialog').showModal();
+});
+
+/* ---- cheapest month strip ---- */
+async function loadMonthStrip(origin, destination) {
+  try {
+    const { months, currency } = await api(`/api/flights/month-lows?origin=${origin}&destination=${destination}`);
+    if (months.length < 2) { $('#monthSec').hidden = true; return; }
+    const min = Math.min(...months.map(m => m.low));
+    $('#monthStrip').innerHTML = months.map(m => {
+      const [y, mo] = m.month.split('-');
+      return `<button class="${m.low === min ? 'cheapest' : ''}" data-day="${m.cheapestDay}" title="היום הזול: ${m.cheapestDay}">
+        <span class="d">${HE_MONTHS[Number(mo) - 1]} ${y.slice(2)}</span><span class="p num">${fmt(m.low, currency)}</span>
+      </button>`;
+    }).join('');
+    $('#monthSec').hidden = false;
+    $$('#monthStrip button').forEach(b => b.addEventListener('click', () => {
+      setDate('fDep', b.dataset.day);
+      if (tripType === 'round') setDate('fRet', new Date(Date.parse(b.dataset.day) + 7 * 864e5).toISOString().slice(0, 10));
+      $('#searchForm').requestSubmit();
+    }));
+  } catch { $('#monthSec').hidden = true; }
 }
 
 /* ---- flight details drawer: everything about one flight, one place ---- */

@@ -162,6 +162,23 @@ export interface ParsedTripRequest {
   flexibility: 'NONE' | 'LOW' | 'HIGH';
   mode: 'SPECIFIC' | 'FLEXIBLE' | 'ANYWHERE' | 'WEEKEND';
   raw: string;
+  /** 0 = direct only. Undefined = no constraint stated. */
+  maxStops?: number;
+  /** Budget applies per traveller rather than to the whole party. */
+  budgetPerPerson?: boolean;
+  /** Airline codes the user asked for / ruled out. */
+  airlines?: string[];
+  excludeAirlines?: string[];
+  /** Checked bags requested (used for fare comparison, not as a hard filter). */
+  checkedBags?: number;
+  /** Departure hour window [from, to) in local airport time. */
+  departureTimeWindow?: [number, number];
+  /** Fields the parser could not resolve and that materially change results. */
+  missing?: ('origin' | 'destination' | 'dates')[];
+  /** Human label of the resolved origin, for the "understood" preview. */
+  originLabel?: string;
+  /** True when the user named two places without saying which way they fly. */
+  ambiguousDirection?: boolean;
 }
 
 export interface ProviderHealth {

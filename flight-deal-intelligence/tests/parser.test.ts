@@ -58,3 +58,99 @@ describe('natural language parser (§17, §30)', () => {
     expect(r.currency).toBe('USD');
   });
 });
+
+describe('flight direction is a hard constraint, never a guess', () => {
+  const NOW = new Date('2026-08-17T00:00:00Z');
+  const dirOf = (t: string) => {
+    const r = parseTripRequest(t, NOW);
+    return { o: r.origins, d: r.destinations };
+  };
+
+  it('Hebrew: מאיטליה לישראל searches Italy → Israel', () => {
+    const { o, d } = dirOf('תמצא לי טיסות מאיטליה לישראל');
+    expect(o).toContain('FCO');
+    expect(d).toEqual(['TLV']);
+    expect(o).not.toContain('TLV');
+  });
+
+  it('Hebrew: מישראל לאיטליה searches the opposite direction', () => {
+    const { o, d } = dirOf('תמצא לי טיסות מישראל לאיטליה');
+    expect(o).toEqual(['TLV']);
+    expect(d).toContain('FCO');
+    expect(d).not.toContain('TLV');
+  });
+
+  it('English: from Italy to Israel', () => {
+    const { o, d } = dirOf('flights from Italy to Israel');
+    expect(o).toContain('FCO');
+    expect(d).toEqual(['TLV']);
+  });
+
+  it('English: from Israel to Italy', () => {
+    const { o, d } = dirOf('flights from Israel to Italy');
+    expect(o).toEqual(['TLV']);
+    expect(d).toContain('FCO');
+  });
+
+  it('airport codes keep their direction both ways', () => {
+    expect(dirOf('FCO to TLV').o).toEqual(['FCO']);
+    expect(dirOf('FCO to TLV').d).toEqual(['TLV']);
+    expect(dirOf('TLV to FCO').o).toEqual(['TLV']);
+    expect(dirOf('TLV to FCO').d).toEqual(['FCO']);
+  });
+
+  it('country to city and city to country both resolve correctly', () => {
+    const a = dirOf('מאיטליה לתל אביב');
+    expect(a.o).toContain('FCO');
+    expect(a.d).toEqual(['TLV']);
+    const b = dirOf('מתל אביב לאיטליה');
+    expect(b.o).toEqual(['TLV']);
+    expect(b.d).toContain('FCO');
+  });
+
+  it('origin is never silently defaulted when the user named one', () => {
+    const r = parseTripRequest('טיסות מיוון לישראל', NOW);
+    expect(r.origins).toContain('ATH');
+    expect(r.missing ?? []).not.toContain('origin');
+  });
+
+  it('destination and origin never overlap', () => {
+    const r = parseTripRequest('מאיטליה לישראל', NOW);
+    for (const code of r.destinations) expect(r.origins).not.toContain(code);
+  });
+
+  it('flags ambiguous phrasing that names places without a direction', () => {
+    const r = parseTripRequest('איטליה ישראל טיסות', NOW);
+    expect(r.ambiguousDirection).toBe(true);
+  });
+});
+
+describe('constraint extraction', () => {
+  const NOW = new Date('2026-08-17T00:00:00Z');
+  it('direct-only intent', () => {
+    expect(parseTripRequest('טיסה ישירה ללונדון', NOW).maxStops).toBe(0);
+    expect(parseTripRequest('nonstop to London', NOW).maxStops).toBe(0);
+  });
+  it('explicit Hebrew date range', () => {
+    const r = parseTripRequest('טיסות מאיטליה לישראל 29 באוגוסט עד 30 באוגוסט', NOW);
+    expect(r.departureWindow.from).toBe('2026-08-29');
+    expect(r.departureWindow.to).toBe('2026-08-30');
+  });
+  it('numeric dates', () => {
+    const r = parseTripRequest('טיסה ב-29/08', NOW);
+    expect(r.departureWindow.from).toBe('2026-08-29');
+  });
+  it('tomorrow', () => {
+    expect(parseTripRequest('טיסה מחר ללונדון', NOW).departureWindow.from).toBe('2026-08-18');
+  });
+  it('airline preference vs exclusion', () => {
+    expect(parseTripRequest('רק אל על ללונדון', NOW).airlines).toEqual(['LY']);
+    expect(parseTripRequest('ללונדון בלי ריינאייר', NOW).excludeAirlines).toContain('FR');
+  });
+  it('baggage and per-person budget', () => {
+    const r = parseTripRequest('ליוון עד 1500 שקל לאדם כולל מזוודה', NOW);
+    expect(r.checkedBags).toBe(1);
+    expect(r.budgetPerPerson).toBe(true);
+    expect(r.maxPrice).toBe(1500);
+  });
+});

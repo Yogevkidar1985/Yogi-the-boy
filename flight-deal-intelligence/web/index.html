@@ -1857,8 +1857,40 @@ function renderAiReport(r) {
   loadDeals();
 }
 
+/** Show what the engine understood — direction first — before a wide search. */
+async function showIntentPreview(prompt) {
+  try {
+    const r = await api('/api/ai/parse', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+    const fmtList = (arr) => arr.slice(0, 3).join(', ') + (arr.length > 3 ? ` +${arr.length - 3}` : '');
+    const rows = [
+      ['מוצא', `<b class="ltr">${esc(fmtList(r.origins || []))}</b>${r.originLabel ? ` <span class="muted">(${esc(r.originLabel)})</span>` : ''}`],
+      ['יעד', r.destinationLabel === 'anywhere' ? '<b>כל יעד — סריקה גלובלית</b>' :
+        `<b class="ltr">${esc(fmtList(r.destinations || []))}</b>${r.destinationLabel ? ` <span class="muted">(${esc(r.destinationLabel)})</span>` : ''}`],
+      ['תאריכים', `<span class="ltr num">${esc(r.departureWindow.from)} → ${esc(r.departureWindow.to)}</span>`],
+      r.tripLengthDays ? ['אורך הנסיעה', `${r.tripLengthDays.min}–${r.tripLengthDays.max} לילות`] : null,
+      r.maxStops === 0 ? ['עצירות', 'ישירות בלבד'] : null,
+      r.maxPrice ? ['תקציב', `עד ${r.maxPrice} ${r.currency || ''}${r.budgetPerPerson ? ' לאדם' : ''}`] : null,
+      r.airlines?.length ? ['חברות', `רק <span class="ltr">${esc(r.airlines.join(', '))}</span>`] : null,
+      r.excludeAirlines?.length ? ['לא לכלול', `<span class="ltr">${esc(r.excludeAirlines.join(', '))}</span>`] : null,
+      r.checkedBags != null ? ['כבודה', r.checkedBags === 0 ? 'ללא מזוודה' : `${r.checkedBags} מזוודות`] : null,
+    ].filter(Boolean);
+    $('#betterBox').innerHTML = `<div class="card" style="padding:12px 14px; margin-bottom:10px; border-inline-start:4px solid var(--primary)">
+      <b>מה הבנתי מהבקשה</b>
+      ${r.ambiguousDirection ? '<div class="badge badge-warning" style="margin:6px 0">לא צוין כיוון מפורש — הנחתי לפי סדר המילים. אם התכוונת להפך, כתבו "מ… ל…"</div>' : ''}
+      <div style="display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin-top:6px; font-size:var(--fs-sm)">
+        ${rows.map(([k, v]) => `<span class="muted">${k}</span><span>${v}</span>`).join('')}
+      </div>
+    </div>`;
+    return r;
+  } catch { return null; }
+}
+
 async function runDiscovery(prompt) {
   clearInterval(aiPollTimer);
+  showIntentPreview(prompt);
   $('#resultsSec').hidden = false; $('#destsSec').hidden = true; $('#recsBox').innerHTML = '';
   $('#airlineChips').innerHTML = '';
   $('#resultsTitle').textContent = 'הסריקה הגלובלית פועלת…';

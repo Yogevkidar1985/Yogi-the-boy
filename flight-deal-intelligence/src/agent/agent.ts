@@ -95,10 +95,12 @@ export class FlightAgent {
   buildSearchMatrix(req: ParsedTripRequest): SearchQuery[] {
     const queries: SearchQuery[] = [];
     const origin0 = req.origins[0] ?? 'TLV';
-    const destinations = req.mode === 'ANYWHERE'
-      ? this.rankCandidates(origin0, ANYWHERE_DESTINATIONS)
-      : req.destinations.length
-        ? req.destinations
+    // an explicit destination always wins over "anywhere" exploration, so a
+    // stated route is never widened into a different trip
+    const destinations = req.destinations.length
+      ? req.destinations
+      : req.mode === 'ANYWHERE'
+        ? this.rankCandidates(origin0, ANYWHERE_DESTINATIONS)
         : this.rankCandidates(origin0, ANYWHERE_DESTINATIONS).slice(0, 10);
 
     const { from, to } = req.departureWindow;
@@ -116,6 +118,7 @@ export class FlightAgent {
             const len = Math.round((req.tripLengthDays.min + req.tripLengthDays.max) / 2);
             returnDate = addDays(dep, len);
           }
+          if (origin === dest) continue; // a route into its own origin is not a trip
           queries.push({
             origin,
             destination: dest,
@@ -191,7 +194,18 @@ export class FlightAgent {
     await mapLimit(queries, CONCURRENCY, async (q) => {
       const outcome = await this.registry.search(q);
       outcome.attempted.filter((a) => a.ok).forEach((a) => providersUsed.add(a.provider));
-      const scored = this.analysis.analyze(outcome.results);
+      // Direction is a contract, not a preference: a provider result that does
+      // not fly the requested origin → destination is discarded, never swapped.
+      const onRoute = outcome.results.filter(
+        (r) => r.origin === q.origin && r.destination === q.destination
+      );
+      if (onRoute.length !== outcome.results.length) {
+        this.db.logEvent('warn', 'provider_wrong_direction', {
+          requested: `${q.origin}-${q.destination}`,
+          dropped: outcome.results.length - onRoute.length,
+        });
+      }
+      const scored = this.analysis.analyze(onRoute);
       allScored.push(...scored);
       const low = scored.length ? Math.min(...scored.map((s) => s.normalizedPrice)) : null;
       cellResults.push({

@@ -139,6 +139,18 @@ export class MonitorWorker {
     const rules = this.db.listAlerts(search.id);
     const triggered = evaluateRules(rules, scored, search.lastLowestPrice);
     await this.alerts.dispatch(triggered);
+
+    // favorite flights bound to this monitor: track current price + hits
+    for (const watch of this.db.watchesForSearch(search.id)) {
+      const matching = watch.airline ? scored.filter((s) => s.airline === watch.airline) : scored;
+      const low = matching.length
+        ? Math.min(...matching.map((s) => s.normalizedPrice))
+        : lowest;
+      this.db.updateWatchedFlight(watch.id, {
+        lastPrice: low,
+        triggered: low !== null && low <= watch.targetPrice,
+      });
+    }
     return triggered.length;
   }
 

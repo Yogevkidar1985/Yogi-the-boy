@@ -21,6 +21,20 @@ export interface SearchOutcome {
 }
 
 const CACHE_TTL_MS = Number(process.env.SEARCH_CACHE_MINUTES ?? 10) * 60_000;
+/** Serve a stale cache hit (and refresh in the background) up to this age. */
+const STALE_TTL_MS = Number(process.env.SEARCH_STALE_MINUTES ?? 45) * 60_000;
+/** Hard cap per provider so one hung source never stalls the whole search. */
+const PROVIDER_TIMEOUT_MS = Number(process.env.PROVIDER_TIMEOUT_SECONDS ?? 45) * 1000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); }
+    );
+  });
+}
 
 export class ProviderRegistry {
   private adapters: FlightSearchAdapter[] = [];
@@ -90,7 +104,7 @@ export class ProviderRegistry {
       if (!(await this.isAvailableCached(adapter))) {
         return { provider: adapter.name, ok: false, error: 'unavailable', latencyMs: 0, results: [] };
       }
-      const results = await adapter.search(query);
+      const results = await withTimeout(adapter.search(query), PROVIDER_TIMEOUT_MS, adapter.name);
       const latencyMs = Date.now() - started;
       this.db.recordProviderRun(adapter.name, 'ok', latencyMs);
       return { provider: adapter.name, ok: true, latencyMs, results };
@@ -112,10 +126,36 @@ export class ProviderRegistry {
   async search(query: SearchQuery): Promise<SearchOutcome> {
     const cacheKey = JSON.stringify(query);
     const cached = this.cache.get(cacheKey);
-    if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
-      return cached.outcome;
+    if (cached) {
+      const age = Date.now() - cached.at;
+      if (age < CACHE_TTL_MS) return cached.outcome;
+      if (age < STALE_TTL_MS) {
+        // stale-while-revalidate: answer instantly, refresh in the background
+        if (!this.refreshing.has(cacheKey)) {
+          this.refreshing.add(cacheKey);
+          void this.searchLive(query, cacheKey)
+            .catch(() => {})
+            .finally(() => this.refreshing.delete(cacheKey));
+        }
+        return cached.outcome;
+      }
     }
+    return this.searchLive(query, cacheKey);
+  }
 
+  private refreshing = new Set<string>();
+  /** Request coalescing: identical concurrent searches share one live job. */
+  private inflight = new Map<string, Promise<SearchOutcome>>();
+
+  private searchLive(query: SearchQuery, cacheKey: string): Promise<SearchOutcome> {
+    const existing = this.inflight.get(cacheKey);
+    if (existing) return existing;
+    const job = this.searchLiveInner(query, cacheKey).finally(() => this.inflight.delete(cacheKey));
+    this.inflight.set(cacheKey, job);
+    return job;
+  }
+
+  private async searchLiveInner(query: SearchQuery, cacheKey: string): Promise<SearchOutcome> {
     const ordered = this.ordered();
     const live = ordered.filter((a) => a.capabilities.liveNetwork);
     const local = ordered.filter((a) => !a.capabilities.liveNetwork);

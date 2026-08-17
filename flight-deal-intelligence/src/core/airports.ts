@@ -152,6 +152,12 @@ export const DESTINATION_GROUPS: Record<string, string[]> = {
   'ארהב': ['JFK', 'EWR', 'MIA', 'LAX', 'SFO', 'BOS'],
   dubai: ['DXB'],
   דובאי: ['DXB'],
+  asia: ['BKK', 'DMK', 'HKT', 'NRT', 'HND', 'ICN', 'SGN', 'HAN', 'DEL', 'BOM', 'CMB', 'KUL', 'SIN', 'TPE'],
+  אסיה: ['BKK', 'DMK', 'HKT', 'NRT', 'HND', 'ICN', 'SGN', 'HAN', 'DEL', 'BOM', 'CMB', 'KUL', 'SIN', 'TPE'],
+  nearby: ['LCA', 'ATH', 'IST', 'SAW', 'CAI', 'AMM', 'TBS', 'EVN', 'BAK', 'OTP', 'SOF', 'BEG', 'SKG'],
+  קרוב: ['LCA', 'ATH', 'IST', 'SAW', 'CAI', 'AMM', 'TBS', 'EVN', 'BAK', 'OTP', 'SOF', 'BEG', 'SKG'],
+  'middle east': ['IST', 'SAW', 'DXB', 'AUH', 'CAI', 'AMM', 'DOH', 'BAH'],
+  'המזרח התיכון': ['IST', 'SAW', 'DXB', 'AUH', 'CAI', 'AMM', 'DOH', 'BAH'],
   'tel aviv': ['TLV'],
   'תל אביב': ['TLV'],
 };

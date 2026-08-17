@@ -98,6 +98,75 @@ describe('alerts (§25)', () => {
   });
 });
 
+describe('smart alerts: filters, cooldown, quiet hours', () => {
+  const mkFlight = (price: number, opts: { stops?: number; airline?: string; depHour?: number } = {}) => ({
+    normalizedPrice: price, normalizedCurrency: 'EUR',
+    stops: opts.stops ?? 0, airline: opts.airline ?? 'LY', cabin: 'ECONOMY',
+    departureTime: `2026-10-12T${String(opts.depHour ?? 9).padStart(2, '0')}:00`,
+    analysis: { dealScore: 50, explanation: [], scoreBreakdown: {}, percentile: null, vsAverage: null, vsLowest: null, isExceptional: false, isErrorFareCandidate: false },
+  }) as never;
+  const base = { id: 1, savedSearchId: 1, kind: 'PRICE_BELOW' as const, threshold: 250, channels: ['console'], active: true, createdAt: '' };
+
+  it('maxStops filter blocks connecting flights from triggering', () => {
+    const rule = { ...base, filters: { maxStops: 0 } };
+    expect(evaluateRules([rule], [mkFlight(200, { stops: 1 })], null)).toHaveLength(0);
+    expect(evaluateRules([rule], [mkFlight(200, { stops: 0 })], null)).toHaveLength(1);
+  });
+
+  it('airline filter only fires for the watched airline', () => {
+    const rule = { ...base, filters: { airlines: ['W6'] } };
+    expect(evaluateRules([rule], [mkFlight(200, { airline: 'LY' })], null)).toHaveLength(0);
+    expect(evaluateRules([rule], [mkFlight(200, { airline: 'W6' })], null)).toHaveLength(1);
+  });
+
+  it('departure-hour window filters flights outside it', () => {
+    const rule = { ...base, filters: { depHours: [5, 12] as [number, number] } };
+    expect(evaluateRules([rule], [mkFlight(200, { depHour: 20 })], null)).toHaveLength(0);
+    expect(evaluateRules([rule], [mkFlight(200, { depHour: 8 })], null)).toHaveLength(1);
+  });
+
+  it('cooldown silences a rule that fired recently', () => {
+    const now = new Date('2026-10-12T10:00:00Z');
+    const recent = { ...base, cooldownMinutes: 360, lastTriggeredAt: '2026-10-12T08:00:00Z' };
+    const old = { ...base, cooldownMinutes: 360, lastTriggeredAt: '2026-10-11T10:00:00Z' };
+    expect(evaluateRules([recent], [mkFlight(200)], null, now)).toHaveLength(0);
+    expect(evaluateRules([old], [mkFlight(200)], null, now)).toHaveLength(1);
+  });
+
+  it('quiet hours hold alerts back, including windows wrapping midnight', () => {
+    const rule = { ...base, quietHours: [21, 5] as [number, number] };
+    expect(evaluateRules([rule], [mkFlight(200)], null, new Date('2026-10-12T23:00:00Z'))).toHaveLength(0);
+    expect(evaluateRules([rule], [mkFlight(200)], null, new Date('2026-10-12T03:00:00Z'))).toHaveLength(0);
+    expect(evaluateRules([rule], [mkFlight(200)], null, new Date('2026-10-12T12:00:00Z'))).toHaveLength(1);
+  });
+});
+
+describe('watched flights (favorites with a target price)', () => {
+  it('round-trips a watch and syncs price + trigger state', () => {
+    const db = new FlightDatabase(':memory:');
+    const searchId = db.createSavedSearch('TLV-ATH', buildQuery({ origin: 'TLV', destination: 'ATH', departureDate: '2026-10-05' }), true, 180);
+    const id = db.createWatchedFlight({
+      savedSearchId: searchId, route: 'TLV-ATH', origin: 'TLV', destination: 'ATH',
+      departureDate: '2026-10-05', airline: 'A3', priceAtSave: 220, currency: 'EUR', targetPrice: 180,
+    });
+    let w = db.getWatchedFlight(id)!;
+    expect(w.targetPrice).toBe(180);
+    expect(w.active).toBe(true);
+    expect(w.triggeredAt).toBeNull();
+
+    db.updateWatchedFlight(id, { lastPrice: 175, triggered: true });
+    w = db.getWatchedFlight(id)!;
+    expect(w.lastPrice).toBe(175);
+    expect(w.triggeredAt).not.toBeNull();
+
+    expect(db.watchesForSearch(searchId)).toHaveLength(1);
+    db.deleteWatchedFlight(id);
+    expect(db.listWatchedFlights()).toHaveLength(0);
+    // the monitor existed only for this watch → cleaned up with it
+    expect(db.getSavedSearch(searchId)).toBeUndefined();
+  });
+});
+
 describe('smart scheduling (§28)', () => {
   it('anomaly → 30 minutes', () => {
     expect(nextInterval(180, 180, null, true)).toBe(30);

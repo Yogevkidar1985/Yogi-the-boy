@@ -8,7 +8,7 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { FlightResult, SavedSearch, SearchQuery, AlertRule } from '../core/types.js';
+import type { FlightResult, SavedSearch, SearchQuery, AlertRule, AlertFilters, WatchedFlight } from '../core/types.js';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -139,6 +139,8 @@ CREATE TABLE IF NOT EXISTS deal_scores (
   computed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_deal_scores_route ON deal_scores(route, computed_at);
+CREATE INDEX IF NOT EXISTS idx_deal_scores_computed ON deal_scores(computed_at);
+CREATE INDEX IF NOT EXISTS idx_results_collected ON flight_results(collected_at);
 
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -147,6 +149,29 @@ CREATE TABLE IF NOT EXISTS alerts (
   threshold REAL NOT NULL,
   channels_json TEXT NOT NULL DEFAULT '["console"]',
   active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS watched_flights (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  saved_search_id INTEGER REFERENCES saved_searches(id),
+  route TEXT NOT NULL,
+  origin TEXT NOT NULL,
+  destination TEXT NOT NULL,
+  departure_date TEXT NOT NULL,
+  return_date TEXT,
+  airline TEXT,
+  airline_name TEXT,
+  flight_number TEXT,
+  stops INTEGER,
+  price_at_save REAL NOT NULL,
+  currency TEXT NOT NULL,
+  target_price REAL NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  last_price REAL,
+  last_checked_at TEXT,
+  triggered_at TEXT,
+  flight_json TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -212,6 +237,23 @@ export class FlightDatabase {
     this.db = new Database(path);
     this.db.pragma('journal_mode = WAL');
     this.db.exec(SCHEMA);
+    this.migrate();
+  }
+
+  /** Additive migrations for databases created before newer columns existed. */
+  private migrate(): void {
+    const alertCols = new Set(
+      (this.db.prepare(`PRAGMA table_info(alerts)`).all() as { name: string }[]).map((c) => c.name)
+    );
+    const add = (col: string, ddl: string) => {
+      if (!alertCols.has(col)) this.db.exec(`ALTER TABLE alerts ADD COLUMN ${ddl}`);
+    };
+    add('label', `label TEXT`);
+    add('filters_json', `filters_json TEXT`);
+    add('cooldown_minutes', `cooldown_minutes INTEGER NOT NULL DEFAULT 360`);
+    add('quiet_from', `quiet_from INTEGER`);
+    add('quiet_to', `quiet_to INTEGER`);
+    add('last_triggered_at', `last_triggered_at TEXT`);
   }
 
   // ---- flight results -----------------------------------------------------
@@ -312,7 +354,21 @@ export class FlightDatabase {
 
   deleteSavedSearch(id: number): void {
     this.db.prepare(`DELETE FROM alerts WHERE saved_search_id = ?`).run(id);
+    this.db.prepare(`UPDATE watched_flights SET saved_search_id = NULL WHERE saved_search_id = ?`).run(id);
     this.db.prepare(`DELETE FROM saved_searches WHERE id = ?`).run(id);
+  }
+
+  updateSavedSearch(id: number, patch: { monitor?: boolean; intervalMinutes?: number; name?: string }): void {
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    if (patch.monitor !== undefined) { sets.push('monitor = ?'); vals.push(patch.monitor ? 1 : 0); }
+    if (patch.intervalMinutes !== undefined) {
+      sets.push('interval_minutes = ?', 'adaptive_interval_minutes = ?');
+      vals.push(patch.intervalMinutes, patch.intervalMinutes);
+    }
+    if (patch.name !== undefined) { sets.push('name = ?'); vals.push(patch.name); }
+    if (!sets.length) return;
+    this.db.prepare(`UPDATE saved_searches SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id);
   }
 
   updateSavedSearchRun(id: number, lowestPrice: number | null, adaptiveIntervalMinutes: number): void {
@@ -325,11 +381,52 @@ export class FlightDatabase {
 
   // ---- alerts (§25-§26) ---------------------------------------------------
 
-  createAlert(savedSearchId: number, kind: string, threshold: number, channels: string[]): number {
+  createAlert(
+    savedSearchId: number,
+    kind: string,
+    threshold: number,
+    channels: string[],
+    opts: {
+      label?: string;
+      filters?: AlertFilters;
+      cooldownMinutes?: number;
+      quietHours?: [number, number] | null;
+    } = {}
+  ): number {
     const info = this.db
-      .prepare(`INSERT INTO alerts (saved_search_id, kind, threshold, channels_json) VALUES (?,?,?,?)`)
-      .run(savedSearchId, kind, threshold, JSON.stringify(channels));
+      .prepare(
+        `INSERT INTO alerts (saved_search_id, kind, threshold, channels_json, label, filters_json, cooldown_minutes, quiet_from, quiet_to)
+         VALUES (?,?,?,?,?,?,?,?,?)`
+      )
+      .run(
+        savedSearchId, kind, threshold, JSON.stringify(channels),
+        opts.label ?? null,
+        opts.filters ? JSON.stringify(opts.filters) : null,
+        opts.cooldownMinutes ?? 360,
+        opts.quietHours?.[0] ?? null,
+        opts.quietHours?.[1] ?? null
+      );
     return Number(info.lastInsertRowid);
+  }
+
+  private rowToAlert(r: Record<string, unknown>): AlertRule {
+    return {
+      id: r.id as number,
+      savedSearchId: r.saved_search_id as number,
+      kind: r.kind as AlertRule['kind'],
+      threshold: r.threshold as number,
+      channels: JSON.parse(r.channels_json as string) as string[],
+      active: !!r.active,
+      createdAt: r.created_at as string,
+      label: (r.label as string) ?? undefined,
+      filters: r.filters_json ? (JSON.parse(r.filters_json as string) as AlertFilters) : undefined,
+      cooldownMinutes: (r.cooldown_minutes as number) ?? undefined,
+      quietHours:
+        r.quiet_from != null && r.quiet_to != null
+          ? [r.quiet_from as number, r.quiet_to as number]
+          : undefined,
+      lastTriggeredAt: (r.last_triggered_at as string) ?? null,
+    };
   }
 
   listAlerts(savedSearchId?: number): AlertRule[] {
@@ -338,15 +435,157 @@ export class FlightDatabase {
         ? this.db.prepare(`SELECT * FROM alerts WHERE saved_search_id = ?`).all(savedSearchId)
         : this.db.prepare(`SELECT * FROM alerts`).all()
     ) as Record<string, unknown>[];
-    return rows.map((r) => ({
+    return rows.map((r) => this.rowToAlert(r));
+  }
+
+  updateAlert(
+    id: number,
+    patch: {
+      threshold?: number;
+      active?: boolean;
+      channels?: string[];
+      label?: string;
+      filters?: AlertFilters | null;
+      cooldownMinutes?: number;
+      quietHours?: [number, number] | null;
+    }
+  ): void {
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    if (patch.threshold !== undefined) { sets.push('threshold = ?'); vals.push(patch.threshold); }
+    if (patch.active !== undefined) { sets.push('active = ?'); vals.push(patch.active ? 1 : 0); }
+    if (patch.channels !== undefined) { sets.push('channels_json = ?'); vals.push(JSON.stringify(patch.channels)); }
+    if (patch.label !== undefined) { sets.push('label = ?'); vals.push(patch.label); }
+    if (patch.filters !== undefined) {
+      sets.push('filters_json = ?');
+      vals.push(patch.filters ? JSON.stringify(patch.filters) : null);
+    }
+    if (patch.cooldownMinutes !== undefined) { sets.push('cooldown_minutes = ?'); vals.push(patch.cooldownMinutes); }
+    if (patch.quietHours !== undefined) {
+      sets.push('quiet_from = ?', 'quiet_to = ?');
+      vals.push(patch.quietHours?.[0] ?? null, patch.quietHours?.[1] ?? null);
+    }
+    if (!sets.length) return;
+    this.db.prepare(`UPDATE alerts SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id);
+  }
+
+  deleteAlert(id: number): void {
+    this.db.prepare(`DELETE FROM alerts WHERE id = ?`).run(id);
+  }
+
+  markAlertTriggered(id: number): void {
+    this.db.prepare(`UPDATE alerts SET last_triggered_at = datetime('now') WHERE id = ?`).run(id);
+  }
+
+  // ---- watched flights (favorites with a target price) --------------------
+
+  createWatchedFlight(w: {
+    savedSearchId: number | null;
+    route: string;
+    origin: string;
+    destination: string;
+    departureDate: string;
+    returnDate?: string | null;
+    airline?: string | null;
+    airlineName?: string | null;
+    flightNumber?: string | null;
+    stops?: number | null;
+    priceAtSave: number;
+    currency: string;
+    targetPrice: number;
+    flight?: unknown;
+  }): number {
+    const info = this.db
+      .prepare(
+        `INSERT INTO watched_flights
+         (saved_search_id, route, origin, destination, departure_date, return_date,
+          airline, airline_name, flight_number, stops, price_at_save, currency,
+          target_price, flight_json)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      )
+      .run(
+        w.savedSearchId, w.route, w.origin, w.destination, w.departureDate, w.returnDate ?? null,
+        w.airline ?? null, w.airlineName ?? null, w.flightNumber ?? null, w.stops ?? null,
+        w.priceAtSave, w.currency, w.targetPrice,
+        w.flight ? JSON.stringify(w.flight) : null
+      );
+    return Number(info.lastInsertRowid);
+  }
+
+  private rowToWatch(r: Record<string, unknown>): WatchedFlight {
+    return {
       id: r.id as number,
-      savedSearchId: r.saved_search_id as number,
-      kind: r.kind as AlertRule['kind'],
-      threshold: r.threshold as number,
-      channels: JSON.parse(r.channels_json as string) as string[],
+      savedSearchId: (r.saved_search_id as number) ?? null,
+      route: r.route as string,
+      origin: r.origin as string,
+      destination: r.destination as string,
+      departureDate: r.departure_date as string,
+      returnDate: (r.return_date as string) ?? null,
+      airline: (r.airline as string) ?? null,
+      airlineName: (r.airline_name as string) ?? null,
+      flightNumber: (r.flight_number as string) ?? null,
+      stops: (r.stops as number) ?? null,
+      priceAtSave: r.price_at_save as number,
+      currency: r.currency as string,
+      targetPrice: r.target_price as number,
       active: !!r.active,
+      lastPrice: (r.last_price as number) ?? null,
+      lastCheckedAt: (r.last_checked_at as string) ?? null,
+      triggeredAt: (r.triggered_at as string) ?? null,
       createdAt: r.created_at as string,
-    }));
+      flight: r.flight_json ? JSON.parse(r.flight_json as string) : undefined,
+    };
+  }
+
+  listWatchedFlights(): WatchedFlight[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM watched_flights ORDER BY id DESC`)
+      .all() as Record<string, unknown>[];
+    return rows.map((r) => this.rowToWatch(r));
+  }
+
+  getWatchedFlight(id: number): WatchedFlight | undefined {
+    const row = this.db.prepare(`SELECT * FROM watched_flights WHERE id = ?`).get(id) as
+      | Record<string, unknown>
+      | undefined;
+    return row ? this.rowToWatch(row) : undefined;
+  }
+
+  updateWatchedFlight(
+    id: number,
+    patch: { targetPrice?: number; active?: boolean; lastPrice?: number | null; triggered?: boolean }
+  ): void {
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    if (patch.targetPrice !== undefined) { sets.push('target_price = ?'); vals.push(patch.targetPrice); }
+    if (patch.active !== undefined) { sets.push('active = ?'); vals.push(patch.active ? 1 : 0); }
+    if (patch.lastPrice !== undefined) {
+      sets.push('last_price = ?', `last_checked_at = datetime('now')`);
+      vals.push(patch.lastPrice);
+    }
+    if (patch.triggered) sets.push(`triggered_at = datetime('now')`);
+    if (!sets.length) return;
+    this.db.prepare(`UPDATE watched_flights SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id);
+  }
+
+  deleteWatchedFlight(id: number): void {
+    const row = this.getWatchedFlight(id);
+    this.db.prepare(`DELETE FROM watched_flights WHERE id = ?`).run(id);
+    // remove the monitor that existed only to serve this watch
+    if (row?.savedSearchId) {
+      const others = this.db
+        .prepare(`SELECT COUNT(*) AS n FROM watched_flights WHERE saved_search_id = ?`)
+        .get(row.savedSearchId) as { n: number };
+      if (others.n === 0) this.deleteSavedSearch(row.savedSearchId);
+    }
+  }
+
+  /** Watches whose monitor is the given saved search (used by the worker). */
+  watchesForSearch(savedSearchId: number): WatchedFlight[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM watched_flights WHERE saved_search_id = ? AND active = 1`)
+      .all(savedSearchId) as Record<string, unknown>[];
+    return rows.map((r) => this.rowToWatch(r));
   }
 
   recordAlertDelivery(alertId: number, channel: string, status: string, message: string): void {

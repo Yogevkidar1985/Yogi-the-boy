@@ -22,7 +22,7 @@ export class ConsoleChannel implements AlertChannel {
     return true;
   }
   async send(msg: AlertMessage): Promise<void> {
-    console.log(`\n🔔 ALERT: ${msg.title}\n${msg.body}${msg.url ? `\n${msg.url}` : ''}`);
+    console.log(`\nALERT: ${msg.title}\n${msg.body}${msg.url ? `\n${msg.url}` : ''}`);
   }
 }
 

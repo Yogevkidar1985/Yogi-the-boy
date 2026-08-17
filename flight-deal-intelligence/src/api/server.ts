@@ -220,6 +220,19 @@ app.delete('/api/searches/:id', (req, res) => {
   res.status(204).end();
 });
 
+app.patch('/api/searches/:id', (req, res) => {
+  const schema = z.object({
+    monitor: z.boolean().optional(),
+    intervalMinutes: z.number().int().min(30).max(1440).optional(),
+    name: z.string().min(1).max(120).optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  if (!db.getSavedSearch(Number(req.params.id))) return res.status(404).json({ error: 'not found' });
+  db.updateSavedSearch(Number(req.params.id), parsed.data);
+  res.json({ ok: true });
+});
+
 app.post('/api/searches/:id/run', async (req, res) => {
   const search = db.getSavedSearch(Number(req.params.id));
   if (!search) return res.status(404).json({ error: 'not found' });
@@ -232,20 +245,177 @@ app.post('/api/searches/:id/run', async (req, res) => {
 
 // ---- alerts (§25) ---------------------------------------------------------
 
+const alertFiltersSchema = z.object({
+  maxStops: z.number().int().min(0).max(3).optional(),
+  airlines: z.array(z.string().min(2).max(3)).max(20).optional(),
+  depHours: z.tuple([z.number().int().min(0).max(24), z.number().int().min(0).max(24)]).optional(),
+  cabin: z.enum(['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST']).optional(),
+});
+
+const hourPair = z.tuple([z.number().int().min(0).max(23), z.number().int().min(0).max(23)]);
+
 app.post('/api/alerts', (req, res) => {
   const schema = z.object({
     savedSearchId: z.number().int(),
     kind: z.enum(['PRICE_BELOW', 'DROP_PERCENT', 'DEAL_SCORE_ABOVE']),
     threshold: z.number().positive(),
     channels: z.array(z.string()).default(['console']),
+    label: z.string().max(160).optional(),
+    filters: alertFiltersSchema.optional(),
+    cooldownMinutes: z.number().int().min(0).max(10080).optional(),
+    quietHours: hourPair.nullable().optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const id = db.createAlert(parsed.data.savedSearchId, parsed.data.kind, parsed.data.threshold, parsed.data.channels);
+  const d = parsed.data;
+  if (!db.getSavedSearch(d.savedSearchId)) {
+    return res.status(404).json({ error: 'saved search not found' });
+  }
+  const id = db.createAlert(d.savedSearchId, d.kind, d.threshold, d.channels, {
+    label: d.label,
+    filters: d.filters,
+    cooldownMinutes: d.cooldownMinutes,
+    quietHours: d.quietHours ?? undefined,
+  });
   res.status(201).json({ id });
 });
 
 app.get('/api/alerts', (_req, res) => res.json(db.listAlerts()));
+
+app.patch('/api/alerts/:id', (req, res) => {
+  const schema = z.object({
+    threshold: z.number().positive().optional(),
+    active: z.boolean().optional(),
+    channels: z.array(z.string()).optional(),
+    label: z.string().max(160).optional(),
+    filters: alertFiltersSchema.nullable().optional(),
+    cooldownMinutes: z.number().int().min(0).max(10080).optional(),
+    quietHours: hourPair.nullable().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const id = Number(req.params.id);
+  if (!db.listAlerts().some((a) => a.id === id)) return res.status(404).json({ error: 'not found' });
+  db.updateAlert(id, parsed.data);
+  res.json({ ok: true });
+});
+
+app.delete('/api/alerts/:id', (req, res) => {
+  db.deleteAlert(Number(req.params.id));
+  res.status(204).end();
+});
+
+// ---- watched flights: save a flight, get pinged when it hits your price ----
+
+const watchSchema = z.object({
+  flight: z.object({
+    origin: z.string().length(3),
+    destination: z.string().length(3),
+    departureDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    airline: z.string().max(3).optional(),
+    airlineName: z.string().max(120).optional(),
+    flightNumber: z.string().max(12).optional(),
+    stops: z.number().int().min(0).max(5).optional(),
+    departureTime: z.string().optional(),
+    arrivalTime: z.string().optional(),
+    durationMinutes: z.number().optional(),
+    normalizedPrice: z.number().positive(),
+    normalizedCurrency: z.string().length(3),
+    bookingUrl: z.string().optional(),
+    cabin: z.enum(['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST']).optional(),
+  }),
+  targetPrice: z.number().positive(),
+  channels: z.array(z.string()).default(['telegram', 'console']),
+  /** restrict the alert to the hearted flight's airline (default) or any airline */
+  sameAirlineOnly: z.boolean().default(true),
+  intervalMinutes: z.number().int().min(30).max(1440).default(180),
+});
+
+app.post('/api/watches', (req, res) => {
+  const parsed = watchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { flight: f, targetPrice, channels, sameAirlineOnly, intervalMinutes } = parsed.data;
+  const route = routeKey(f.origin, f.destination);
+
+  // 1) a monitored saved search that re-checks exactly this trip
+  const searchId = db.createSavedSearch(
+    `מעקב ${route} ${f.departureDate}`,
+    buildQuery({
+      origin: f.origin.toUpperCase(),
+      destination: f.destination.toUpperCase(),
+      departureDate: f.departureDate,
+      returnDate: f.returnDate ?? undefined,
+      cabin: f.cabin ?? 'ECONOMY',
+    }),
+    true,
+    intervalMinutes
+  );
+
+  // 2) a PRICE_BELOW rule scoped to the flight's shape
+  const filters: Record<string, unknown> = {};
+  if (sameAirlineOnly && f.airline) filters.airlines = [f.airline];
+  if (f.stops !== undefined) filters.maxStops = f.stops;
+  const label = `${f.origin}→${f.destination} מתחת ל-${Math.round(targetPrice)} ${f.normalizedCurrency}`;
+  const alertId = db.createAlert(searchId, 'PRICE_BELOW', targetPrice, channels, {
+    label,
+    filters: Object.keys(filters).length ? (filters as never) : undefined,
+    cooldownMinutes: 720,
+  });
+
+  // 3) the favorite itself, for the "טיסות שאהבתי" board
+  const id = db.createWatchedFlight({
+    savedSearchId: searchId,
+    route,
+    origin: f.origin.toUpperCase(),
+    destination: f.destination.toUpperCase(),
+    departureDate: f.departureDate,
+    returnDate: f.returnDate ?? null,
+    airline: f.airline ?? null,
+    airlineName: f.airlineName ?? null,
+    flightNumber: f.flightNumber ?? null,
+    stops: f.stops ?? null,
+    priceAtSave: f.normalizedPrice,
+    currency: f.normalizedCurrency,
+    targetPrice,
+    flight: f,
+  });
+  res.status(201).json({ id, savedSearchId: searchId, alertId });
+});
+
+app.get('/api/watches', (_req, res) => res.json(db.listWatchedFlights()));
+
+app.patch('/api/watches/:id', (req, res) => {
+  const schema = z.object({
+    targetPrice: z.number().positive().optional(),
+    active: z.boolean().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const id = Number(req.params.id);
+  const watch = db.getWatchedFlight(id);
+  if (!watch) return res.status(404).json({ error: 'not found' });
+  db.updateWatchedFlight(id, parsed.data);
+  // keep the linked PRICE_BELOW rule in sync with the new target / paused state
+  if (watch.savedSearchId) {
+    for (const rule of db.listAlerts(watch.savedSearchId)) {
+      if (rule.kind !== 'PRICE_BELOW') continue;
+      db.updateAlert(rule.id, {
+        ...(parsed.data.targetPrice !== undefined ? { threshold: parsed.data.targetPrice } : {}),
+        ...(parsed.data.active !== undefined ? { active: parsed.data.active } : {}),
+      });
+    }
+    if (parsed.data.active !== undefined) {
+      db.updateSavedSearch(watch.savedSearchId, { monitor: parsed.data.active });
+    }
+  }
+  res.json({ ok: true });
+});
+
+app.delete('/api/watches/:id', (req, res) => {
+  db.deleteWatchedFlight(Number(req.params.id));
+  res.status(204).end();
+});
 
 /** Delivery log — proves alerts actually reached their channels (§48). */
 app.get('/api/alerts/deliveries', (_req, res) => {
@@ -271,8 +441,8 @@ app.post('/api/alerts/test', async (_req, res) => {
   }
   try {
     await tg.send({
-      title: '✈️ Flight Deal Intelligence — בדיקת חיבור',
-      body: 'ההתראות מחוברות! כשמחיר במעקב יירד, ההודעה תגיע לכאן.',
+      title: 'Flight Deal Intelligence — בדיקת חיבור',
+      body: 'ההתראות מחוברות. כשמחיר במעקב יירד, ההודעה תגיע לכאן.',
     });
     res.json({ ok: true });
   } catch (err) {

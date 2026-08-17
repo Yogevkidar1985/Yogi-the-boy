@@ -152,6 +152,17 @@ export interface ProviderHealth {
   confidence: number; // 0-1, used for provider selection §38/§70
 }
 
+/** Restricts which flights may trigger an alert rule (§25 smart alerts). */
+export interface AlertFilters {
+  /** 0 = direct only, 1 = up to one stop, … */
+  maxStops?: number;
+  /** only these airline codes may trigger */
+  airlines?: string[];
+  /** departure hour window [from, to) in the flight's local time */
+  depHours?: [number, number];
+  cabin?: CabinClass;
+}
+
 export interface AlertRule {
   id: number;
   savedSearchId: number;
@@ -160,6 +171,39 @@ export interface AlertRule {
   channels: string[]; // channel adapter names
   active: boolean;
   createdAt: string;
+  /** Human label shown in the UI, e.g. "TLV→ATH under €120". */
+  label?: string;
+  filters?: AlertFilters;
+  /** Minimum minutes between two notifications from this rule (anti-spam). */
+  cooldownMinutes?: number;
+  /** Quiet window in UTC hours [from, to) during which alerts are held back. */
+  quietHours?: [number, number];
+  lastTriggeredAt?: string | null;
+}
+
+/** A specific flight the user "hearted" with a target price (§25 favorites). */
+export interface WatchedFlight {
+  id: number;
+  savedSearchId: number | null;
+  route: string;
+  origin: string;
+  destination: string;
+  departureDate: string;
+  returnDate: string | null;
+  airline: string | null;
+  airlineName: string | null;
+  flightNumber: string | null;
+  stops: number | null;
+  priceAtSave: number;
+  currency: string;
+  targetPrice: number;
+  active: boolean;
+  lastPrice: number | null;
+  lastCheckedAt: string | null;
+  triggeredAt: string | null;
+  createdAt: string;
+  /** Full flight snapshot for rendering the favorite card. */
+  flight?: unknown;
 }
 
 export interface SavedSearch {

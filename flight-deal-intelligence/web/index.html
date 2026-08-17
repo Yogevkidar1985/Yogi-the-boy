@@ -4,349 +4,534 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Flight Deal Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  /* ---- tokens: light is the base; dark redefines; hero is navy in both ---- */
+  /* =====================================================================
+     DESIGN TOKENS — the single source of truth for the whole product.
+     One font family. One icon language (inline Lucide strokes). No emojis.
+     ===================================================================== */
   :root {
     color-scheme: light;
-    --page: #eef2f7;
-    --card: #ffffff;
-    --card-2: #f2f5f9;
-    --border: #d9dfe7;
-    --ink: #131c28;
-    --ink-2: #4c5866;
-    --ink-3: #7c8794;
-    --hero: #071f3d;
+    /* typography */
+    --font-family: 'Heebo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --fs-display: clamp(26px, 4vw, 38px);
+    --fs-h1: 22px;
+    --fs-h2: 18px;
+    --fs-h3: 16px;
+    --fs-body-lg: 16px;
+    --fs-body: 14.5px;
+    --fs-sm: 13px;
+    --fs-caption: 12px;
+    --fs-price-lg: 28px;
+    --fs-price: 24px;
+    /* spacing scale */
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+    --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-12: 48px;
+    /* radius */
+    --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-full: 999px;
+    /* elevation */
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, .06);
+    --shadow-md: 0 4px 16px rgba(15, 23, 42, .09);
+    --shadow-lg: 0 12px 32px rgba(15, 23, 42, .14);
+    /* motion */
+    --t-fast: .12s ease;
+    --t-normal: .25s ease;
+    /* palette — restrained, professional */
+    --page: #f4f6f9;
+    --surface: #ffffff;
+    --surface-2: #f0f3f7;
+    --border: #dde3ea;
+    --ink: #101725;
+    --ink-2: #48556a;
+    --ink-3: #77839a;
+    --hero: #0b1f3a;
+    --hero-2: #12300f: ;
     --hero-ink: #ffffff;
-    --hero-ink-2: #b8c7da;
-    --accent: #2a78d6;
-    --accent-ink: #ffffff;
-    --good: #1baf7a;
-    --good-bg: #e2f5ee;
-    --good-ink: #0d6b4a;
-    --fire-bg: #fdeaea;
-    --fire-ink: #a33636;
-    --warn-bg: #fdf3dd;
-    --warn-ink: #7a5300;
-    --line-low: #2a78d6;
-    --line-avg: #eb6834;
-    --shadow: none;
-    --radius: 10px;
+    --hero-ink-2: #aebdd2;
+    --primary: #1a63d4;
+    --primary-hover: #1554b8;
+    --primary-ink: #ffffff;
+    --primary-soft: #e8f0fc;
+    --success: #0e8a5f;
+    --success-bg: #e3f4ec;
+    --success-ink: #0a6b4a;
+    --warning-bg: #fbf1dc;
+    --warning-ink: #7a5300;
+    --error-bg: #fbe7e7;
+    --error-ink: #a33636;
+    --info-bg: #e8f0fc;
+    --info-ink: #1a55a8;
+    --line-low: #1a63d4;
+    --line-avg: #c2571f;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --page: #0d141d;
-      --card: #16202c;
-      --card-2: #1d2937;
-      --border: #2b3949;
-      --ink: #f2f5f8;
-      --ink-2: #b7c2ce;
-      --ink-3: #8794a3;
-      --hero: #071f3d;
+      --page: #0c1220;
+      --surface: #151d2e;
+      --surface-2: #1c2638;
+      --border: #2a3750;
+      --ink: #eef2f8;
+      --ink-2: #b3bfd2;
+      --ink-3: #8391a8;
+      --hero: #0b1f3a;
       --hero-ink: #ffffff;
-      --hero-ink-2: #b8c7da;
-      --accent: #3987e5;
-      --accent-ink: #ffffff;
-      --good: #199e70;
-      --good-bg: #12362a;
-      --good-ink: #7fd6b3;
-      --fire-bg: #3d2020;
-      --fire-ink: #f1a1a1;
-      --warn-bg: #382c12;
-      --warn-ink: #e5c07b;
-      --line-low: #3987e5;
-      --line-avg: #d95926;
-      --shadow: none;
+      --hero-ink-2: #aebdd2;
+      --primary: #4d8ce8;
+      --primary-hover: #6ba1ee;
+      --primary-ink: #0b1f3a;
+      --primary-soft: #1c2c47;
+      --success: #2fae7f;
+      --success-bg: #123528;
+      --success-ink: #7fd6b3;
+      --warning-bg: #382c12;
+      --warning-ink: #e5c07b;
+      --error-bg: #3d2020;
+      --error-ink: #f1a1a1;
+      --info-bg: #1c2c47;
+      --info-ink: #9dc0f0;
+      --line-low: #4d8ce8;
+      --line-avg: #d97f4a;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+      --shadow-md: 0 4px 16px rgba(0,0,0,.45);
+      --shadow-lg: 0 12px 32px rgba(0,0,0,.55);
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --page: #0d141d;
-    --card: #16202c;
-    --card-2: #1d2937;
-    --border: #2b3949;
-    --ink: #f2f5f8;
-    --ink-2: #b7c2ce;
-    --ink-3: #8794a3;
-    --hero: #071f3d;
+    --page: #0c1220;
+    --surface: #151d2e;
+    --surface-2: #1c2638;
+    --border: #2a3750;
+    --ink: #eef2f8;
+    --ink-2: #b3bfd2;
+    --ink-3: #8391a8;
+    --hero: #0b1f3a;
     --hero-ink: #ffffff;
-    --hero-ink-2: #b8c7da;
-    --accent: #3987e5;
-    --accent-ink: #ffffff;
-    --good: #199e70;
-    --good-bg: #12362a;
-    --good-ink: #7fd6b3;
-    --fire-bg: #3d2020;
-    --fire-ink: #f1a1a1;
-    --warn-bg: #382c12;
-    --warn-ink: #e5c07b;
-    --line-low: #3987e5;
-    --line-avg: #d95926;
-    --shadow: none;
+    --hero-ink-2: #aebdd2;
+    --primary: #4d8ce8;
+    --primary-hover: #6ba1ee;
+    --primary-ink: #0b1f3a;
+    --primary-soft: #1c2c47;
+    --success: #2fae7f;
+    --success-bg: #123528;
+    --success-ink: #7fd6b3;
+    --warning-bg: #382c12;
+    --warning-ink: #e5c07b;
+    --error-bg: #3d2020;
+    --error-ink: #f1a1a1;
+    --info-bg: #1c2c47;
+    --info-ink: #9dc0f0;
+    --line-low: #4d8ce8;
+    --line-avg: #d97f4a;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+    --shadow-md: 0 4px 16px rgba(0,0,0,.45);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,.55);
   }
 
   * { box-sizing: border-box; }
-  h1, h2, h3, h4, button, input, select, textarea { font-family: inherit; font-weight: inherit; }
-  h1, h2, h3, .brand h1, .hero h2 { font-weight: 700; }
-  .cal {
-    position: absolute; top: calc(100% + 6px); inset-inline-start: 0; z-index: 40;
-    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-    padding: 12px; width: 280px; user-select: none;
-  }
-  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-  .cal-head b { font-size: 14.5px; }
-  .cal-nav { background: var(--card-2); border: 1px solid var(--border); border-radius: 8px;
-    width: 30px; height: 30px; cursor: pointer; color: var(--ink-2); font-size: 14px; }
-  .cal-nav:hover { color: var(--accent); border-color: var(--accent); }
-  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
-  .cal-grid .dow { font-size: 11px; color: var(--ink-3); padding: 4px 0; font-weight: 600; }
-  .cal-grid button {
-    background: none; border: none; border-radius: 8px; padding: 7px 0; font: inherit;
-    font-size: 13.5px; color: var(--ink); cursor: pointer;
-  }
-  .cal-grid button:hover:not(:disabled) { background: var(--card-2); }
-  .cal-grid button:disabled { color: var(--border); cursor: default; }
-  .cal-grid button.sel { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
-  .cal-grid button.today:not(.sel) { border: 1px solid var(--accent); color: var(--accent); }
-  .cal-foot { display: flex; justify-content: flex-start; margin-top: 8px; }
-  .cal-foot button { background: none; border: none; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; font-weight: 650; }
+  html { scroll-behavior: smooth; }
   body {
     margin: 0; background: var(--page); color: var(--ink);
-    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-family: var(--font-family);
+    font-size: var(--fs-body); line-height: 1.55;
   }
+  h1, h2, h3, h4, button, input, select, textarea { font-family: inherit; }
   .ltr { direction: ltr; unicode-bidi: isolate; }
   .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--ink-3); font-size: var(--fs-sm); }
+  svg.ic { flex-shrink: 0; vertical-align: -3px; }
+
+  /* ---- top bar ---- */
+  .topbar {
+    background: var(--hero); color: var(--hero-ink);
+    position: sticky; top: 0; z-index: 60;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  .topbar-inner {
+    max-width: 1080px; margin: 0 auto; padding: 10px 20px;
+    display: flex; align-items: center; gap: var(--sp-5);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: var(--fs-h3); font-weight: 700; }
+  .brand .logo {
+    width: 30px; height: 30px; border-radius: 8px; background: var(--primary);
+    display: inline-flex; align-items: center; justify-content: center; color: #fff;
+  }
+  .topnav { display: flex; gap: var(--sp-2); margin-inline-start: var(--sp-4); }
+  .topnav a {
+    color: var(--hero-ink-2); text-decoration: none; font-size: var(--fs-sm); font-weight: 500;
+    padding: 6px 12px; border-radius: var(--radius-full); transition: background var(--t-fast), color var(--t-fast);
+  }
+  .topnav a:hover { background: rgba(255,255,255,.1); color: var(--hero-ink); }
+  .tg-top {
+    margin-inline-start: auto; display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,.1); color: var(--hero-ink);
+    border: 1px solid rgba(255,255,255,.25); border-radius: var(--radius-full);
+    padding: 7px 16px; font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
+    transition: background var(--t-fast);
+  }
+  .tg-top:hover { background: rgba(255,255,255,.2); }
+  .tg-top.ok { border-color: var(--success); color: #d7f5e8; }
+  .tg-top.ok .dot { background: #37d59a; }
+  .tg-top .dot { width: 8px; height: 8px; border-radius: 50%; background: #e5b567; }
 
   /* ---- hero ---- */
-  .hero { background: var(--hero); color: var(--hero-ink); padding: 34px 20px 86px; }
-  .hero-inner { max-width: 1060px; margin: 0 auto; }
-  .brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-  .brand h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
-  .brand .sub { color: var(--hero-ink-2); font-size: 13.5px; }
-  .hero h2 { font-size: clamp(26px, 4.5vw, 40px); margin: 26px 0 4px; font-weight: 800; letter-spacing: -.02em; text-wrap: balance; }
-  .hero p.lead { margin: 0 0 20px; color: var(--hero-ink-2); font-size: 16px; }
-
-  .tg-top {
-    margin-inline-start: auto; background: rgba(255,255,255,.12); color: var(--hero-ink);
-    border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 8px 18px;
-    font: inherit; font-weight: 700; cursor: pointer;
-  }
-  .tg-top:hover { background: rgba(255,255,255,.22); }
-  .tg-top.ok { background: var(--good); border-color: var(--good); }
+  .hero { background: var(--hero); color: var(--hero-ink); padding: 40px 20px 92px; }
+  .hero-inner { max-width: 1080px; margin: 0 auto; }
+  .hero h2 { font-size: var(--fs-display); margin: 0 0 6px; font-weight: 800; letter-spacing: -.02em; text-wrap: balance; }
+  .hero p.lead { margin: 0; color: var(--hero-ink-2); font-size: var(--fs-body-lg); max-width: 60ch; }
 
   /* ---- search panel ---- */
-  .panel {
-    max-width: 1060px; margin: -62px auto 0; padding: 0 20px;
-  }
+  .panel { max-width: 1080px; margin: -64px auto 0; padding: 0 20px; position: relative; z-index: 10; }
   .search-card {
-    background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
-    border: 1px solid var(--border); padding: 16px;
+    background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border); padding: var(--sp-4) var(--sp-4) var(--sp-4);
   }
-  .tabs { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tabs { display: flex; gap: var(--sp-1); margin-bottom: var(--sp-3); flex-wrap: wrap; }
   .tabs button {
-    background: transparent; border: none; color: var(--ink-2); font: inherit; font-weight: 600;
-    padding: 7px 14px; border-radius: 999px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    background: transparent; border: none; color: var(--ink-2); font-size: var(--fs-body); font-weight: 600;
+    padding: 8px 16px; border-radius: var(--radius-full); cursor: pointer; transition: background var(--t-fast);
   }
-  .tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
-  .fields { display: grid; grid-template-columns: 1.2fr auto 1.2fr 1fr 1fr auto; gap: 8px; align-items: end; }
-  .triptype { display: inline-flex; gap: 4px; }
+  .tabs button:hover { background: var(--surface-2); }
+  .tabs button[aria-selected="true"] { background: var(--primary); color: var(--primary-ink); }
+  .fields { display: grid; grid-template-columns: 1.2fr auto 1.2fr 1fr 1fr auto; gap: var(--sp-2); align-items: end; }
   .field { display: flex; flex-direction: column; gap: 4px; position: relative; }
   .field label { font-size: 11.5px; font-weight: 600; color: var(--ink-3); letter-spacing: .04em; }
   .field input, .field select {
-    background: var(--card-2); color: var(--ink); border: 1px solid var(--border);
-    border-radius: 9px; padding: 11px 12px; font: inherit; width: 100%;
+    background: var(--surface-2); color: var(--ink); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 11px 12px; font-size: var(--fs-body); width: 100%;
+    transition: border-color var(--t-fast);
   }
-  .field input:focus, .field select:focus, .swap:focus-visible, button:focus-visible, a:focus-visible {
-    outline: 2px solid var(--accent); outline-offset: 1px;
+  .field input:hover, .field select:hover { border-color: var(--ink-3); }
+  .field input:focus, .field select:focus, button:focus-visible, a:focus-visible, .chip:focus-visible {
+    outline: 2px solid var(--primary); outline-offset: 1px;
   }
   .hint { position: absolute; top: 100%; inset-inline-start: 2px; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
-  .hint.err { color: var(--fire-ink); font-weight: 600; }
+  .hint.err { color: var(--error-ink); font-weight: 600; }
+  .swap {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 50%;
+    width: 38px; height: 38px; cursor: pointer; color: var(--ink-2);
+    display: inline-flex; align-items: center; justify-content: center;
+    align-self: end; margin-bottom: 3px; transition: color var(--t-fast), border-color var(--t-fast);
+  }
+  .swap:hover { color: var(--primary); border-color: var(--primary); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border: none; border-radius: var(--radius-sm); cursor: pointer;
+    font-size: var(--fs-body); font-weight: 600; padding: 10px 18px;
+    transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+  }
+  .btn-primary { background: var(--primary); color: var(--primary-ink); font-size: var(--fs-body-lg); font-weight: 700; padding: 12px 26px; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--ink-2); }
+  .btn-ghost:hover { border-color: var(--primary); color: var(--ink); }
+  .btn-danger { background: transparent; border: 1px solid var(--border); color: var(--error-ink); }
+  .btn-danger:hover { border-color: var(--error-ink); }
+  .btn-sm { padding: 6px 12px; font-size: var(--fs-sm); }
+  .opts { display: flex; gap: var(--sp-4); margin-top: var(--sp-3); flex-wrap: wrap; align-items: center; font-size: var(--fs-sm); color: var(--ink-2); }
+  .opts label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .opts input[type="number"] {
+    width: 90px; padding: 6px 8px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--ink); font-family: inherit;
+  }
+
+  /* chips */
+  .chip {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-full);
+    padding: 6px 14px; font-family: inherit; font-size: var(--fs-sm); cursor: pointer; color: var(--ink-2);
+    transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
+  }
+  .chip:hover { border-color: var(--ink-3); }
+  .chip[aria-pressed="true"] { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); font-weight: 600; }
+  .triptype { display: inline-flex; gap: var(--sp-1); }
+
+  /* autocomplete + calendar */
   .ac {
     position: absolute; top: calc(100% + 4px); inset-inline: 0; z-index: 30;
-    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-    overflow: hidden; min-width: 240px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
+    overflow: hidden; min-width: 240px; box-shadow: var(--shadow-md);
   }
   .ac button {
     display: flex; justify-content: space-between; align-items: center; gap: 10px;
-    width: 100%; background: none; border: none; font: inherit; color: var(--ink);
+    width: 100%; background: none; border: none; font-family: inherit; font-size: var(--fs-body); color: var(--ink);
     padding: 10px 14px; cursor: pointer; text-align: start;
   }
-  .ac button:hover, .ac button.sel { background: var(--card-2); }
-  .ac .city { font-weight: 650; }
-  .ac .sub { color: var(--ink-3); font-size: 12px; }
-  .ac .code { color: var(--ink-2); font-size: 13px; }
-  .swap {
-    background: var(--card-2); border: 1px solid var(--border); border-radius: 50%;
-    width: 38px; height: 38px; cursor: pointer; color: var(--ink-2); font-size: 16px;
-    align-self: end; margin-bottom: 3px;
+  .ac button:hover, .ac button.sel { background: var(--surface-2); }
+  .ac .city { font-weight: 600; }
+  .ac .sub { color: var(--ink-3); font-size: var(--fs-caption); }
+  .ac .code { color: var(--ink-2); font-size: var(--fs-sm); }
+  .cal {
+    position: absolute; top: calc(100% + 6px); inset-inline-start: 0; z-index: 40;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
+    padding: var(--sp-3); width: 280px; user-select: none; box-shadow: var(--shadow-md);
   }
-  .swap:hover { color: var(--accent); }
-  .cta {
-    background: var(--accent); color: var(--accent-ink); border: none; border-radius: 10px;
-    font: inherit; font-weight: 700; font-size: 16px; padding: 12px 26px; cursor: pointer;
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-2); }
+  .cal-head b { font-size: var(--fs-body); }
+  .cal-nav { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    width: 30px; height: 30px; cursor: pointer; color: var(--ink-2); font-size: var(--fs-body); }
+  .cal-nav:hover { color: var(--primary); border-color: var(--primary); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+  .cal-grid .dow { font-size: 11px; color: var(--ink-3); padding: 4px 0; font-weight: 600; }
+  .cal-grid button {
+    background: none; border: none; border-radius: var(--radius-sm); padding: 7px 0; font-family: inherit;
+    font-size: var(--fs-sm); color: var(--ink); cursor: pointer;
   }
-  .cta:hover { filter: brightness(1.08); }
-  .opts { display: flex; gap: 18px; margin-top: 12px; flex-wrap: wrap; align-items: center; font-size: 13.5px; color: var(--ink-2); }
-  .opts label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
-  .ai-row { display: flex; gap: 8px; margin-top: 4px; }
-  .ai-row textarea {
-    flex: 1; background: var(--card-2); color: var(--ink); border: 1px solid var(--border);
-    border-radius: 9px; padding: 11px 12px; font: inherit; resize: vertical; min-height: 46px;
-  }
-  .spin { display: none; color: var(--ink-3); font-size: 13.5px; padding: 8px 2px; }
-  .spin.on { display: block; }
-  .progress-outer { height: 8px; background: var(--card-2); border-radius: 99px; overflow: hidden; }
-  .progress-inner { height: 100%; background: var(--accent); border-radius: 99px; transition: width .6s ease; }
-  .avlogo {
-    width: 36px; height: 36px; border-radius: 50%; background: var(--card-2);
-    border: 1px solid var(--border); display: inline-flex; align-items: center;
-    justify-content: center; font-weight: 700; font-size: 12px; color: var(--ink-2);
-    flex-shrink: 0;
-  }
-  .buy .pr.cheap { color: var(--good-ink); }
-  .legsbox summary { cursor: pointer; font-size: 12.5px; }
-  .legslist { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding: 10px 12px; background: var(--card-2); border-radius: 8px; }
-  .legrow { display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline; font-size: 13px; }
-  .layover { padding-inline-start: 8px; border-inline-start: 2px dashed var(--border); font-size: 12px; }
+  .cal-grid button:hover:not(:disabled) { background: var(--surface-2); }
+  .cal-grid button:disabled { color: var(--border); cursor: default; }
+  .cal-grid button.sel { background: var(--primary); color: var(--primary-ink); font-weight: 700; }
+  .cal-grid button.today:not(.sel) { border: 1px solid var(--primary); color: var(--primary); }
+  .cal-foot { display: flex; justify-content: flex-start; margin-top: var(--sp-2); }
+  .cal-foot button { background: none; border: none; color: var(--primary); font-family: inherit; font-size: var(--fs-sm); cursor: pointer; font-weight: 600; }
 
-  html { scroll-behavior: smooth; }
-  main > * { animation: rise .35s ease both; }
-  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  .card { transition: background .12s ease; }
-  .flight:hover, .dealcard:hover { background: var(--card-2); }
-  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } main > * { animation: none; } }
+  /* freestyle */
+  .fs-row { display: flex; gap: var(--sp-2); }
+  .fs-row textarea {
+    flex: 1; background: var(--surface-2); color: var(--ink); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px; font-family: inherit; font-size: var(--fs-body);
+    resize: vertical; min-height: 52px;
+  }
+  .fs-suggest { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); flex-wrap: wrap; }
+  .fs-scope { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); flex-wrap: wrap; align-items: center; }
+  .fs-scope .lbl { font-size: var(--fs-caption); font-weight: 600; color: var(--ink-3); letter-spacing: .04em; }
+  .everything {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+    margin-top: var(--sp-4); padding: var(--sp-3) var(--sp-4);
+    background: var(--primary-soft); border: 1px solid var(--primary);
+    border-radius: var(--radius-md);
+  }
+  .everything .t { font-weight: 700; color: var(--ink); }
+  .everything .s { color: var(--ink-2); font-size: var(--fs-sm); }
+
+  /* progress / status */
+  .searchstatus { margin-top: var(--sp-3); display: none; }
+  .searchstatus.on { display: block; }
+  .progress-outer { height: 6px; background: var(--surface-2); border-radius: var(--radius-full); overflow: hidden; }
+  .progress-inner { height: 100%; background: var(--primary); border-radius: var(--radius-full); transition: width .6s ease; }
+  .statuslines { margin-top: var(--sp-2); color: var(--ink-2); font-size: var(--fs-sm); display: flex; gap: var(--sp-4); flex-wrap: wrap; }
+
+  /* skeletons */
+  .skeleton { border-radius: var(--radius-md); background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .sk-card { height: 108px; margin-bottom: var(--sp-2); }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .skeleton { animation: none; }
+    main > * { animation: none !important; }
+  }
 
   /* ---- layout ---- */
-  main { max-width: 1060px; margin: 0 auto; padding: 26px 20px 80px; }
-  h3.sec { font-size: 18px; margin: 34px 0 12px; font-weight: 750; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+  main { max-width: 1080px; margin: 0 auto; padding: var(--sp-6) 20px 80px; }
+  main > * { animation: rise .3s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  h3.sec { font-size: var(--fs-h2); margin: var(--sp-8) 0 var(--sp-3); font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  h3.sec .ic { color: var(--ink-3); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
 
-  /* ---- date price strip ---- */
-  .datestrip { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 8px; }
+  /* badges */
+  .badge { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--radius-full); font-size: var(--fs-caption); font-weight: 600; padding: 3px 10px; }
+  .badge-success { background: var(--success-bg); color: var(--success-ink); }
+  .badge-warning { background: var(--warning-bg); color: var(--warning-ink); }
+  .badge-error { background: var(--error-bg); color: var(--error-ink); }
+  .badge-info { background: var(--info-bg); color: var(--info-ink); }
+  .badge-neutral { background: var(--surface-2); color: var(--ink-2); }
+
+  /* date strip */
+  .datestrip { display: flex; gap: var(--sp-2); overflow-x: auto; padding: 4px 2px 8px; }
   .datestrip button {
-    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-    padding: 8px 12px; font: inherit; cursor: pointer; color: var(--ink-2);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 8px 12px; font-family: inherit; cursor: pointer; color: var(--ink-2);
     display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 74px;
   }
-  .datestrip .d { font-size: 12px; }
+  .datestrip .d { font-size: var(--fs-caption); }
   .datestrip .p { font-weight: 700; color: var(--ink); }
-  .datestrip button.cheapest { border-color: var(--good); }
-  .datestrip button.cheapest .p { color: var(--good-ink); }
-  .datestrip button[aria-pressed="true"] { border-color: var(--accent); background: var(--card-2); }
+  .datestrip button.cheapest { border-color: var(--success); }
+  .datestrip button.cheapest .p { color: var(--success-ink); }
+  .datestrip button[aria-pressed="true"] { border-color: var(--primary); background: var(--surface-2); }
 
-  /* ---- sort tabs + results ---- */
-  .sorttabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
-  .sorttabs button {
-    background: var(--card); border: none; font: inherit; padding: 12px 8px; cursor: pointer; color: var(--ink-2);
-  }
-  .sorttabs button .t { font-weight: 700; color: var(--ink); display: block; }
-  .sorttabs button .v { font-size: 12.5px; }
-  .sorttabs button[aria-selected="true"] { box-shadow: inset 0 -3px 0 var(--accent); background: var(--card-2); }
-  .filters { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
-  .chip {
-    background: var(--card); border: 1px solid var(--border); border-radius: 999px;
-    padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer; color: var(--ink-2);
-  }
-  .chip[aria-pressed="true"] { border-color: var(--accent); color: var(--ink); background: var(--card-2); }
-  .flight { display: grid; grid-template-columns: 1fr auto; gap: 14px; padding: 16px; margin-top: 0; }
+  /* sort tabs + results */
+  .sorttabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); }
+  .sorttabs button { background: var(--surface); border: none; font-family: inherit; padding: 12px 8px; cursor: pointer; color: var(--ink-2); }
+  .sorttabs button .t { font-weight: 700; color: var(--ink); display: block; font-size: var(--fs-body); }
+  .sorttabs button .v { font-size: var(--fs-caption); }
+  .sorttabs button[aria-selected="true"] { box-shadow: inset 0 -3px 0 var(--primary); background: var(--surface-2); }
+  .filters { display: flex; gap: var(--sp-2); margin: var(--sp-3) 0; flex-wrap: wrap; }
+
+  /* flight cards */
+  .flight { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-4); padding: var(--sp-4); transition: background var(--t-fast); }
+  .flight:hover { background: var(--surface-2); }
   #flightList .flight { border-radius: 0; border-top-width: 0; }
-  #flightList .flight:first-child { border-radius: var(--radius) var(--radius) 0 0; border-top-width: 1px; }
-  #flightList .flight:last-child { border-radius: 0 0 var(--radius) var(--radius); }
-  #flightList .flight:only-child { border-radius: var(--radius); }
-  .flight .itin { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-  .leg { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  #flightList .flight:first-child { border-radius: var(--radius-md) var(--radius-md) 0 0; border-top-width: 1px; }
+  #flightList .flight:last-child { border-radius: 0 0 var(--radius-md) var(--radius-md); }
+  #flightList .flight:only-child { border-radius: var(--radius-md); }
+  .flight .itin { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+  .leg { display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap; }
   .leg .times { font-size: 19px; font-weight: 700; }
-  .leg .airline { color: var(--ink-2); font-size: 13.5px; }
-  .leg .dur { color: var(--ink-3); font-size: 13px; }
-  .stops-line { display: flex; align-items: center; gap: 8px; color: var(--ink-3); font-size: 12.5px; }
+  .leg .airline { color: var(--ink-2); font-size: var(--fs-sm); }
+  .leg .dur { color: var(--ink-3); font-size: var(--fs-sm); }
+  .avlogo {
+    width: 36px; height: 36px; border-radius: 50%; background: var(--surface-2);
+    border: 1px solid var(--border); display: inline-flex; align-items: center;
+    justify-content: center; font-weight: 700; font-size: var(--fs-caption); color: var(--ink-2); flex-shrink: 0;
+  }
+  .stops-line { display: flex; align-items: center; gap: var(--sp-2); color: var(--ink-3); font-size: var(--fs-caption); }
   .stops-line .bar { flex: 0 0 90px; height: 2px; background: var(--border); border-radius: 2px; position: relative; }
   .stops-line .bar i { position: absolute; top: -2.5px; width: 7px; height: 7px; border-radius: 50%; background: var(--line-avg); }
-  .direct { color: var(--good-ink); font-weight: 600; }
-  .buy { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; border-inline-start: 1px dashed var(--border); padding-inline-start: 16px; min-width: 170px; }
-  .buy .pr { font-size: 26px; font-weight: 800; letter-spacing: -.01em; }
-  .buy .per { font-size: 12px; color: var(--ink-3); }
-  .badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; font-size: 12px; font-weight: 650; padding: 2.5px 10px; }
-  .badge.score { background: var(--good-bg); color: var(--good-ink); }
-  .badge.fire { background: var(--fire-bg); color: var(--fire-ink); }
-  .badge.warn { background: var(--warn-bg); color: var(--warn-ink); }
-  .whylist { margin: 4px 0 0; padding-inline-start: 18px; color: var(--ink-2); font-size: 13px; }
-  .book-btn {
-    background: var(--accent); color: var(--accent-ink); border: none; border-radius: 9px;
-    font: inherit; font-weight: 700; padding: 9px 20px; cursor: pointer; text-decoration: none; display: inline-block;
+  .direct { color: var(--success-ink); font-weight: 600; }
+  .whylist { margin: 4px 0 0; padding-inline-start: 18px; color: var(--ink-2); font-size: var(--fs-sm); }
+  .legsbox summary { cursor: pointer; font-size: var(--fs-caption); color: var(--ink-3); }
+  .legslist { display: flex; flex-direction: column; gap: 6px; margin-top: var(--sp-2); padding: var(--sp-3); background: var(--surface-2); border-radius: var(--radius-sm); }
+  .legrow { display: flex; gap: var(--sp-4); flex-wrap: wrap; align-items: baseline; font-size: var(--fs-sm); }
+  .layover { padding-inline-start: 8px; border-inline-start: 2px dashed var(--border); font-size: var(--fs-caption); color: var(--ink-3); }
+  .buy { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; border-inline-start: 1px dashed var(--border); padding-inline-start: var(--sp-4); min-width: 185px; }
+  .buy .pr { font-size: var(--fs-price-lg); font-weight: 800; letter-spacing: -.01em; }
+  .buy .pr.cheap { color: var(--success-ink); }
+  .buy .per { font-size: var(--fs-caption); color: var(--ink-3); }
+  .buyrow { display: flex; gap: var(--sp-2); align-items: center; }
+  .heart {
+    background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center;
+    color: var(--ink-3); cursor: pointer; transition: color var(--t-fast), border-color var(--t-fast);
   }
-  .linkrow { display: flex; gap: 12px; font-size: 13px; }
-  .linkrow a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .heart:hover { color: var(--error-ink); border-color: var(--error-ink); }
+  .heart.saved { color: var(--error-ink); border-color: var(--error-ink); }
+  .heart.saved svg { fill: currentColor; }
+  .linkrow { display: flex; gap: var(--sp-3); font-size: var(--fs-sm); flex-wrap: wrap; }
+  .linkrow a { color: var(--primary); text-decoration: none; font-weight: 600; }
   .linkrow a:hover { text-decoration: underline; }
-  .track { background: transparent; border: 1px solid var(--border); color: var(--ink-2); border-radius: 9px; padding: 8px 14px; font: inherit; font-size: 13px; cursor: pointer; }
-  .track:hover { border-color: var(--accent); color: var(--ink); }
 
-  /* ---- deals grid ---- */
-  .deals { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-  .dealcard { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
-  .dealcard .dest { font-weight: 750; font-size: 15.5px; }
-  .dealcard .pr { font-size: 24px; font-weight: 800; }
-  .dealcard .old { color: var(--ink-3); text-decoration: line-through; font-size: 13.5px; font-weight: 400; margin-inline-start: 6px; }
-  .dealcard a { color: var(--accent); font-weight: 650; text-decoration: none; font-size: 13.5px; }
+  /* deals grid */
+  .deals { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--sp-3); }
+  .dealcard { padding: var(--sp-4); display: flex; flex-direction: column; gap: 6px; transition: background var(--t-fast); }
+  .dealcard:hover { background: var(--surface-2); }
+  .dealcard .dest { font-weight: 700; font-size: var(--fs-h3); }
+  .dealcard .pr { font-size: var(--fs-price); font-weight: 800; }
+  .dealcard .old { color: var(--ink-3); text-decoration: line-through; font-size: var(--fs-sm); font-weight: 400; margin-inline-start: 6px; }
+  .dealcard a { color: var(--primary); font-weight: 600; text-decoration: none; font-size: var(--fs-sm); }
   .dealcard a:hover { text-decoration: underline; }
 
-  /* ---- chart ---- */
-  .chartwrap { position: relative; overflow-x: auto; padding: 16px; }
-  svg text { fill: var(--ink-2); font-size: 11px; }
+  /* watches (favorites) */
+  .watchgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--sp-3); }
+  .watch { padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2); }
+  .watch .route { font-weight: 700; font-size: var(--fs-h3); display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+  .watch .meta { color: var(--ink-3); font-size: var(--fs-sm); }
+  .watch .prices { display: flex; gap: var(--sp-4); align-items: baseline; }
+  .watch .prices .cur { font-size: var(--fs-price); font-weight: 800; }
+  .watch .prices .tgt { color: var(--ink-2); font-size: var(--fs-sm); }
+  .goal { height: 6px; background: var(--surface-2); border-radius: var(--radius-full); overflow: hidden; }
+  .goal i { display: block; height: 100%; background: var(--success); border-radius: var(--radius-full); transition: width var(--t-normal); }
+  .watch .actions { display: flex; gap: var(--sp-2); margin-top: 2px; flex-wrap: wrap; }
+
+  /* alerts management */
+  .alertlist { display: flex; flex-direction: column; gap: var(--sp-2); }
+  .alertrow { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); flex-wrap: wrap; }
+  .alertrow .grow { flex: 1; min-width: 220px; }
+  .alertrow .title { font-weight: 600; }
+  .alertrow .sub { color: var(--ink-3); font-size: var(--fs-caption); display: flex; gap: var(--sp-3); flex-wrap: wrap; }
+  .switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; cursor: pointer; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .tr { position: absolute; inset: 0; background: var(--border); border-radius: var(--radius-full); transition: background var(--t-fast); }
+  .switch .tr::before { content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%; background: var(--surface); top: 3px; inset-inline-start: 3px; transition: transform var(--t-fast); }
+  .switch input:checked + .tr { background: var(--success); }
+  .switch input:checked + .tr::before { transform: translateX(-18px); }
+  [dir="ltr"] .switch input:checked + .tr::before { transform: translateX(18px); }
+
+  /* chart */
+  .chartwrap { position: relative; overflow-x: auto; padding: var(--sp-4); }
+  svg.chart text { fill: var(--ink-2); font-size: 11px; font-family: var(--font-family); }
   .grid line { stroke: var(--border); }
   .tooltip {
-    position: absolute; pointer-events: none; background: var(--card-2); border: 1px solid var(--border);
-    border-radius: 7px; padding: 7px 10px; font-size: 12px; display: none; z-index: 5; white-space: nowrap;
+    position: absolute; pointer-events: none; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 7px 10px; font-size: var(--fs-caption); display: none; z-index: 5; white-space: nowrap;
   }
-  .legend { display: flex; gap: 18px; font-size: 12.5px; color: var(--ink-2); padding: 0 16px 12px; }
+  .legend { display: flex; gap: var(--sp-4); font-size: var(--fs-caption); color: var(--ink-2); padding: 0 var(--sp-4) var(--sp-3); }
   .legend .chipline { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-inline-end: 6px; }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; padding: 0 16px 16px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: var(--sp-2); padding: 0 var(--sp-4) var(--sp-4); }
   .stat .v { font-size: 19px; font-weight: 700; }
-  .stat .k { font-size: 12px; color: var(--ink-3); }
-  .routebtns { display: flex; gap: 6px; padding: 16px 16px 0; flex-wrap: wrap; }
+  .stat .k { font-size: var(--fs-caption); color: var(--ink-3); }
+  .routebtns { display: flex; gap: var(--sp-2); padding: var(--sp-4) var(--sp-4) 0; flex-wrap: wrap; }
 
-  .tablewrap { overflow-x: auto; padding: 0 16px 16px; }
-  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  .tablewrap { overflow-x: auto; padding: 0 var(--sp-4) var(--sp-4); }
+  table { border-collapse: collapse; width: 100%; font-size: var(--fs-sm); }
   th, td { text-align: start; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-  th { color: var(--ink-3); font-weight: 550; font-size: 12px; }
-  .muted { color: var(--ink-3); font-size: 12.5px; }
-  footer { max-width: 1060px; margin: 0 auto; padding: 0 20px 60px; color: var(--ink-3); font-size: 12.5px; }
+  th { color: var(--ink-3); font-weight: 600; font-size: var(--fs-caption); }
+  footer { max-width: 1080px; margin: 0 auto; padding: 0 20px 60px; color: var(--ink-3); font-size: var(--fs-caption); }
+
+  /* dialogs */
+  dialog {
+    border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); color: var(--ink);
+    padding: 0; max-width: 460px; width: calc(100vw - 40px); box-shadow: var(--shadow-lg);
+    font-family: var(--font-family);
+  }
+  dialog::backdrop { background: rgba(8, 15, 30, .55); }
+  .dlg-head { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-4) var(--sp-5) 0; }
+  .dlg-head h3 { margin: 0; font-size: var(--fs-h2); font-weight: 700; }
+  .dlg-close { background: none; border: none; color: var(--ink-3); cursor: pointer; padding: 4px; border-radius: var(--radius-sm); }
+  .dlg-close:hover { color: var(--ink); background: var(--surface-2); }
+  .dlg-body { padding: var(--sp-3) var(--sp-5) var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-3); }
+  .dlg-body .frow { display: flex; gap: var(--sp-2); }
+  .dlg-body .frow > * { flex: 1; }
+  .dlg-sum { background: var(--surface-2); border-radius: var(--radius-sm); padding: var(--sp-3); font-size: var(--fs-sm); color: var(--ink-2); display: flex; flex-direction: column; gap: 3px; }
+  .dlg-sum b { color: var(--ink); }
+  .dlg-actions { display: flex; gap: var(--sp-2); justify-content: flex-start; margin-top: var(--sp-2); }
+  .seg { display: flex; gap: var(--sp-1); flex-wrap: wrap; }
+
+  /* toasts */
+  #toasts { position: fixed; bottom: 20px; inset-inline-start: 20px; z-index: 100; display: flex; flex-direction: column; gap: var(--sp-2); }
+  .toast {
+    background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md); padding: 12px 16px; font-size: var(--fs-sm); max-width: 340px;
+    display: flex; align-items: center; gap: 10px; animation: rise .25s ease both;
+  }
+  .toast .ic { color: var(--success-ink); }
+  .toast.err .ic { color: var(--error-ink); }
+
   @media (max-width: 900px) {
+    .topnav { display: none; }
     .fields { grid-template-columns: 1fr auto 1fr; }
     .fields .field.dates, .fields .field.small { grid-column: span 3; }
-    .fields .cta { grid-column: span 3; width: 100%; }
+    .fields .btn-primary { grid-column: span 3; width: 100%; }
     .flight { grid-template-columns: 1fr; }
-    .buy { border-inline-start: none; border-top: 1px dashed var(--border); padding: 12px 0 0; }
+    .buy { border-inline-start: none; border-top: 1px dashed var(--border); padding: var(--sp-3) 0 0; }
   }
-
 </style>
 </head>
 <body>
 
-<div class="hero">
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="brand"><span class="logo" id="logoIcon"></span> Flight Deal Intelligence <span class="muted" id="health" style="font-weight:400">מתחבר…</span></span>
+    <nav class="topnav" aria-label="ניווט">
+      <a href="#searchTop">חיפוש</a>
+      <a href="#watchesSec">טיסות שמורות</a>
+      <a href="#alertsSec">התראות</a>
+      <a href="#historySec">היסטוריית מחירים</a>
+    </nav>
+    <button id="tgTopBtn" class="tg-top" type="button"><span class="dot"></span><span id="tgTopTxt">התראות טלגרם</span></button>
+  </div>
+</header>
+
+<div class="hero" id="searchTop">
   <div class="hero-inner">
-    <div class="brand">
-      <h1>✈️ Flight Deal Intelligence</h1>
-      <span class="sub">המנוע הפרטי שלך למחירי טיסות · <span id="health">מתחבר…</span></span>
-      <button id="tgTopBtn" class="tg-top" type="button">🔔 התראות טלגרם</button>
-    </div>
     <h2>לאן טסים? המנוע כבר יודע אם המחיר באמת זול.</h2>
-    <p class="lead">כל תוצאה מגיעה עם הוכחה: ציון עסקה, השוואה להיסטוריה, וכמה חסכת.</p>
+    <p class="lead">כל תוצאה מגיעה עם הוכחה: ציון עסקה, השוואה להיסטוריית המחירים של המסלול, וכמה נחסך ביחס למחיר הרגיל.</p>
   </div>
 </div>
 
 <div class="panel">
   <div class="search-card">
     <div class="tabs" role="tablist" aria-label="סוג חיפוש">
-      <button role="tab" id="tabForm" aria-selected="true">חיפוש רגיל</button>
-      <button role="tab" id="tabAI" aria-selected="false">תאר במילים ✨</button>
-      <button role="tab" id="tabAnywhere" aria-selected="false">לאן שהכי זול 🌍</button>
+      <button role="tab" id="tabForm" aria-selected="true"><span id="icSearch"></span>חיפוש רגיל</button>
+      <button role="tab" id="tabFree" aria-selected="false"><span id="icCompass"></span>Freestyle</button>
     </div>
 
     <form id="searchForm">
-      <div class="row" style="margin-bottom:10px; gap:14px">
+      <div style="display:flex; gap:14px; margin-bottom:10px; flex-wrap:wrap">
         <span class="triptype" role="group" aria-label="סוג נסיעה">
-          <button type="button" class="chip" data-trip="round" aria-pressed="true">⇄ הלוך ושוב</button>
-          <button type="button" class="chip" data-trip="oneway" aria-pressed="false">→ כיוון אחד</button>
+          <button type="button" class="chip" data-trip="round" aria-pressed="true">הלוך ושוב</button>
+          <button type="button" class="chip" data-trip="oneway" aria-pressed="false">כיוון אחד</button>
         </span>
         <select id="fPax" name="adults" aria-label="נוסעים" class="chip" style="padding:6px 12px">
           <option value="1">נוסע 1</option><option value="2">2 נוסעים</option>
@@ -366,7 +551,7 @@
           <div class="ac" id="acOrigin" hidden></div>
           <span class="hint" id="errOrigin"></span>
         </div>
-        <button type="button" class="swap" id="swapBtn" title="החלפת כיוון" aria-label="החלפת כיוון">⇄</button>
+        <button type="button" class="swap" id="swapBtn" title="החלפת כיוון" aria-label="החלפת כיוון"></button>
         <div class="field">
           <label for="fDest">לאן</label>
           <input id="fDest" name="destination" value="" data-code="" required autocomplete="off" placeholder="עיר, למשל: ברגמו או לונדון">
@@ -383,47 +568,46 @@
           <input id="fRet" readonly autocomplete="off" style="cursor:pointer">
           <div class="cal" id="calRet" hidden></div>
         </div>
-        <button class="cta" type="submit">חיפוש</button>
+        <button class="btn btn-primary" type="submit">חיפוש</button>
       </div>
       <div class="opts">
         <label><input type="checkbox" id="fDirect"> טיסות ישירות בלבד</label>
-        <label>תקציב מקס׳ <input type="number" id="fMax" min="0" step="10" style="width:90px;padding:6px 8px;border-radius:7px;border:1px solid var(--border);background:var(--card-2);color:var(--ink)"> €</label>
+        <label>תקציב מקסימלי <input type="number" id="fMax" min="0" step="10"> EUR</label>
       </div>
     </form>
 
-    <form id="aiForm" hidden>
-      <div class="ai-row">
-        <textarea id="aiPrompt" placeholder='למשל: "אני רוצה לטוס ליוון בספטמבר, בערך שבוע, הכי זול שאפשר" — אפשר גם באנגלית'></textarea>
-        <button class="cta" type="submit">חפש ✨</button>
+    <form id="freeForm" hidden>
+      <div class="fs-row">
+        <textarea id="freePrompt" placeholder="תארו מה מחפשים — למשל: דיל טוב באירופה בחודש הבא, בערך שבוע, עד 250 יורו"></textarea>
+        <button class="btn btn-primary" type="submit">חפש</button>
       </div>
-      <p class="muted" style="margin:8px 2px 0">המנוע מבין תאריכים גמישים, יעדים כלליים ("אירופה"), תקציב ומשפחה — ובונה לבד את כל צירופי החיפוש.</p>
-    </form>
-
-    <form id="anywhereForm" hidden>
-      <div class="fields" style="grid-template-columns: 1fr 1fr 1fr auto;">
-        <div class="field">
-          <label for="awFrom">מאיפה</label>
-          <input id="awFrom" value="TLV" class="ltr">
+      <div class="fs-scope" role="group" aria-label="טווח חיפוש">
+        <span class="lbl">טווח</span>
+        <button type="button" class="chip scope" data-scope="" aria-pressed="true">כל העולם</button>
+        <button type="button" class="chip scope" data-scope="קרוב" aria-pressed="false">קרוב</button>
+        <button type="button" class="chip scope" data-scope="אירופה" aria-pressed="false">אירופה</button>
+        <button type="button" class="chip scope" data-scope="אסיה" aria-pressed="false">אסיה</button>
+      </div>
+      <div class="fs-suggest" id="fsSuggest"></div>
+      <div class="everything">
+        <div>
+          <div class="t">מצב "הכל" — תנו למנוע להפתיע</div>
+          <div class="s">בלי יעד, בלי תאריך. המנוע בונה מרחב מועמדים חכם, סורק במקביל ומחזיר את העסקאות החזקות ביותר שנמצאו.</div>
         </div>
-        <div class="field">
-          <label for="awMonth">מתי (חודש)</label>
-          <input id="awMonth" type="month">
-        </div>
-        <div class="field">
-          <label for="awBudget">תקציב מקס׳ (€)</label>
-          <input id="awBudget" type="number" placeholder="לא חובה">
-        </div>
-        <button class="cta" type="submit">גלה יעדים</button>
+        <button type="button" class="btn btn-primary" id="everythingBtn">הצג את הדילים הכי שווים</button>
       </div>
     </form>
 
-    <div class="spin" id="spin">🔎 מחפש בכל המקורות… השוואה מול היסטוריית מחירים…</div>
+    <div class="searchstatus" id="searchStatus">
+      <div class="progress-outer"><div class="progress-inner" id="statusBar" style="width:4%"></div></div>
+      <div class="statuslines" id="statusLines">מתחיל סריקה…</div>
+    </div>
   </div>
 </div>
 
 <main>
   <section id="dateStripSec" hidden>
-    <h3 class="sec">מחירים לפי תאריך <span class="muted">(מהתצפיות שנאספו — ירוק = הכי זול)</span></h3>
+    <h3 class="sec">מחירים לפי תאריך <span class="muted">(מהתצפיות שנאספו — מודגש בירוק הזול ביותר)</span></h3>
     <div class="datestrip" id="dateStrip"></div>
   </section>
 
@@ -431,17 +615,17 @@
     <h3 class="sec" id="resultsTitle">תוצאות</h3>
     <div id="priceLevel" style="margin-bottom:10px"></div>
     <div class="sorttabs" role="tablist" aria-label="מיון">
-      <button data-sort="best" aria-selected="true"><span class="t">הכי משתלם</span><span class="v" id="vBest">—</span></button>
+      <button data-sort="best" aria-selected="true"><span class="t">מומלץ</span><span class="v" id="vBest">—</span></button>
       <button data-sort="cheap" aria-selected="false"><span class="t">הכי זול</span><span class="v" id="vCheap">—</span></button>
       <button data-sort="fast" aria-selected="false"><span class="t">הכי מהיר</span><span class="v" id="vFast">—</span></button>
     </div>
     <div class="filters" id="quickFilters" role="group" aria-label="סינון">
       <button class="chip qf" data-k="stops" data-v="0" aria-pressed="false">ישירה בלבד</button>
       <button class="chip qf" data-k="stops" data-v="1" aria-pressed="false">עד עצירה אחת</button>
-      <button class="chip qf" data-k="dep" data-v="morning" aria-pressed="false">🌅 המראה בבוקר (5-12)</button>
-      <button class="chip qf" data-k="dep" data-v="afternoon" aria-pressed="false">☀️ צהריים (12-18)</button>
-      <button class="chip qf" data-k="dep" data-v="evening" aria-pressed="false">🌙 ערב (18-24)</button>
-      <button class="chip qf" data-k="dur" data-v="short" aria-pressed="false">⏱ עד 8 שעות</button>
+      <button class="chip qf" data-k="dep" data-v="morning" aria-pressed="false">המראה בבוקר (5–12)</button>
+      <button class="chip qf" data-k="dep" data-v="afternoon" aria-pressed="false">צהריים (12–18)</button>
+      <button class="chip qf" data-k="dep" data-v="evening" aria-pressed="false">ערב (18–24)</button>
+      <button class="chip qf" data-k="dur" data-v="short" aria-pressed="false">עד 8 שעות</button>
     </div>
     <div class="filters" id="airlineChips"></div>
     <div id="flightList"></div>
@@ -453,54 +637,180 @@
     <div class="deals" id="destGrid"></div>
   </section>
 
-  <h3 class="sec">דילים חמים עכשיו</h3>
-  <div class="deals" id="deals"><p class="muted">עוד אין דילים — חפש משהו והמנוע יתחיל ללמוד מחירים.</p></div>
+  <section id="watchesSec">
+    <h3 class="sec"><span id="icHeartSec"></span>טיסות שמורות במעקב</h3>
+    <p class="muted" id="watchesEmpty">עוד אין טיסות שמורות. אחרי חיפוש, סמנו טיסה בלחיצה על סימן הלב, קבעו מחיר יעד — וכשהמחיר יירד מתחתיו תישלח התראה לטלגרם.</p>
+    <div class="watchgrid" id="watchGrid"></div>
+  </section>
 
-  <h3 class="sec">היסטוריית מחירים</h3>
-  <div class="card">
-    <div class="routebtns" id="routeBtns">
-      <input id="routeInput" class="chip ltr" value="TLV-LHR" style="width:110px" aria-label="מסלול">
-      <span role="group" aria-label="טווח זמן">
-        <button class="chip range" data-days="7">7 ימים</button>
-        <button class="chip range" data-days="30">30</button>
-        <button class="chip range" data-days="90" aria-pressed="true">90</button>
-        <button class="chip range" data-days="180">180</button>
-        <button class="chip range" data-days="365">שנה</button>
-      </span>
-    </div>
-    <div class="chartwrap">
-      <svg id="chart" width="100%" height="250" role="img" aria-label="גרף היסטוריית מחירים"></svg>
-      <div class="tooltip" id="tooltip"></div>
-    </div>
-    <div class="legend">
-      <span><span class="chipline" style="background:var(--line-low)"></span>המחיר הנמוך היומי</span>
-      <span><span class="chipline" style="background:var(--line-avg)"></span>ממוצע יומי</span>
-    </div>
-    <div class="stats" id="routeStats"></div>
-    <details style="padding:0 16px 16px"><summary class="muted">טבלת נתונים</summary><div class="tablewrap" id="chartTable"></div></details>
-  </div>
-
-  <h3 class="sec">מעקבים והתראות</h3>
-  <div class="card" style="padding:14px 16px; margin-bottom:12px">
-    <div class="row" style="justify-content:space-between">
-      <div class="row">
-        <span id="tgStatus" class="badge warn">טלגרם: בודק…</span>
-        <span class="muted">התראות על ירידות מחיר נשלחות לטלגרם שלך</span>
+  <section id="alertsSec">
+    <h3 class="sec"><span id="icBellSec"></span>מרכז ההתראות</h3>
+    <div class="card" style="padding:14px 16px; margin-bottom:12px; display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap">
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+        <span id="tgStatus" class="badge badge-warning">טלגרם: בודק…</span>
+        <span class="muted">התראות על ירידות מחיר נשלחות לטלגרם, בשעות ובתנאים שתגדירו</span>
       </div>
-      <button class="track" id="tgTest">📨 שלח הודעת בדיקה לטלגרם</button>
+      <div style="display:flex; gap:8px">
+        <button class="btn btn-ghost btn-sm" id="tgTest">שלח הודעת בדיקה</button>
+        <button class="btn btn-primary btn-sm" id="newAlertBtn">התראה חכמה חדשה</button>
+      </div>
     </div>
+    <p class="muted" id="alertsEmpty">אין התראות עדיין. "התראה חכמה" מאפשרת לקבוע מחיר יעד, סוג טיסה, תדירות בדיקה ושעות שקט.</p>
+    <div class="alertlist" id="alertList"></div>
     <p class="muted" id="tgTestResult" style="margin:8px 0 0; display:none"></p>
-  </div>
-  <div class="card tablewrap" id="monitors" style="padding-top:8px"><p class="muted" style="padding:0 16px">אין מעקבים עדיין — אחרי חיפוש, לחץ "עקוב אחרי המסלול" והמנוע יבדוק מחירים סביב השעון ויתריע על ירידות.</p></div>
-  <details style="margin-top:10px"><summary class="muted">יומן התראות שנשלחו</summary>
-    <div class="card tablewrap" id="deliveries" style="margin-top:8px; padding:8px 0"><p class="muted" style="padding:0 16px">עוד לא נשלחו התראות.</p></div>
-  </details>
+    <details style="margin-top:10px"><summary class="muted">יומן התראות שנשלחו</summary>
+      <div class="card tablewrap" id="deliveries" style="margin-top:8px; padding:8px 0"><p class="muted" style="padding:0 16px">עוד לא נשלחו התראות.</p></div>
+    </details>
+    <details style="margin-top:10px"><summary class="muted">מעקבי מסלול פעילים</summary>
+      <div class="card tablewrap" id="monitors" style="margin-top:8px; padding-top:8px"><p class="muted" style="padding:0 16px">אין מעקבים עדיין.</p></div>
+    </details>
+  </section>
+
+  <h3 class="sec">עסקאות מובילות עכשיו</h3>
+  <div class="deals" id="deals"><p class="muted">עוד אין עסקאות — חפשו משהו והמנוע יתחיל ללמוד מחירים.</p></div>
+
+  <section id="historySec">
+    <h3 class="sec">היסטוריית מחירים</h3>
+    <div class="card">
+      <div class="routebtns" id="routeBtns">
+        <input id="routeInput" class="chip ltr" value="TLV-LHR" style="width:110px" aria-label="מסלול">
+        <span role="group" aria-label="טווח זמן">
+          <button class="chip range" data-days="7">7 ימים</button>
+          <button class="chip range" data-days="30">30</button>
+          <button class="chip range" data-days="90" aria-pressed="true">90</button>
+          <button class="chip range" data-days="180">180</button>
+          <button class="chip range" data-days="365">שנה</button>
+        </span>
+      </div>
+      <div class="chartwrap">
+        <svg id="chart" class="chart" width="100%" height="250" role="img" aria-label="גרף היסטוריית מחירים"></svg>
+        <div class="tooltip" id="tooltip"></div>
+      </div>
+      <div class="legend">
+        <span><span class="chipline" style="background:var(--line-low)"></span>המחיר הנמוך היומי</span>
+        <span><span class="chipline" style="background:var(--line-avg)"></span>ממוצע יומי</span>
+      </div>
+      <div class="stats" id="routeStats"></div>
+      <details style="padding:0 16px 16px"><summary class="muted">טבלת נתונים</summary><div class="tablewrap" id="chartTable"></div></details>
+    </div>
+  </section>
 </main>
 
 <footer>
   <div id="providers"></div>
-  <p>המחירים הם הנמוכים ביותר שנמצאו במקורות הזמינים למנוע בזמן החיפוש — לא הבטחה למחיר הנמוך בעולם. מחיר חריג לטובה? ודא מול חברת התעופה לפני רכישה. ליד כל מחיר מוצג מתי נבדק.</p>
+  <p>המחירים הם הנמוכים ביותר שנמצאו במקורות הזמינים למנוע בזמן החיפוש — לא הבטחה למחיר הנמוך בעולם. מחיר חריג לטובה? מומלץ לוודא מול חברת התעופה לפני רכישה. ליד כל מחיר מוצג מתי נבדק.</p>
 </footer>
+
+<dialog id="watchDialog">
+  <div class="dlg-head"><h3>שמירת טיסה למעקב מחיר</h3><button class="dlg-close" data-close="watchDialog" aria-label="סגירה"></button></div>
+  <form class="dlg-body" id="watchForm" method="dialog">
+    <div class="dlg-sum" id="watchSummary"></div>
+    <div class="field">
+      <label for="wTarget">מחיר יעד — כשהמחיר יירד מתחתיו תישלח התראה</label>
+      <input id="wTarget" type="number" min="1" step="1" required class="num">
+    </div>
+    <label style="display:flex; gap:8px; align-items:center; font-size:var(--fs-sm); color:var(--ink-2)">
+      <input type="checkbox" id="wSameAirline" checked> התראה רק על אותה חברת תעופה
+    </label>
+    <div class="field">
+      <label for="wInterval">תדירות בדיקה</label>
+      <select id="wInterval">
+        <option value="60">כל שעה</option>
+        <option value="180" selected>כל 3 שעות (מומלץ)</option>
+        <option value="360">כל 6 שעות</option>
+        <option value="720">פעמיים ביום</option>
+      </select>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn btn-primary" type="submit">שמור והתחל מעקב</button>
+      <button class="btn btn-ghost" type="button" data-close="watchDialog">ביטול</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="alertDialog">
+  <div class="dlg-head"><h3>התראה חכמה</h3><button class="dlg-close" data-close="alertDialog" aria-label="סגירה"></button></div>
+  <form class="dlg-body" id="alertForm" method="dialog">
+    <div class="frow">
+      <div class="field">
+        <label for="aOrigin">מאיפה</label>
+        <input id="aOrigin" class="ltr" maxlength="3" placeholder="TLV" required style="text-transform:uppercase">
+      </div>
+      <div class="field">
+        <label for="aDest">לאן</label>
+        <input id="aDest" class="ltr" maxlength="3" placeholder="ATH" required style="text-transform:uppercase">
+      </div>
+    </div>
+    <div class="frow">
+      <div class="field">
+        <label for="aDep">תאריך יציאה</label>
+        <input id="aDep" type="date" required>
+      </div>
+      <div class="field">
+        <label for="aRet">חזרה (לא חובה)</label>
+        <input id="aRet" type="date">
+      </div>
+    </div>
+    <div class="field">
+      <label>מתי לשלוח התראה</label>
+      <div class="seg" role="group">
+        <button type="button" class="chip akind" data-kind="PRICE_BELOW" aria-pressed="true">מחיר מתחת ל־</button>
+        <button type="button" class="chip akind" data-kind="DROP_PERCENT" aria-pressed="false">ירידה של %</button>
+        <button type="button" class="chip akind" data-kind="DEAL_SCORE_ABOVE" aria-pressed="false">ציון עסקה מעל</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="aThreshold" id="aThresholdLbl">מחיר יעד (EUR)</label>
+      <input id="aThreshold" type="number" min="1" step="1" required class="num" value="150">
+    </div>
+    <div class="field">
+      <label>סוג טיסה</label>
+      <div class="seg" role="group">
+        <button type="button" class="chip astops" data-stops="" aria-pressed="true">הכל</button>
+        <button type="button" class="chip astops" data-stops="0" aria-pressed="false">ישירה בלבד</button>
+        <button type="button" class="chip astops" data-stops="1" aria-pressed="false">עד עצירה אחת</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>שעת המראה</label>
+      <div class="seg" role="group">
+        <button type="button" class="chip adep" data-dep="" aria-pressed="true">כל שעה</button>
+        <button type="button" class="chip adep" data-dep="5-12" aria-pressed="false">בוקר</button>
+        <button type="button" class="chip adep" data-dep="12-18" aria-pressed="false">צהריים</button>
+        <button type="button" class="chip adep" data-dep="18-24" aria-pressed="false">ערב</button>
+      </div>
+    </div>
+    <div class="frow">
+      <div class="field">
+        <label for="aInterval">תדירות בדיקה</label>
+        <select id="aInterval">
+          <option value="60">כל שעה</option>
+          <option value="180" selected>כל 3 שעות</option>
+          <option value="360">כל 6 שעות</option>
+          <option value="720">פעמיים ביום</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="aCooldown">מרווח בין התראות</label>
+        <select id="aCooldown">
+          <option value="60">שעה</option>
+          <option value="360" selected>6 שעות</option>
+          <option value="720">12 שעות</option>
+          <option value="1440">24 שעות</option>
+        </select>
+      </div>
+    </div>
+    <label style="display:flex; gap:8px; align-items:center; font-size:var(--fs-sm); color:var(--ink-2)">
+      <input type="checkbox" id="aQuiet" checked> שעות שקט — בלי הודעות בין 23:00 ל־07:00
+    </label>
+    <div class="dlg-actions">
+      <button class="btn btn-primary" type="submit">צור התראה</button>
+      <button class="btn btn-ghost" type="button" data-close="alertDialog">ביטול</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toasts" role="status" aria-live="polite"></div>
 
 <script>
 const $ = (s) => document.querySelector(s);
@@ -510,16 +820,62 @@ let SYSTEM_CURRENCY = 'EUR';
 const fmt = (n, c) => n == null ? '—' : `${SYM[c ?? SYSTEM_CURRENCY] ?? (c ?? '')}${Math.round(n).toLocaleString('en')}`;
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const hhmm = (t) => { const m = String(t).match(/T?(\d{2}:\d{2})/); return m ? m[1] : '—'; };
-const durTxt = (m) => m ? `${Math.floor(m/60)}ש׳ ${m%60}ד׳` : '—';
+const durTxt = (m) => m ? `${Math.floor(m/60)} שע׳ ${m%60} דק׳` : '—';
+
+/* ---- icon system: one library (Lucide outline), inline SVG only ---- */
+const ICONS = {
+  plane: '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  compass: '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.51 4.04 3 5.5l7 7Z"/>',
+  swap: '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  down: '<polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>',
+  up: '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+};
+const icon = (name, size = 16) =>
+  `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] ?? ''}</svg>`;
+
+$('#logoIcon').innerHTML = icon('plane', 17);
+$('#icSearch').innerHTML = icon('search', 15);
+$('#icCompass').innerHTML = icon('compass', 15);
+$('#icHeartSec').innerHTML = icon('heart', 18);
+$('#icBellSec').innerHTML = icon('bell', 18);
+$('#swapBtn').innerHTML = icon('swap', 16);
+$$('.dlg-close').forEach((b) => b.innerHTML = icon('x', 18));
+
+/* ---- toasts (no alert() popups) ---- */
+function toast(msg, kind = 'ok') {
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind === 'err' ? ' err' : '');
+  el.innerHTML = icon(kind === 'err' ? 'x' : 'check', 16) + `<span>${esc(msg)}</span>`;
+  $('#toasts').appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 320); }, 4200);
+}
 
 async function api(path, opts) {
   const res = await fetch(path, opts);
   if (!res.ok) throw new Error(`${res.status}`);
-  return res.json();
+  return res.status === 204 ? null : res.json();
 }
 
-// defaults
-// ---- custom flat Hebrew calendar ----
+/* ---- deal-state labels: text instead of decoration ---- */
+function dealState(score) {
+  if (score == null) return null;
+  if (score >= 90) return ['עסקה מצוינת', 'badge-success'];
+  if (score >= 75) return ['עסקה חזקה', 'badge-success'];
+  if (score >= 60) return ['עסקה טובה', 'badge-info'];
+  if (score >= 40) return ['מחיר הוגן', 'badge-neutral'];
+  return ['מחיר גבוה מהרגיל', 'badge-neutral'];
+}
+
+/* ---- custom flat Hebrew calendar ---- */
 const HE_MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 const HE_DOW = ['א','ב','ג','ד','ה','ו','ש'];
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
@@ -586,10 +942,9 @@ wireCalendar('fDep', 'calDep', (iso) => {
   }
 });
 wireCalendar('fRet', 'calRet');
-$('#awMonth').value = new Date(Date.now() + 40 * 864e5).toISOString().slice(0, 7);
 
-// ---- tabs ----
-const forms = { tabForm: '#searchForm', tabAI: '#aiForm', tabAnywhere: '#anywhereForm' };
+/* ---- tabs ---- */
+const forms = { tabForm: '#searchForm', tabFree: '#freeForm' };
 for (const [tabId, formSel] of Object.entries(forms)) {
   document.getElementById(tabId).addEventListener('click', () => {
     for (const [t, f] of Object.entries(forms)) {
@@ -599,7 +954,7 @@ for (const [tabId, formSel] of Object.entries(forms)) {
   });
 }
 
-// ---- airport autocomplete (Google-Flights style: type a city, pick from a list) ----
+/* ---- airport autocomplete ---- */
 function wireAutocomplete(inputId, acId, errId) {
   const input = document.getElementById(inputId);
   const ac = document.getElementById(acId);
@@ -651,7 +1006,6 @@ function wireAutocomplete(inputId, acId, errId) {
 wireAutocomplete('fOrigin', 'acOrigin', 'errOrigin');
 wireAutocomplete('fDest', 'acDest', 'errDest');
 
-/** Resolve an input to an airport code: picked value, or free text via the API. */
 async function resolveField(inputId, errId) {
   const input = document.getElementById(inputId);
   const err = document.getElementById(errId);
@@ -665,7 +1019,7 @@ async function resolveField(inputId, errId) {
     input.dataset.code = hit.code;
     return hit.code;
   } catch {
-    err.textContent = `לא מצאתי שדה תעופה עבור "${q}" — נסה שם עיר`;
+    err.textContent = `לא נמצא שדה תעופה עבור "${q}" — נסו שם עיר`;
     err.classList.add('err');
     return null;
   }
@@ -677,7 +1031,7 @@ $('#swapBtn').addEventListener('click', () => {
   [o.dataset.code, d.dataset.code] = [d.dataset.code, o.dataset.code];
 });
 
-// ---- trip type: round-trip / one-way (Google-style) ----
+/* ---- trip type ---- */
 let tripType = 'round';
 $$('.triptype .chip').forEach(b => b.addEventListener('click', () => {
   tripType = b.dataset.trip;
@@ -696,7 +1050,7 @@ $$('.triptype .chip').forEach(b => b.addEventListener('click', () => {
   }
 }));
 
-// ---- health/providers ----
+/* ---- health/providers ---- */
 (async () => {
   try {
     const h = await api('/api/health');
@@ -705,14 +1059,14 @@ $$('.triptype .chip').forEach(b => b.addEventListener('click', () => {
     const tg = $('#tgStatus');
     const top = $('#tgTopBtn');
     if (h.telegram?.configured) {
-      tg.textContent = 'טלגרם: מחובר ✓';
-      tg.className = 'badge score';
-      top.textContent = '🔔 התראות טלגרם פעילות';
+      tg.textContent = 'טלגרם מחובר';
+      tg.className = 'badge badge-success';
+      $('#tgTopTxt').textContent = 'התראות טלגרם פעילות';
       top.classList.add('ok');
     } else {
-      tg.textContent = 'טלגרם: לא מוגדר';
-      tg.className = 'badge warn';
-      top.textContent = '🔔 חבר התראות טלגרם';
+      tg.textContent = 'טלגרם לא מוגדר';
+      tg.className = 'badge badge-warning';
+      $('#tgTopTxt').textContent = 'חיבור התראות טלגרם';
     }
     const provs = await api('/api/providers');
     $('#providers').innerHTML = 'מקורות: ' + provs.map(p =>
@@ -720,9 +1074,13 @@ $$('.triptype .chip').forEach(b => b.addEventListener('click', () => {
   } catch { $('#health').textContent = 'לא מחובר'; }
 })();
 
-// ---- search state ----
+/* ---- search state ---- */
 let flights = [];
+let renderedList = [];
 let currentSort = 'best';
+let savedKeys = new Set();
+
+function flightKey(f) { return [f.origin, f.destination, f.departureDate, f.airline, f.flightNumber].join('|'); }
 
 function sorted() {
   const f = [...flights];
@@ -746,10 +1104,12 @@ function renderAirlineChips() {
   }));
 }
 
-function flightRow(f) {
+function flightRow(f, idx) {
   const a = f.analysis || {};
   const why = (a.explanation || []).slice(0, 3).map(e => `<li>${esc(e)}</li>`).join('');
   const isCheap = (a.dealScore ?? 0) >= 70 || (a.vsAverage != null && a.vsAverage < -0.1);
+  const state = dealState(a.dealScore);
+  const saved = savedKeys.has(flightKey(f));
   return `<div class="card flight">
     <div class="itin">
       <div class="leg">
@@ -765,13 +1125,13 @@ function flightRow(f) {
         <span class="dur">${durTxt(f.durationMinutes)}</span>
       </div>
       <div>
-        <span class="badge score">ציון עסקה ${a.dealScore ?? '—'}</span>
-        ${a.isExceptional ? '<span class="badge fire">🔥 מחיר חריג לטובה</span>' : ''}
-        ${a.isErrorFareCandidate ? '<span class="badge warn">⚠ ודא מול חברת התעופה</span>' : ''}
+        ${state ? `<span class="badge ${state[1]}">${state[0]} · ${a.dealScore}</span>` : ''}
+        ${a.vsAverage != null && a.vsAverage < -0.05 ? `<span class="badge badge-success">${Math.round(Math.abs(a.vsAverage) * 100)}% מתחת לממוצע</span>` : ''}
+        ${a.isErrorFareCandidate ? '<span class="badge badge-warning">מומלץ לוודא מול חברת התעופה</span>' : ''}
       </div>
       ${why ? `<ul class="whylist">${why}</ul>` : ''}
       ${(f.segments || []).length ? `<details class="legsbox">
-        <summary class="muted">פרטי הטיסה המלאים (${f.segments.length} ${f.segments.length === 1 ? 'קטע' : 'קטעים'})</summary>
+        <summary>פרטי הטיסה המלאים (${f.segments.length} ${f.segments.length === 1 ? 'קטע' : 'קטעים'})</summary>
         <div class="legslist">${f.segments.map((s, si) => `
           <div class="legrow">
             <span class="ltr num">${hhmm(s.departureTime)}–${hhmm(s.arrivalTime)}</span>
@@ -779,15 +1139,18 @@ function flightRow(f) {
             <span class="muted">${esc(s.airlineName || s.airline || '')} ${esc(s.flightNumber || '')}</span>
             <span class="muted">${durTxt(s.durationMinutes)}${s.aircraft ? ' · ' + esc(s.aircraft) : ''}</span>
           </div>
-          ${si < f.segments.length - 1 ? `<div class="layover muted">⏱ עצירת ביניים ב-${esc(s.destination)}</div>` : ''}`).join('')}
+          ${si < f.segments.length - 1 ? `<div class="layover">עצירת ביניים ב-${esc(s.destination)}</div>` : ''}`).join('')}
         </div>
       </details>` : ''}
     </div>
     <div class="buy">
       <span class="pr num ${isCheap ? 'cheap' : ''}">${fmt(f.normalizedPrice, f.normalizedCurrency)}</span>
       <span class="per">נבדק לפני ${f.freshnessMinutes ?? '?'} דק׳ · ${esc(f.provider)}</span>
-      <a class="book-btn" href="${esc(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה ↗</a>
-      <div class="linkrow" style="flex-wrap:wrap">
+      <div class="buyrow">
+        <a class="btn btn-primary btn-sm" href="${esc(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה ${icon('external', 13)}</a>
+        <button class="heart ${saved ? 'saved' : ''}" data-watch="${idx}" title="שמירה למעקב מחיר" aria-label="שמירה למעקב מחיר">${icon('heart', 17)}</button>
+      </div>
+      <div class="linkrow">
         ${(() => {
           const r = { origin: f.origin, destination: f.destination, departureDate: f.departureDate, returnDate: f.returnDate };
           const dep = r.departureDate, ret = r.returnDate ? '/' + r.returnDate : '';
@@ -797,15 +1160,15 @@ function flightRow(f) {
             ['Momondo', `https://www.momondo.com/flight-search/${r.origin}-${r.destination}/${dep}${ret}`],
             ['Skyscanner', `https://www.skyscanner.com/transport/flights/${r.origin.toLowerCase()}/${r.destination.toLowerCase()}/${d6}${r6}/`],
             ['Kiwi', `https://www.kiwi.com/en/search/results/${r.origin.toLowerCase()}/${r.destination.toLowerCase()}/${dep}${r.returnDate ? '/' + r.returnDate : '/no-return'}`],
-          ].map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${n} ↗</a>`).join('');
+          ].map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${n}</a>`).join('');
         })()}
       </div>
-      <button class="track" onclick='track(${JSON.stringify(f.origin)},${JSON.stringify(f.destination)},${JSON.stringify(f.departureDate)},${JSON.stringify(f.returnDate ?? null)})'>🔔 עקוב אחרי המסלול</button>
+      <button class="btn btn-ghost btn-sm" onclick='track(${JSON.stringify(f.origin)},${JSON.stringify(f.destination)},${JSON.stringify(f.departureDate)},${JSON.stringify(f.returnDate ?? null)})'>${icon('bell', 13)} עקוב אחרי המסלול</button>
     </div>
   </div>`;
 }
 
-/** Google-style price-level banner: is now a good time to book this route? */
+/* price-level banner: is now a good time to book this route? */
 function renderPriceLevel() {
   const box = $('#priceLevel');
   const cheap = [...flights].sort((a, b) => a.normalizedPrice - b.normalizedPrice)[0];
@@ -813,17 +1176,17 @@ function renderPriceLevel() {
   if (va == null) { box.innerHTML = ''; return; }
   const pct = Math.round(Math.abs(va) * 100);
   if (va <= -0.12) {
-    box.innerHTML = `<div class="card" style="padding:10px 14px; border-inline-start:4px solid var(--good)">
-      <b style="color:var(--good-ink)">📉 המחירים כרגע נמוכים מהרגיל</b>
-      <span class="meta"> — ${pct}% מתחת לממוצע ההיסטורי של המסלול. זמן טוב להזמין.</span></div>`;
+    box.innerHTML = `<div class="card" style="padding:10px 14px; border-inline-start:4px solid var(--success)">
+      <b style="color:var(--success-ink)">${icon('down', 15)} המחירים כרגע נמוכים מהרגיל</b>
+      <span class="muted"> — ${pct}% מתחת לממוצע ההיסטורי של המסלול. זמן טוב להזמין.</span></div>`;
   } else if (va >= 0.12) {
-    box.innerHTML = `<div class="card" style="padding:10px 14px; border-inline-start:4px solid var(--warning)">
-      <b style="color:var(--warn-ink)">📈 המחירים כרגע גבוהים מהרגיל</b>
-      <span class="meta"> — ${pct}% מעל הממוצע. שווה לעקוב 🔔 ולחכות לירידה.</span></div>`;
+    box.innerHTML = `<div class="card" style="padding:10px 14px; border-inline-start:4px solid var(--warning-ink)">
+      <b style="color:var(--warning-ink)">${icon('up', 15)} המחירים כרגע גבוהים מהרגיל</b>
+      <span class="muted"> — ${pct}% מעל הממוצע. שווה להפעיל התראה ולחכות לירידה.</span></div>`;
   } else {
     box.innerHTML = `<div class="card" style="padding:10px 14px">
-      <b>➡️ המחירים בטווח הרגיל</b>
-      <span class="meta"> למסלול הזה על פי ההיסטוריה שנאספה.</span></div>`;
+      <b>המחירים בטווח הרגיל</b>
+      <span class="muted"> למסלול הזה על פי ההיסטוריה שנאספה.</span></div>`;
   }
 }
 
@@ -848,8 +1211,10 @@ function renderFlights() {
     return quick.dep === 'morning' ? h >= 5 && h < 12 : quick.dep === 'afternoon' ? h >= 12 && h < 18 : h >= 18;
   });
   if (quick.dur === 'short') list = list.filter(f => !f.durationMinutes || f.durationMinutes <= 480);
-  $('#flightList').innerHTML = list.slice(0, 12).map(flightRow).join('') ||
-    '<p class="muted">אין תוצאות מתאימות לסינון.</p>';
+  renderedList = list.slice(0, 12);
+  $('#flightList').innerHTML = renderedList.map((f, i) => flightRow(f, i)).join('') ||
+    '<p class="muted">אין תוצאות מתאימות לסינון. נסו תאריכים גמישים, שדות תעופה סמוכים או Freestyle.</p>';
+  $$('#flightList [data-watch]').forEach(b => b.addEventListener('click', () => openWatchDialog(renderedList[Number(b.dataset.watch)])));
   const cheap = [...flights].sort((x, y) => x.normalizedPrice - y.normalizedPrice)[0];
   const fast = [...flights].sort((x, y) => (x.durationMinutes||1e9) - (y.durationMinutes||1e9))[0];
   const best = [...flights].sort((x, y) => y.valueScore - x.valueScore)[0];
@@ -864,7 +1229,7 @@ $$('.sorttabs button').forEach(b => b.addEventListener('click', () => {
   renderFlights();
 }));
 
-// ---- date strip ----
+/* ---- date strip ---- */
 async function loadDateStrip(origin, destination, selectedDate) {
   try {
     const { dates } = await api(`/api/routes/${origin}-${destination}/cheapest-dates?days=90`);
@@ -878,7 +1243,17 @@ async function loadDateStrip(origin, destination, selectedDate) {
   } catch { $('#dateStripSec').hidden = true; }
 }
 
-// ---- regular search ----
+/* ---- status helpers ---- */
+function statusOn(lines) {
+  $('#searchStatus').classList.add('on');
+  $('#statusLines').innerHTML = lines;
+}
+function statusOff() { $('#searchStatus').classList.remove('on'); $('#statusBar').style.width = '4%'; }
+function skeletons(n = 3) {
+  return Array.from({ length: n }, () => '<div class="skeleton sk-card"></div>').join('');
+}
+
+/* ---- regular search ---- */
 $('#searchForm').addEventListener('submit', async (ev) => {
   ev.preventDefault();
   const [originCode, destCode] = await Promise.all([
@@ -886,8 +1261,12 @@ $('#searchForm').addEventListener('submit', async (ev) => {
     resolveField('fDest', 'errDest'),
   ]);
   if (!originCode || !destCode) return;
-  $('#spin').classList.add('on');
-  $('#resultsSec').hidden = true; $('#destsSec').hidden = true; $('#recsBox').innerHTML = '';
+  statusOn('מחפש בכל המקורות במקביל · השוואה מול היסטוריית מחירים');
+  $('#statusBar').style.width = '30%';
+  $('#resultsSec').hidden = false; $('#destsSec').hidden = true; $('#recsBox').innerHTML = '';
+  $('#resultsTitle').textContent = 'מחפש…';
+  $('#flightList').innerHTML = skeletons(3);
+  $('#airlineChips').innerHTML = '';
   const p = new URLSearchParams({
     origin: originCode,
     destination: destCode,
@@ -903,16 +1282,16 @@ $('#searchForm').addEventListener('submit', async (ev) => {
     if (data.count === 0) {
       const attempts = (data.attempted || []).map(a =>
         `<li><b class="ltr">${esc(a.provider)}</b>: ${a.ok ? 'ענה אך ללא תוצאות' : esc((a.error || 'שגיאה').slice(0, 180))}</li>`).join('');
-      $('#resultsTitle').textContent = 'לא התקבלו תוצאות מהמקורות החיים';
+      $('#resultsTitle').textContent = 'החיפוש אינו זמין כרגע';
       $('#flightList').innerHTML = `<div class="card" style="padding:16px">
-        <p class="meta" style="margin-top:0">מה כל מקור ענה:</p>
+        <p class="muted" style="margin-top:0">אחד או יותר מהמקורות לא ענה. מה כל מקור השיב:</p>
         <ul class="whylist ltr" style="direction:ltr">${attempts || '<li>אין מידע</li>'}</ul>
         ${(data.attempted || []).some(a => (a.provider === 'serpapi' || a.provider === 'amadeus') && a.error === 'unavailable')
-          ? `<p class="meta" style="margin-bottom:0">💡 <b>הפתרון:</b> Google מגביל שרתי ענן. הפעל את המקורות העצמאיים — הוסף מפתח חינמי של
-             <a class="book" href="https://serpapi.com" target="_blank" rel="noopener">SerpAPI</a> או
-             <a class="book" href="https://developers.amadeus.com" target="_blank" rel="noopener">Amadeus</a>
-             ב-Render → Environment (משתני SERPAPI_API_KEY / AMADEUS_CLIENT_ID+SECRET) — והחיפוש יעבוד באופן אמין.</p>`
-          : `<p class="muted">אם זה נמשך — ייתכן ש-Google מגביל זמנית את כתובת השרת. נסה שוב בעוד כמה דקות.</p>`}</div>`;
+          ? `<p class="muted" style="margin-bottom:0">פתרון: Google מגביל שרתי ענן. הוסיפו מפתח חינמי של
+             <a href="https://serpapi.com" target="_blank" rel="noopener">SerpAPI</a> או
+             <a href="https://developers.amadeus.com" target="_blank" rel="noopener">Amadeus</a>
+             במשתני הסביבה (SERPAPI_API_KEY / AMADEUS_CLIENT_ID+SECRET) — והחיפוש יעבוד באופן אמין.</p>`
+          : `<p class="muted">אם זה נמשך — ייתכן שהמקורות מוגבלים זמנית. נסו שוב בעוד כמה דקות.</p>`}</div>`;
       $('#airlineChips').innerHTML = '';
       $('#resultsSec').hidden = false;
       return;
@@ -927,47 +1306,75 @@ $('#searchForm').addEventListener('submit', async (ev) => {
     loadChart(); loadDeals();
     $('#resultsSec').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (e) {
-    $('#resultsTitle').textContent = 'החיפוש נכשל — ייתכן שכל המקורות החיים חסומים כרגע. נסה שוב עוד רגע.';
+    $('#resultsTitle').textContent = 'החיפוש נכשל — ייתכן שכל המקורות חסומים כרגע. נסו שוב עוד רגע.';
     $('#resultsSec').hidden = false; $('#flightList').innerHTML = ''; $('#airlineChips').innerHTML = '';
-  } finally { $('#spin').classList.remove('on'); }
+  } finally { statusOff(); }
 });
 
-// ---- AI search: background job + live progress (wide scans take minutes) ----
+/* ---- Freestyle: global deal discovery on top of the AI agent ---- */
+let freeScope = '';
+$$('.scope').forEach(b => b.addEventListener('click', () => {
+  freeScope = b.dataset.scope;
+  $$('.scope').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+}));
+
+const FS_SUGGESTIONS = [
+  'מצא לי את היעד הכי זול באירופה',
+  'דיל לסוף שבוע בחודש הקרוב',
+  'שבועיים באסיה במחיר הכי נמוך',
+  'יעד חוף עד 250 יורו',
+  'לא משנה לאן, העיקר שיהיה זול',
+];
+$('#fsSuggest').innerHTML = FS_SUGGESTIONS.map(s => `<button type="button" class="chip fs-sg">${esc(s)}</button>`).join('');
+$$('.fs-sg').forEach(b => b.addEventListener('click', () => { $('#freePrompt').value = b.textContent; }));
+
+function composeFreestylePrompt() {
+  let text = $('#freePrompt').value.trim();
+  if (!text) text = 'לא משנה לי לאן, העיקר שיהיה זול';
+  if (freeScope && !text.includes(freeScope)) text += ` ב${freeScope}`;
+  return text;
+}
+
+$('#freeForm').addEventListener('submit', (ev) => { ev.preventDefault(); runDiscovery(composeFreestylePrompt()); });
+$('#everythingBtn').addEventListener('click', () => {
+  const scopeTxt = freeScope ? ` ב${freeScope}` : '';
+  runDiscovery('לא משנה לי לאן, העיקר שיהיה זול' + scopeTxt);
+});
+
 let aiPollTimer = null;
 
 function renderAiReport(r) {
   flights = r.top || [];
   activeAirlines.clear();
-  $('#resultsTitle').innerHTML = `החיפוש החכם <span class="muted">(${r.totalQueries} שאילתות · ${r.totalResults} מחירים · ${(r.elapsedMs/1000).toFixed(0)} שנ׳)</span>`;
+  $('#resultsTitle').innerHTML = `תוצאות הסריקה הגלובלית <span class="muted">(${r.totalQueries} מסלולים נבדקו · ${r.totalResults} מחירים · ${(r.elapsedMs/1000).toFixed(0)} שנ׳)</span>`;
   renderAirlineChips(); renderFlights();
   $('#resultsSec').hidden = false;
   if (r.recommendations?.length) {
-    $('#recsBox').innerHTML = r.recommendations.map(x => `<p class="muted">💡 ${esc(x)}</p>`).join('');
+    $('#recsBox').innerHTML = r.recommendations.map(x => `<div class="card" style="padding:10px 14px; margin-top:8px"><span class="muted">${esc(x)}</span></div>`).join('');
   }
   if (r.byDestination?.length > 1) {
-    $('#destGrid').innerHTML = r.byDestination.slice(0, 12).map(d => `<div class="card dealcard">
+    $('#destGrid').innerHTML = r.byDestination.slice(0, 12).map(d => {
+      const st = dealState(d.best.analysis?.dealScore);
+      return `<div class="card dealcard">
       <span class="dest">${esc(d.destinationName || d.destination)} <span class="muted ltr">${esc(d.destination)}</span></span>
       <span class="pr num">${fmt(d.best.normalizedPrice, d.best.normalizedCurrency)}</span>
+      ${st ? `<span><span class="badge ${st[1]}">${st[0]}</span></span>` : ''}
       <span class="muted ltr">${esc(d.best.departureDate)}</span>
-      <a href="${esc(d.best.bookingUrl)}" target="_blank" rel="noopener">להזמנה ↗</a>
-    </div>`).join('');
+      <a href="${esc(d.best.bookingUrl)}" target="_blank" rel="noopener">להזמנה</a>
+    </div>`; }).join('');
     $('#destsSec').hidden = false;
   }
   loadDeals();
 }
 
-$('#aiForm').addEventListener('submit', async (ev) => {
-  ev.preventDefault();
-  const prompt = $('#aiPrompt').value.trim();
-  if (prompt.length < 3) return;
+async function runDiscovery(prompt) {
   clearInterval(aiPollTimer);
   $('#resultsSec').hidden = false; $('#destsSec').hidden = true; $('#recsBox').innerHTML = '';
   $('#airlineChips').innerHTML = '';
-  $('#resultsTitle').textContent = 'החיפוש החכם רץ…';
-  $('#flightList').innerHTML = `<div class="card" style="padding:18px">
-    <div class="progress-outer"><div class="progress-inner" id="aiBar" style="width:3%"></div></div>
-    <p class="meta" id="aiProgressText" style="margin:10px 0 0">מתחיל סריקה…</p>
-  </div>`;
+  $('#resultsTitle').textContent = 'הסריקה הגלובלית פועלת…';
+  $('#flightList').innerHTML = skeletons(3);
+  statusOn('בונה מרחב חיפוש חכם…');
+  $('#statusBar').style.width = '4%';
   $('#resultsSec').scrollIntoView({ behavior: 'smooth' });
   try {
     const { jobId } = await api('/api/ai/search', {
@@ -978,80 +1385,82 @@ $('#aiForm').addEventListener('submit', async (ev) => {
       try {
         const job = await api('/api/ai/jobs/' + jobId);
         if (job.status === 'running') {
-          const pct = job.total ? Math.max(3, Math.round((job.progress / job.total) * 100)) : 3;
-          $('#aiBar').style.width = pct + '%';
+          const pct = job.total ? Math.max(4, Math.round((job.progress / job.total) * 100)) : 4;
+          $('#statusBar').style.width = pct + '%';
           const best = job.bestSoFar;
-          $('#aiProgressText').innerHTML = `נסרקו ${job.progress}/${job.total || '?'} צירופים` +
-            (best ? ` · הזול ביותר עד כה: <b>${fmt(best.normalizedPrice, best.normalizedCurrency)}</b> ל-${esc(best.destination)} (${esc(best.departureDate)})` : '');
+          statusOn(
+            `<span>נסרקו ${job.progress}/${job.total || '?'} צירופי מסלול ותאריך</span>` +
+            (best ? `<span>הזול ביותר עד כה: <b class="num">${fmt(best.normalizedPrice, best.normalizedCurrency)}</b> ל-${esc(best.destination)} (${esc(best.departureDate)})</span>` : '')
+          );
         } else if (job.status === 'done') {
           clearInterval(aiPollTimer);
+          statusOff();
           renderAiReport(job.report);
         } else {
           clearInterval(aiPollTimer);
-          $('#resultsTitle').textContent = 'החיפוש החכם נכשל';
-          $('#flightList').innerHTML = `<div class="card" style="padding:16px"><span class="meta">${esc(job.error || 'שגיאה לא ידועה')}</span></div>`;
+          statusOff();
+          $('#resultsTitle').textContent = 'הסריקה אינה זמינה כרגע';
+          $('#flightList').innerHTML = `<div class="card" style="padding:16px"><span class="muted">${esc(job.error || 'אחד או יותר מהמקורות לא ענה. נסו שוב בעוד כמה דקות.')}</span></div>`;
         }
       } catch { /* keep polling */ }
     }, 1500);
   } catch (e) {
-    $('#resultsTitle').textContent = 'החיפוש החכם נכשל — נסה שוב.';
+    statusOff();
+    $('#resultsTitle').textContent = 'הסריקה נכשלה — נסו שוב.';
     $('#flightList').innerHTML = '';
   }
-});
+}
 
-// ---- anywhere ----
-$('#anywhereForm').addEventListener('submit', async (ev) => {
-  ev.preventDefault();
-  $('#spin').classList.add('on');
-  const [y, m] = $('#awMonth').value.split('-');
-  const budget = $('#awBudget').value ? ` עד ${$('#awBudget').value} יורו` : '';
-  const monthNames = ['','ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
-  $('#aiPrompt').value = `לא אכפת לי לאן, רק שיהיה זול, ב${monthNames[Number(m)]}${budget}`;
-  $('#aiForm').requestSubmit();
-});
-
-// ---- track ----
+/* ---- quick route tracking ---- */
 window.track = async (origin, destination, departureDate, returnDate) => {
-  const body = {
-    name: `${origin}-${destination} ${departureDate}`,
-    query: { origin, destination, departureDate, returnDate: returnDate || undefined },
-    monitor: true, intervalMinutes: 180,
-  };
-  const { id } = await api('/api/searches', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-  await api('/api/alerts', { method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ savedSearchId: id, kind: 'DROP_PERCENT', threshold: 10, channels: ['console','telegram','webhook'] }) });
-  loadMonitors();
-  alert('נוסף מעקב! המנוע יבדוק את המסלול כל ~3 שעות (מתהדק אוטומטית כשהמחיר זז) ויתריע על ירידה של 10%+.');
+  try {
+    const body = {
+      name: `${origin}-${destination} ${departureDate}`,
+      query: { origin, destination, departureDate, returnDate: returnDate || undefined },
+      monitor: true, intervalMinutes: 180,
+    };
+    const { id } = await api('/api/searches', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    await api('/api/alerts', { method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        savedSearchId: id, kind: 'DROP_PERCENT', threshold: 10,
+        channels: ['console','telegram','webhook'],
+        label: `${origin}→${destination} — ירידה של 10% ומעלה`,
+        cooldownMinutes: 360,
+      }) });
+    loadMonitors(); loadAlerts();
+    toast('נוסף מעקב. המנוע בודק את המסלול סביב השעון ויתריע על ירידה של 10% ומעלה.');
+  } catch { toast('הוספת המעקב נכשלה', 'err'); }
 };
 
-// ---- deals ----
+/* ---- deals feed ---- */
 async function loadDeals() {
   const deals = await api('/api/deals?limit=24');
   if (!deals.length) return;
-  $('#deals').innerHTML = deals.map(d => `<div class="card dealcard">
+  $('#deals').innerHTML = deals.map(d => {
+    const st = dealState(Math.round(d.score));
+    return `<div class="card dealcard">
     <span class="dest"><span class="ltr">${esc(d.origin)} → ${esc(d.destination)}</span></span>
     <span class="pr num">${fmt(d.normalized_price, d.normalized_currency)}${d.typical_price && d.savings > 0 ? `<span class="old num">${fmt(d.typical_price, d.normalized_currency)}</span>` : ''}</span>
-    <span><span class="badge score">ציון ${Math.round(d.score)}</span> ${d.is_exceptional ? '<span class="badge fire">🔥</span>' : ''}
-      ${d.savings > 0 ? `<span class="badge score">חיסכון ${fmt(d.savings, d.normalized_currency)}</span>` : ''}</span>
+    <span>${st ? `<span class="badge ${st[1]}">${st[0]} · ${Math.round(d.score)}</span>` : ''}
+      ${d.savings > 0 ? `<span class="badge badge-success">חיסכון ${fmt(d.savings, d.normalized_currency)}</span>` : ''}</span>
     <span class="muted">${esc(d.airline_name || d.airline)} · ${d.stops === 0 ? 'ישירה' : d.stops + ' עצירות'} · <span class="ltr">${esc(d.departure_date)}</span></span>
-    <a href="${esc(d.booking_url)}" target="_blank" rel="noopener">להזמנה ↗</a>
+    <a href="${esc(d.booking_url)}" target="_blank" rel="noopener">להזמנה</a>
     <span class="muted">נבדק לפני ${d.freshness_minutes} דק׳</span>
-  </div>`).join('');
+  </div>`; }).join('');
 }
 
+/* ---- telegram ---- */
 $('#tgTopBtn').addEventListener('click', async () => {
   if ($('#tgTopBtn').classList.contains('ok')) {
     try {
       const res = await fetch('/api/alerts/test', { method: 'POST' });
       const d = await res.json();
-      alert(d.ok ? '✅ הודעת בדיקה נשלחה לטלגרם שלך!' : '❌ ' + d.error);
-    } catch { alert('❌ שגיאה בשליחה'); }
+      d.ok ? toast('הודעת בדיקה נשלחה לטלגרם') : toast(d.error, 'err');
+    } catch { toast('שגיאה בשליחה', 'err'); }
   } else {
-    $('#tgStatus').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('#alertsSec').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 });
-
-// ---- telegram test ----
 $('#tgTest').addEventListener('click', async () => {
   const out = $('#tgTestResult');
   out.style.display = 'block';
@@ -1060,14 +1469,245 @@ $('#tgTest').addEventListener('click', async () => {
     const res = await fetch('/api/alerts/test', { method: 'POST' });
     const data = await res.json();
     out.textContent = data.ok
-      ? '✅ נשלח! בדוק את הטלגרם שלך — אם ההודעה הגיעה, ההתראות מחוברות.'
-      : `❌ ${data.error}`;
+      ? 'נשלח. אם ההודעה הגיעה לטלגרם — ההתראות מחוברות.'
+      : data.error;
   } catch (e) {
-    out.textContent = '❌ שגיאה בשליחה: ' + e.message;
+    out.textContent = 'שגיאה בשליחה: ' + e.message;
   }
 });
 
-// ---- alert deliveries log ----
+/* ---- watch dialog (favorite a flight) ---- */
+let watchFlight = null;
+function openWatchDialog(f) {
+  watchFlight = f;
+  $('#watchSummary').innerHTML = `
+    <span><b class="ltr">${esc(f.origin)} → ${esc(f.destination)}</b> · ${esc(f.airlineName || f.airline)} <span class="ltr">${esc(f.flightNumber || '')}</span></span>
+    <span>יציאה <span class="ltr">${esc(f.departureDate)}</span>${f.returnDate ? ` · חזרה <span class="ltr">${esc(f.returnDate)}</span>` : ''} · ${f.stops === 0 ? 'ישירה' : f.stops + ' עצירות'}</span>
+    <span>המחיר עכשיו: <b class="num">${fmt(f.normalizedPrice, f.normalizedCurrency)}</b></span>`;
+  $('#wTarget').value = Math.max(1, Math.round(f.normalizedPrice * 0.9));
+  $('#watchDialog').showModal();
+}
+$$('[data-close]').forEach(b => b.addEventListener('click', () => document.getElementById(b.dataset.close).close()));
+
+$('#watchForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  if (!watchFlight) return;
+  const f = watchFlight;
+  try {
+    await api('/api/watches', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        flight: {
+          origin: f.origin, destination: f.destination,
+          departureDate: f.departureDate, returnDate: f.returnDate ?? null,
+          airline: f.airline, airlineName: f.airlineName, flightNumber: f.flightNumber,
+          stops: f.stops, departureTime: f.departureTime, arrivalTime: f.arrivalTime,
+          durationMinutes: f.durationMinutes,
+          normalizedPrice: f.normalizedPrice, normalizedCurrency: f.normalizedCurrency,
+          bookingUrl: f.bookingUrl, cabin: f.cabin,
+        },
+        targetPrice: Number($('#wTarget').value),
+        sameAirlineOnly: $('#wSameAirline').checked,
+        intervalMinutes: Number($('#wInterval').value),
+        channels: ['telegram', 'console'],
+      }),
+    });
+    savedKeys.add(flightKey(f));
+    $('#watchDialog').close();
+    renderFlights(); loadWatches(); loadAlerts(); loadMonitors();
+    toast('הטיסה נשמרה. כשהמחיר יירד מתחת ליעד — תישלח התראה לטלגרם.');
+  } catch { toast('השמירה נכשלה', 'err'); }
+});
+
+/* ---- watches board ---- */
+async function loadWatches() {
+  try {
+    const watches = await api('/api/watches');
+    $('#watchesEmpty').style.display = watches.length ? 'none' : '';
+    $('#watchGrid').innerHTML = watches.map(w => {
+      const cur = w.lastPrice ?? w.priceAtSave;
+      const hit = w.triggeredAt || (w.lastPrice != null && w.lastPrice <= w.targetPrice);
+      const span = Math.max(1, w.priceAtSave - w.targetPrice);
+      const pct = Math.max(0, Math.min(100, Math.round(((w.priceAtSave - cur) / span) * 100)));
+      return `<div class="card watch ${w.active ? '' : 'off'}" style="${w.active ? '' : 'opacity:.65'}">
+        <div class="route"><span class="ltr">${esc(w.origin)} → ${esc(w.destination)}</span>
+          ${hit ? '<span class="badge badge-success">המחיר הגיע ליעד</span>' : (w.active ? '' : '<span class="badge badge-neutral">מושהה</span>')}</div>
+        <div class="meta">${esc(w.airlineName || w.airline || 'כל חברה')} ${w.flightNumber ? `<span class="ltr">${esc(w.flightNumber)}</span>` : ''} · <span class="ltr">${esc(w.departureDate)}</span>${w.returnDate ? ` – <span class="ltr">${esc(w.returnDate)}</span>` : ''} · ${w.stops === 0 ? 'ישירה' : w.stops == null ? '' : w.stops + ' עצירות'}</div>
+        <div class="prices">
+          <span class="cur num" style="${hit ? 'color:var(--success-ink)' : ''}">${fmt(cur, w.currency)}</span>
+          <span class="tgt">יעד: <b class="num">${fmt(w.targetPrice, w.currency)}</b> · נשמר ב-<span class="num">${fmt(w.priceAtSave, w.currency)}</span></span>
+        </div>
+        <div class="goal" title="התקדמות אל מחיר היעד"><i style="width:${hit ? 100 : pct}%"></i></div>
+        <div class="meta">${w.lastCheckedAt ? `נבדק לאחרונה <span class="ltr num">${esc(w.lastCheckedAt.slice(0, 16).replace('T', ' '))}</span>` : 'טרם נבדק — הבדיקה הראשונה בדרך'}</div>
+        <div class="actions">
+          <button class="btn btn-ghost btn-sm" data-wedit="${w.id}" data-target="${w.targetPrice}">עדכון יעד</button>
+          <button class="btn btn-ghost btn-sm" data-wpause="${w.id}" data-active="${w.active ? 1 : 0}">${w.active ? 'השהיה' : 'הפעלה'}</button>
+          <button class="btn btn-danger btn-sm" data-wdel="${w.id}">הסרה</button>
+        </div>
+      </div>`;
+    }).join('');
+    savedKeys = new Set(watches.map(w => [w.origin, w.destination, w.departureDate, w.airline, w.flightNumber].join('|')));
+    $$('#watchGrid [data-wdel]').forEach(b => b.addEventListener('click', async () => {
+      await api('/api/watches/' + b.dataset.wdel, { method: 'DELETE' });
+      loadWatches(); loadAlerts(); loadMonitors();
+      toast('המעקב הוסר');
+    }));
+    $$('#watchGrid [data-wpause]').forEach(b => b.addEventListener('click', async () => {
+      await api('/api/watches/' + b.dataset.wpause, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: b.dataset.active !== '1' }),
+      });
+      loadWatches(); loadAlerts();
+    }));
+    $$('#watchGrid [data-wedit]').forEach(b => b.addEventListener('click', async () => {
+      const v = prompt('מחיר יעד חדש:', b.dataset.target);
+      if (!v || !Number(v)) return;
+      await api('/api/watches/' + b.dataset.wedit, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetPrice: Number(v) }),
+      });
+      loadWatches(); loadAlerts();
+      toast('מחיר היעד עודכן');
+    }));
+  } catch { /* board is optional */ }
+}
+
+/* ---- smart alert dialog ---- */
+let alertKind = 'PRICE_BELOW';
+$$('.akind').forEach(b => b.addEventListener('click', () => {
+  alertKind = b.dataset.kind;
+  $$('.akind').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  const lbl = $('#aThresholdLbl');
+  if (alertKind === 'PRICE_BELOW') { lbl.textContent = `מחיר יעד (${SYSTEM_CURRENCY})`; $('#aThreshold').value = 150; }
+  else if (alertKind === 'DROP_PERCENT') { lbl.textContent = 'אחוז ירידה'; $('#aThreshold').value = 10; }
+  else { lbl.textContent = 'ציון עסקה (0–100)'; $('#aThreshold').value = 85; }
+}));
+let alertStops = '';
+$$('.astops').forEach(b => b.addEventListener('click', () => {
+  alertStops = b.dataset.stops;
+  $$('.astops').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+}));
+let alertDep = '';
+$$('.adep').forEach(b => b.addEventListener('click', () => {
+  alertDep = b.dataset.dep;
+  $$('.adep').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+}));
+
+$('#newAlertBtn').addEventListener('click', () => {
+  // prefill from the current search context when available
+  const o = $('#fOrigin').dataset.code, d = $('#fDest').dataset.code;
+  if (o) $('#aOrigin').value = o;
+  if (d) $('#aDest').value = d;
+  if ($('#fDep').dataset.iso) $('#aDep').value = $('#fDep').dataset.iso;
+  if ($('#fRet').dataset.iso) $('#aRet').value = $('#fRet').dataset.iso;
+  $('#alertDialog').showModal();
+});
+
+/** Convert a local hour to UTC for the server-side quiet window. */
+function localToUtcHour(h) {
+  const off = new Date().getTimezoneOffset() / 60;
+  return ((h + off) % 24 + 24) % 24;
+}
+
+$('#alertForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const origin = $('#aOrigin').value.trim().toUpperCase();
+  const dest = $('#aDest').value.trim().toUpperCase();
+  const dep = $('#aDep').value;
+  if (!/^[A-Z]{3}$/.test(origin) || !/^[A-Z]{3}$/.test(dest) || !dep) { toast('נא למלא מוצא, יעד ותאריך', 'err'); return; }
+  try {
+    const { id } = await api('/api/searches', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: `${origin}-${dest} ${dep}`,
+        query: { origin, destination: dest, departureDate: dep, returnDate: $('#aRet').value || undefined },
+        monitor: true,
+        intervalMinutes: Number($('#aInterval').value),
+      }),
+    });
+    const filters = {};
+    if (alertStops !== '') filters.maxStops = Number(alertStops);
+    if (alertDep) { const [f, t] = alertDep.split('-').map(Number); filters.depHours = [f, t]; }
+    const kindTxt = alertKind === 'PRICE_BELOW'
+      ? `מתחת ל-${$('#aThreshold').value} ${SYSTEM_CURRENCY}`
+      : alertKind === 'DROP_PERCENT' ? `ירידה של ${$('#aThreshold').value}%` : `ציון עסקה מעל ${$('#aThreshold').value}`;
+    await api('/api/alerts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        savedSearchId: id,
+        kind: alertKind,
+        threshold: Number($('#aThreshold').value),
+        channels: ['telegram', 'console', 'webhook'],
+        label: `${origin}→${dest} — ${kindTxt}`,
+        filters: Object.keys(filters).length ? filters : undefined,
+        cooldownMinutes: Number($('#aCooldown').value),
+        quietHours: $('#aQuiet').checked ? [localToUtcHour(23), localToUtcHour(7)] : null,
+      }),
+    });
+    $('#alertDialog').close();
+    loadAlerts(); loadMonitors();
+    toast('ההתראה נוצרה. המנוע בודק את המסלול ויעדכן בטלגרם בהתאם לתנאים שהגדרת.');
+  } catch { toast('יצירת ההתראה נכשלה', 'err'); }
+});
+
+/* ---- alerts management ---- */
+const KIND_TXT = {
+  PRICE_BELOW: (t) => `מחיר מתחת ל-${fmt(t)}`,
+  DROP_PERCENT: (t) => `ירידה של ${t}% ומעלה`,
+  DEAL_SCORE_ABOVE: (t) => `ציון עסקה מעל ${t}`,
+};
+function utcToLocalHour(h) {
+  const off = new Date().getTimezoneOffset() / 60;
+  return ((h - off) % 24 + 24) % 24;
+}
+async function loadAlerts() {
+  try {
+    const [alerts, searches] = await Promise.all([api('/api/alerts'), api('/api/searches')]);
+    const byId = new Map(searches.map(s => [s.id, s]));
+    $('#alertsEmpty').style.display = alerts.length ? 'none' : '';
+    $('#alertList').innerHTML = alerts.map(a => {
+      const s = byId.get(a.savedSearchId);
+      const flt = a.filters || {};
+      const parts = [];
+      if (flt.maxStops === 0) parts.push('ישירה בלבד');
+      else if (flt.maxStops != null) parts.push(`עד ${flt.maxStops} עצירות`);
+      if (flt.airlines?.length) parts.push('חברה: ' + flt.airlines.join(', '));
+      if (flt.depHours) parts.push(`המראה ${flt.depHours[0]}:00–${flt.depHours[1]}:00`);
+      if (a.quietHours) parts.push(`שקט ${String(Math.round(utcToLocalHour(a.quietHours[0]))).padStart(2,'0')}:00–${String(Math.round(utcToLocalHour(a.quietHours[1]))).padStart(2,'0')}:00`);
+      if (a.cooldownMinutes) parts.push(`מרווח ${a.cooldownMinutes >= 60 ? (a.cooldownMinutes / 60) + ' שע׳' : a.cooldownMinutes + ' דק׳'}`);
+      return `<div class="card alertrow">
+        <div class="grow">
+          <div class="title">${esc(a.label || (s ? s.name : `התראה ${a.id}`))}</div>
+          <div class="sub">
+            <span>${KIND_TXT[a.kind] ? KIND_TXT[a.kind](a.threshold) : esc(a.kind)}</span>
+            ${parts.map(p => `<span>${esc(p)}</span>`).join('')}
+            <span class="ltr">${a.channels.filter(c => c !== 'console').join(', ') || 'console'}</span>
+            ${a.lastTriggeredAt ? `<span>נשלחה לאחרונה <span class="ltr num">${esc(a.lastTriggeredAt.slice(0, 16).replace('T', ' '))}</span></span>` : ''}
+          </div>
+        </div>
+        <label class="switch" title="${a.active ? 'השהיית ההתראה' : 'הפעלת ההתראה'}">
+          <input type="checkbox" data-atoggle="${a.id}" ${a.active ? 'checked' : ''}>
+          <span class="tr"></span>
+        </label>
+        <button class="btn btn-danger btn-sm" data-adel="${a.id}" aria-label="מחיקת התראה">${icon('trash', 14)}</button>
+      </div>`;
+    }).join('');
+    $$('#alertList [data-adel]').forEach(b => b.addEventListener('click', async () => {
+      await api('/api/alerts/' + b.dataset.adel, { method: 'DELETE' });
+      loadAlerts();
+      toast('ההתראה נמחקה');
+    }));
+    $$('#alertList [data-atoggle]').forEach(b => b.addEventListener('change', async () => {
+      await api('/api/alerts/' + b.dataset.atoggle, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: b.checked }),
+      });
+      toast(b.checked ? 'ההתראה הופעלה' : 'ההתראה הושהתה');
+    }));
+  } catch { /* optional */ }
+}
+
+/* ---- deliveries + monitors ---- */
 async function loadDeliveries() {
   try {
     const rows = await api('/api/alerts/deliveries');
@@ -1077,29 +1717,35 @@ async function loadDeliveries() {
       ${rows.map(r => `<tr>
         <td class="ltr num">${esc(r.delivered_at)}</td>
         <td class="ltr">${esc(r.channel)}</td>
-        <td>${r.status === 'ok' ? '✅' : r.status === 'skipped' ? '⏭' : '❌'} ${esc(r.status)}</td>
+        <td>${r.status === 'ok' ? 'נשלחה' : r.status === 'skipped' ? 'דולגה' : 'שגיאה'}</td>
         <td class="muted">${esc((r.message || '').slice(0, 80))}</td>
       </tr>`).join('')}</table>`;
   } catch {}
 }
 
-// ---- monitors ----
 async function loadMonitors() {
   loadDeliveries();
-  const [searches, alerts] = await Promise.all([api('/api/searches'), api('/api/alerts')]);
-  if (!searches.length) return;
-  $('#monitors').innerHTML = `<table>
-    <tr><th>מסלול</th><th>תדירות</th><th>בדיקה אחרונה</th><th>מחיר אחרון</th><th>התראות</th></tr>
-    ${searches.map(s => `<tr>
-      <td class="ltr">${esc(s.name)}</td>
-      <td class="num">${s.adaptiveIntervalMinutes ?? s.intervalMinutes} דק׳</td>
-      <td class="ltr num">${esc(s.lastRunAt ?? 'ממתין')}</td>
-      <td class="num">${fmt(s.lastLowestPrice)}</td>
-      <td class="muted ltr">${alerts.filter(a => a.savedSearchId === s.id).map(a => `${a.kind}<${a.threshold}`).join(', ') || '—'}</td>
-    </tr>`).join('')}</table>`;
+  try {
+    const searches = await api('/api/searches');
+    if (!searches.length) return;
+    $('#monitors').innerHTML = `<table>
+      <tr><th>מסלול</th><th>תדירות</th><th>בדיקה אחרונה</th><th>מחיר אחרון</th><th></th></tr>
+      ${searches.map(s => `<tr>
+        <td class="ltr">${esc(s.name)}</td>
+        <td class="num">${s.monitor ? (s.adaptiveIntervalMinutes ?? s.intervalMinutes) + ' דק׳' : 'מושהה'}</td>
+        <td class="ltr num">${esc(s.lastRunAt ?? 'ממתין')}</td>
+        <td class="num">${fmt(s.lastLowestPrice)}</td>
+        <td><button class="btn btn-danger btn-sm" data-sdel="${s.id}" aria-label="מחיקת מעקב">${icon('trash', 13)}</button></td>
+      </tr>`).join('')}</table>`;
+    $$('#monitors [data-sdel]').forEach(b => b.addEventListener('click', async () => {
+      await api('/api/searches/' + b.dataset.sdel, { method: 'DELETE' });
+      loadMonitors(); loadAlerts(); loadWatches();
+      toast('המעקב נמחק');
+    }));
+  } catch {}
 }
 
-// ---- price chart ----
+/* ---- price chart ---- */
 let chartDays = 90;
 $$('.range').forEach(b => b.addEventListener('click', () => {
   $$('.range').forEach(x => x.removeAttribute('aria-pressed'));
@@ -1117,13 +1763,13 @@ async function loadChart() {
   $('#chartTable').innerHTML = series.length
     ? `<table><tr><th>יום</th><th>נמוך</th><th>ממוצע</th></tr>${series.map(s => `<tr><td class="ltr">${s.day}</td><td class="num">${fmt(s.low)}</td><td class="num">${fmt(s.avg)}</td></tr>`).join('')}</table>`
     : '<p class="muted">אין נתונים.</p>';
-  const trendHe = { RISING: '📈 עולה', FALLING: '📉 יורד', STABLE: '➡️ יציב' };
+  const trendHe = { RISING: 'עולה', FALLING: 'יורד', STABLE: 'יציב' };
   $('#routeStats').innerHTML = stats ? [
     ['הנמוך ביותר', fmt(stats.lowest)], ['ממוצע', fmt(stats.average)], ['חציון', fmt(stats.median)],
     ['הגבוה ביותר', fmt(stats.highest)], ['תנודתיות', (stats.volatility * 100).toFixed(0) + '%'],
     ['מגמה', trendHe[stats.trend] ?? stats.trend], ['תצפיות', stats.sampleCount],
   ].map(([k, v]) => `<div class="stat"><div class="v num">${v}</div><div class="k">${k}</div></div>`).join('')
-  : '<p class="muted">אין עדיין היסטוריה למסלול הזה — חפש אותו והמנוע יתחיל לאסוף.</p>';
+  : '<p class="muted">אין עדיין היסטוריה למסלול הזה — חפשו אותו והמנוע יתחיל לאסוף.</p>';
 }
 
 function drawChart(series) {
@@ -1151,7 +1797,7 @@ function drawChart(series) {
     <path d="${path('avg')}" fill="none" stroke="var(--line-avg)" stroke-width="2" stroke-linejoin="round"/>
     <path d="${path('low')}" fill="none" stroke="var(--line-low)" stroke-width="2" stroke-linejoin="round"/>
     <line id="xhair" y1="${P.t}" y2="${H - P.b}" stroke="var(--ink-3)" stroke-dasharray="3,3" style="display:none"/>
-    <circle id="dot" r="4" fill="var(--line-low)" stroke="var(--card)" stroke-width="2" style="display:none"/>`;
+    <circle id="dot" r="4" fill="var(--line-low)" stroke="var(--surface)" stroke-width="2" style="display:none"/>`;
   const tip = $('#tooltip');
   svg.onmousemove = (ev) => {
     const rect = svg.getBoundingClientRect();
@@ -1170,10 +1816,10 @@ function drawChart(series) {
   svg.onmouseleave = () => { tip.style.display = 'none'; $('#xhair').style.display = 'none'; $('#dot').style.display = 'none'; };
 }
 
-loadDeals(); loadMonitors(); loadChart();
+loadDeals(); loadMonitors(); loadAlerts(); loadWatches(); loadChart();
 try {
   const es = new EventSource('/api/events');
-  es.addEventListener('deals', () => { loadDeals(); loadMonitors(); });
+  es.addEventListener('deals', () => { loadDeals(); loadMonitors(); loadAlerts(); loadWatches(); });
 } catch {}
 </script>
 </body>

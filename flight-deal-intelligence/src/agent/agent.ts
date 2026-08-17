@@ -269,7 +269,7 @@ export class FlightAgent {
     }
 
     if (best.analysis.isErrorFareCandidate) {
-      recs.push('⚠️ ERROR FARE CANDIDATE — price appears unusually low. Verify directly with the airline before purchasing.');
+      recs.push('Error-fare candidate: the price appears unusually low. Verify directly with the airline before purchasing.');
     }
     return recs;
   }

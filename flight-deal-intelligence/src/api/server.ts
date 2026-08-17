@@ -51,6 +51,32 @@ app.use((req, res, next) => {
 
 app.use(express.static(join(ROOT, 'web')));
 
+/**
+ * API rate limiting (§23): a simple per-IP sliding window on the expensive
+ * endpoints (live search, verification, agent scans) so a runaway client
+ * cannot burn provider quota. Cheap reads stay unlimited.
+ */
+const RL_WINDOW_MS = Number(process.env.API_RATE_WINDOW_SECONDS ?? 60) * 1000;
+const RL_MAX = Number(process.env.API_RATE_MAX_SEARCHES ?? 40);
+const rlHits = new Map<string, number[]>();
+
+function rateLimit(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  const key = req.ip ?? 'unknown';
+  const now = Date.now();
+  const hits = (rlHits.get(key) ?? []).filter((t) => now - t < RL_WINDOW_MS);
+  if (hits.length >= RL_MAX) {
+    res.setHeader('Retry-After', Math.ceil(RL_WINDOW_MS / 1000));
+    res.status(429).json({ error: 'too many searches — please wait a moment' });
+    return;
+  }
+  hits.push(now);
+  rlHits.set(key, hits);
+  if (rlHits.size > 5000) rlHits.clear(); // bounded memory
+  next();
+}
+
+app.use(['/api/flights/search', '/api/flights/verify', '/api/ai/search'], rateLimit);
+
 const searchSchema = z.object({
   origin: z.string().length(3),
   destination: z.string().length(3),
@@ -752,6 +778,7 @@ app.get('/api/providers', (_req, res) => {
       status: registry.status(a.name),
       costTier: a.costTier ?? 'FREE',
       capabilities: a.capabilities,
+      rateLimit: registry.rateStats(a.name),
       ...registry.health(a.name),
     }))
   );

@@ -16,6 +16,7 @@ import { DuffelAdapter } from './duffel.js';
 import { KiwiAdapter } from './kiwi.js';
 import { getDatabase, type FlightDatabase } from '../db/database.js';
 import { routeKey } from '../core/types.js';
+import { configFor, ProviderRateLimiter } from './config.js';
 
 export interface SearchOutcome {
   results: FlightResult[];
@@ -113,6 +114,22 @@ export class ProviderRegistry {
   /** Circuit breaker state per provider (V4 §79). */
   private breaker = new Map<string, { fails: number; openedAt: number | null }>();
 
+  /** Per-provider rate limiter + concurrency gate (§23). */
+  private limiters = new Map<string, ProviderRateLimiter>();
+  private limiter(name: string): ProviderRateLimiter {
+    let l = this.limiters.get(name);
+    if (!l) {
+      l = new ProviderRateLimiter(configFor(name));
+      this.limiters.set(name, l);
+    }
+    return l;
+  }
+
+  /** Rate-limit state for the provider dashboard. */
+  rateStats(name: string): ReturnType<ProviderRateLimiter['stats']> {
+    return this.limiter(name).stats();
+  }
+
   private breakerState(name: string): 'closed' | 'open' | 'half-open' {
     const b = this.breaker.get(name);
     if (!b || b.openedAt === null) return 'closed';
@@ -150,6 +167,7 @@ export class ProviderRegistry {
   status(name: string): ProviderStatus {
     const adapter = this.adapters.find((a) => a.name === name);
     if (!adapter) return 'UNKNOWN';
+    if (!configFor(name).enabled) return 'DISABLED';
     const avail = this.availability.get(name);
     if (avail && !avail.ok) return 'DISABLED';
     const state = this.breakerState(name);
@@ -163,6 +181,8 @@ export class ProviderRegistry {
   }
 
   private async isAvailableCached(adapter: FlightSearchAdapter): Promise<boolean> {
+    // feature flag wins over everything: a disabled provider is never called
+    if (!configFor(adapter.name).enabled) return false;
     const cached = this.availability.get(adapter.name);
     if (cached && Date.now() - cached.at < 5 * 60_000) return cached.ok;
     const ok = await adapter.isAvailable();
@@ -184,8 +204,12 @@ export class ProviderRegistry {
       if (!(await this.isAvailableCached(adapter))) {
         return { provider: adapter.name, ok: false, error: 'unavailable', latencyMs: 0, results: [] };
       }
-      const timeoutMs = adapter.timeoutMs ?? PROVIDER_TIMEOUT_MS;
-      const results = await withTimeout(adapter.search(query), timeoutMs, adapter.name);
+      const cfg = configFor(adapter.name);
+      const timeoutMs = cfg.timeoutMs ?? adapter.timeoutMs ?? PROVIDER_TIMEOUT_MS;
+      // rate limiter: never exceed the provider's agreed request budget
+      const results = await this.limiter(adapter.name).run(() =>
+        withTimeout(adapter.search(query), timeoutMs, adapter.name)
+      );
       const latencyMs = Date.now() - started;
       this.db.recordProviderRun(adapter.name, 'ok', latencyMs);
       this.recordOutcome(adapter.name, true);

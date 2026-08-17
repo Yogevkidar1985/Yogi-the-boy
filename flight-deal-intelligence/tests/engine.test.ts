@@ -10,6 +10,7 @@ import { parseTripRequest } from '../src/agent/parser.js';
 import { currencyService } from '../src/core/currency.js';
 import type { FlightSearchAdapter } from '../src/providers/adapter.js';
 import { ProviderError } from '../src/providers/adapter.js';
+import { ProviderRateLimiter } from '../src/providers/config.js';
 
 class FailingProvider implements FlightSearchAdapter {
   readonly name = 'failing';
@@ -195,6 +196,46 @@ describe('provider circuit breaker + route learning (V4)', () => {
     expect(stats[0]!.okRuns).toBe(1);
     expect(stats[0]!.resultsSum).toBeGreaterThan(0);
     expect(stats[0]!.lowestPrice).toBeGreaterThan(0);
+  });
+});
+
+describe('provider rate limiting + feature flags', () => {
+  it('serializes beyond the concurrency limit', async () => {
+    const limiter = new ProviderRateLimiter({ enabled: true, timeoutMs: 1000, requestsPerMinute: 100, concurrency: 2 });
+    let active = 0, peak = 0;
+    const task = async () => {
+      active++; peak = Math.max(peak, active);
+      await new Promise((r) => setTimeout(r, 20));
+      active--;
+    };
+    await Promise.all(Array.from({ length: 6 }, () => limiter.run(task)));
+    expect(peak).toBeLessThanOrEqual(2);
+  });
+
+  it('reports usage against the per-minute budget', async () => {
+    const limiter = new ProviderRateLimiter({ enabled: true, timeoutMs: 1000, requestsPerMinute: 5, concurrency: 5 });
+    await Promise.all(Array.from({ length: 3 }, () => limiter.run(async () => {})));
+    const s = limiter.stats();
+    expect(s.usedThisMinute).toBe(3);
+    expect(s.limitPerMinute).toBe(5);
+    expect(s.active).toBe(0);
+  });
+
+  it('a disabled provider is never queried', async () => {
+    process.env.ENABLE_MOCK = 'false';
+    try {
+      const db = new FlightDatabase(':memory:');
+      const registry = new ProviderRegistry(db);
+      registry.register(new MockFlightProvider());
+      expect(registry.status('mock')).toBe('DISABLED');
+      const outcome = await registry.search(
+        buildQuery({ origin: 'TLV', destination: 'ATH', departureDate: '2026-12-01' }),
+        { fresh: true }
+      );
+      expect(outcome.results).toHaveLength(0);
+    } finally {
+      delete process.env.ENABLE_MOCK;
+    }
   });
 });
 

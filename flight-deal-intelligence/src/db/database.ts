@@ -277,6 +277,15 @@ export class FlightDatabase {
     add('quiet_from', `quiet_from INTEGER`);
     add('quiet_to', `quiet_to INTEGER`);
     add('last_triggered_at', `last_triggered_at TEXT`);
+
+    const watchCols = new Set(
+      (this.db.prepare(`PRAGMA table_info(watched_flights)`).all() as { name: string }[]).map((c) => c.name)
+    );
+    const addWatch = (col: string, ddl: string) => {
+      if (!watchCols.has(col)) this.db.exec(`ALTER TABLE watched_flights ADD COLUMN ${ddl}`);
+    };
+    addWatch('similar_json', `similar_json TEXT`);
+    addWatch('similar_alerted_at', `similar_alerted_at TEXT`);
   }
 
   // ---- flight results -----------------------------------------------------
@@ -557,6 +566,8 @@ export class FlightDatabase {
       triggeredAt: (r.triggered_at as string) ?? null,
       createdAt: r.created_at as string,
       flight: r.flight_json ? JSON.parse(r.flight_json as string) : undefined,
+      similar: r.similar_json ? JSON.parse(r.similar_json as string) : undefined,
+      similarAlertedAt: (r.similar_alerted_at as string) ?? null,
     };
   }
 
@@ -576,7 +587,10 @@ export class FlightDatabase {
 
   updateWatchedFlight(
     id: number,
-    patch: { targetPrice?: number; active?: boolean; lastPrice?: number | null; triggered?: boolean }
+    patch: {
+      targetPrice?: number; active?: boolean; lastPrice?: number | null; triggered?: boolean;
+      similar?: unknown[]; similarAlerted?: boolean;
+    }
   ): void {
     const sets: string[] = [];
     const vals: unknown[] = [];
@@ -587,6 +601,8 @@ export class FlightDatabase {
       vals.push(patch.lastPrice);
     }
     if (patch.triggered) sets.push(`triggered_at = datetime('now')`);
+    if (patch.similar !== undefined) { sets.push('similar_json = ?'); vals.push(JSON.stringify(patch.similar)); }
+    if (patch.similarAlerted) sets.push(`similar_alerted_at = datetime('now')`);
     if (!sets.length) return;
     this.db.prepare(`UPDATE watched_flights SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id);
   }

@@ -508,7 +508,10 @@
       <a href="#alertsSec">התראות</a>
       <a href="#historySec">היסטוריית מחירים</a>
     </nav>
-    <button id="tgTopBtn" class="tg-top" type="button"><span class="dot"></span><span id="tgTopTxt">התראות טלגרם</span></button>
+    <select id="currencySel" aria-label="מטבע תצוגה" class="ltr" style="margin-inline-start:auto; background:rgba(255,255,255,.1); color:var(--hero-ink); border:1px solid rgba(255,255,255,.25); border-radius:var(--radius-full); padding:6px 12px; font-family:inherit; font-size:var(--fs-sm); cursor:pointer">
+      <option value="">מטבע</option>
+    </select>
+    <button id="tgTopBtn" class="tg-top" type="button" style="margin-inline-start:0"><span class="dot"></span><span id="tgTopTxt">התראות טלגרם</span></button>
   </div>
 </header>
 
@@ -534,7 +537,10 @@
         </span>
         <select id="fPax" name="adults" aria-label="נוסעים" class="chip" style="padding:6px 12px">
           <option value="1">נוסע 1</option><option value="2">2 נוסעים</option>
-          <option value="3">3 נוסעים</option><option value="4">4 נוסעים</option><option value="5">5 נוסעים</option>
+          <option value="3">3 נוסעים</option><option value="4">4 נוסעים</option>
+          <option value="5">5 נוסעים</option><option value="6">6 נוסעים</option>
+          <option value="7">7 נוסעים</option><option value="8">8 נוסעים</option>
+          <option value="9">9 נוסעים</option>
         </select>
         <select id="fCabin" name="cabin" aria-label="מחלקה" class="chip" style="padding:6px 12px">
           <option value="ECONOMY">תיירים</option>
@@ -707,6 +713,7 @@
     <div class="field">
       <label for="wTarget">מחיר יעד — כשהמחיר יירד מתחתיו תישלח התראה</label>
       <input id="wTarget" type="number" min="1" step="1" required class="num">
+      <span class="muted" id="wTargetHint" style="margin-top:2px"></span>
     </div>
     <label style="display:flex; gap:8px; align-items:center; font-size:var(--fs-sm); color:var(--ink-2)">
       <input type="checkbox" id="wSameAirline" checked> התראה רק על אותה חברת תעופה
@@ -814,9 +821,28 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
-const SYM = { ILS: '₪', EUR: '€', USD: '$', GBP: '£' };
+const SYM = { ILS: '₪', EUR: '€', USD: '$', GBP: '£', CHF: 'CHF ', AED: 'AED ', JPY: '¥' };
 let SYSTEM_CURRENCY = 'EUR';
-const fmt = (n, c) => n == null ? '—' : `${SYM[c ?? SYSTEM_CURRENCY] ?? (c ?? '')}${Math.round(n).toLocaleString('en')}`;
+/**
+ * Display currency: converts for DISPLAY only, using server-provided rates
+ * (relative to the system currency, timestamped). Original prices are never
+ * mutated — alerts and stored data stay in the system currency.
+ */
+let DISPLAY_CURRENCY = localStorage.getItem('displayCurrency') || '';
+let RATES = null; // { base, rates: {CUR: rate}, fetchedAt }
+function toDisplay(n, from) {
+  const src = from ?? SYSTEM_CURRENCY;
+  if (!DISPLAY_CURRENCY || DISPLAY_CURRENCY === src || !RATES) return { n, c: src };
+  const rSrc = src === RATES.base ? 1 : RATES.rates[src];
+  const rDst = DISPLAY_CURRENCY === RATES.base ? 1 : RATES.rates[DISPLAY_CURRENCY];
+  if (!rSrc || !rDst) return { n, c: src };
+  return { n: n * (rDst / rSrc), c: DISPLAY_CURRENCY };
+}
+const fmt = (n, c) => {
+  if (n == null) return '—';
+  const d = toDisplay(n, c);
+  return `${SYM[d.c] ?? d.c + ' '}${Math.round(d.n).toLocaleString('en')}`;
+};
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const hhmm = (t) => { const m = String(t).match(/T?(\d{2}:\d{2})/); return m ? m[1] : '—'; };
 const durTxt = (m) => m ? `${Math.floor(m/60)} שע׳ ${m%60} דק׳` : '—';
@@ -1048,6 +1074,26 @@ $$('.triptype .chip').forEach(b => b.addEventListener('click', () => {
     }
   }
 }));
+
+/* ---- display currency selector ---- */
+function rerenderPrices() {
+  renderFlights(); loadDeals(); loadWatches(); loadChart(); loadMonitors();
+}
+(async () => {
+  try {
+    RATES = await api('/api/currency/rates');
+    const sel = $('#currencySel');
+    sel.innerHTML = Object.keys(RATES.rates)
+      .map(c => `<option value="${c}">${SYM[c] ? SYM[c].trim() + ' ' : ''}${c}</option>`).join('');
+    sel.value = DISPLAY_CURRENCY || RATES.base;
+    sel.addEventListener('change', () => {
+      DISPLAY_CURRENCY = sel.value === RATES.base ? '' : sel.value;
+      localStorage.setItem('displayCurrency', DISPLAY_CURRENCY);
+      rerenderPrices();
+    });
+    if (DISPLAY_CURRENCY) rerenderPrices();
+  } catch { /* selector stays minimal without rates */ }
+})();
 
 /* ---- health/providers ---- */
 (async () => {
@@ -1536,7 +1582,19 @@ function openWatchDialog(f) {
     <span>יציאה <span class="ltr">${esc(f.departureDate)}</span>${f.returnDate ? ` · חזרה <span class="ltr">${esc(f.returnDate)}</span>` : ''} · ${f.stops === 0 ? 'ישירה' : f.stops + ' עצירות'}</span>
     <span>המחיר עכשיו: <b class="num">${fmt(f.normalizedPrice, f.normalizedCurrency)}</b></span>`;
   $('#wTarget').value = Math.max(1, Math.round(f.normalizedPrice * 0.9));
+  $('#wTargetHint').textContent = '';
   $('#watchDialog').showModal();
+  // smart target suggestion from route history — a suggestion only, never
+  // overriding what the user types
+  (async () => {
+    try {
+      const { stats } = await api(`/api/routes/${f.origin}-${f.destination}/history?days=90`);
+      if (stats?.average && stats?.lowest) {
+        const suggested = Math.round(Math.max(stats.lowest, stats.average * 0.85));
+        $('#wTargetHint').innerHTML = `לפי היסטוריית המסלול, יעד ריאלי: <b class="num">${fmt(suggested)}</b> (הנמוך ההיסטורי: <span class="num">${fmt(stats.lowest)}</span>)`;
+      }
+    } catch { /* no history yet */ }
+  })();
 }
 $$('[data-close]').forEach(b => b.addEventListener('click', () => document.getElementById(b.dataset.close).close()));
 
@@ -1590,6 +1648,13 @@ async function loadWatches() {
         </div>
         <div class="goal" title="התקדמות אל מחיר היעד"><i style="width:${hit ? 100 : pct}%"></i></div>
         <div class="meta">${w.lastCheckedAt ? `נבדק לאחרונה <span class="ltr num">${esc(w.lastCheckedAt.slice(0, 16).replace('T', ' '))}</span>` : 'טרם נבדק — הבדיקה הראשונה בדרך'}</div>
+        ${(w.similar || []).length ? `<div style="border-top:1px dashed var(--border); padding-top:8px; margin-top:2px">
+          <div class="meta" style="font-weight:600; margin-bottom:4px">טיסות דומות שנמצאו</div>
+          ${w.similar.slice(0, 3).map(s => `<div class="meta" style="display:flex; justify-content:space-between; gap:8px">
+            <span>${esc(s.airlineName || s.airline)} <span class="ltr">${esc(s.flightNumber || '')}</span> · ${s.stops === 0 ? 'ישירה' : s.stops + ' עצירות'} · דמיון ${s.similarity}%</span>
+            <span class="num" style="font-weight:600; ${s.price < w.priceAtSave ? 'color:var(--success-ink)' : ''}">${fmt(s.price, s.currency)}</span>
+          </div>`).join('')}
+        </div>` : ''}
         <div class="actions">
           <button class="btn btn-ghost btn-sm" data-wedit="${w.id}" data-target="${w.targetPrice}">עדכון יעד</button>
           <button class="btn btn-ghost btn-sm" data-wpause="${w.id}" data-active="${w.active ? 1 : 0}">${w.active ? 'השהיה' : 'הפעלה'}</button>

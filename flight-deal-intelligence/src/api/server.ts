@@ -658,6 +658,23 @@ app.get('/api/links', (req, res) => {
   res.json(bookingLinks(parsed.data));
 });
 
+/**
+ * Display-currency support: rates relative to the system currency, with the
+ * fetch timestamp and source so every conversion is traceable. Original prices
+ * are never mutated — the client converts for display only.
+ */
+app.get('/api/currency/rates', (_req, res) => {
+  const base = currencyService.systemCurrency;
+  const targets = ['ILS', 'USD', 'EUR', 'GBP', 'CHF', 'AED', 'JPY'];
+  const rates: Record<string, number> = {};
+  for (const t of targets) {
+    try {
+      rates[t] = currencyService.convert(1, base, t).value;
+    } catch { /* unknown currency in the table → omit */ }
+  }
+  res.json({ base, rates, fetchedAt: currencyService.lastUpdated, source: currencyService.source });
+});
+
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',

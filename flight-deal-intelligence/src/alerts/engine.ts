@@ -156,31 +156,36 @@ export class AlertEngine {
     this.channels = new Map(channels.map((c) => [c.name, c]));
   }
 
+  /** Send one message through the given channels, recording every delivery. */
+  async sendCustom(alertId: number, channelNames: string[], msg: AlertMessage): Promise<boolean> {
+    let delivered = false;
+    for (const channelName of channelNames) {
+      const channel = this.channels.get(channelName);
+      if (!channel) {
+        this.db.recordAlertDelivery(alertId, channelName, 'error', 'unknown channel');
+        continue;
+      }
+      if (!channel.enabled()) {
+        this.db.recordAlertDelivery(alertId, channelName, 'skipped', 'channel not configured');
+        continue;
+      }
+      try {
+        await channel.send(msg);
+        this.db.recordAlertDelivery(alertId, channelName, 'ok', msg.title);
+        delivered = true;
+      } catch (err) {
+        this.db.recordAlertDelivery(
+          alertId, channelName, 'error',
+          err instanceof Error ? err.message : String(err)
+        );
+      }
+    }
+    return delivered;
+  }
+
   async dispatch(triggered: TriggeredAlert[]): Promise<void> {
     for (const t of triggered) {
-      const msg = formatAlertMessage(t);
-      let delivered = false;
-      for (const channelName of t.rule.channels) {
-        const channel = this.channels.get(channelName);
-        if (!channel) {
-          this.db.recordAlertDelivery(t.rule.id, channelName, 'error', 'unknown channel');
-          continue;
-        }
-        if (!channel.enabled()) {
-          this.db.recordAlertDelivery(t.rule.id, channelName, 'skipped', 'channel not configured');
-          continue;
-        }
-        try {
-          await channel.send(msg);
-          this.db.recordAlertDelivery(t.rule.id, channelName, 'ok', msg.title);
-          delivered = true;
-        } catch (err) {
-          this.db.recordAlertDelivery(
-            t.rule.id, channelName, 'error',
-            err instanceof Error ? err.message : String(err)
-          );
-        }
-      }
+      const delivered = await this.sendCustom(t.rule.id, t.rule.channels, formatAlertMessage(t));
       // start the cooldown only once something actually went out
       if (delivered) this.db.markAlertTriggered(t.rule.id);
     }

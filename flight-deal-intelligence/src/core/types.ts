@@ -230,6 +230,9 @@ export interface WatchedFlight {
   createdAt: string;
   /** Full flight snapshot for rendering the favorite card. */
   flight?: unknown;
+  /** Top similar alternatives found by the worker (Similar Flights Engine). */
+  similar?: unknown[];
+  similarAlertedAt?: string | null;
 }
 
 export interface SavedSearch {

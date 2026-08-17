@@ -9,9 +9,15 @@
 import { getDatabase } from '../db/database.js';
 import { buildDefaultRegistry } from '../providers/registry.js';
 import { AnalysisService } from '../analyzer/service.js';
-import { AlertEngine, evaluateRules } from '../alerts/engine.js';
-import { routeKey, type SavedSearch } from '../core/types.js';
+import { AlertEngine, evaluateRules, type TriggeredAlert } from '../alerts/engine.js';
+import { rankSimilar, type FlightDna } from '../analyzer/similarity.js';
+import { routeKey, type SavedSearch, type ScoredFlight, type WatchedFlight } from '../core/types.js';
 import { currencyService } from '../core/currency.js';
+
+/** Similar-deal alerts: at most one per watch per this many hours. */
+const SIMILAR_ALERT_COOLDOWN_H = Number(process.env.SIMILAR_ALERT_COOLDOWN_HOURS ?? 24);
+/** A similar flight counts as a better deal below this share of the saved price. */
+const SIMILAR_DEAL_RATIO = Number(process.env.SIMILAR_DEAL_RATIO ?? 0.85);
 
 const MIN_INTERVAL_MIN = 30;
 const MAX_INTERVAL_MIN = 24 * 60;
@@ -135,23 +141,90 @@ export class MonitorWorker {
     );
     this.db.updateSavedSearchRun(search.id, lowest, newInterval);
 
-    // alerts (§25)
+    // alerts (§25) — price alerts are VERIFIED with a fresh, cache-free search
+    // before anything is sent (Flight Watch §86): no stale price ever alerts.
     const rules = this.db.listAlerts(search.id);
-    const triggered = evaluateRules(rules, scored, search.lastLowestPrice);
+    let triggered = evaluateRules(rules, scored, search.lastLowestPrice);
+    if (triggered.length) {
+      triggered = await this.verifyTriggered(search, triggered);
+    }
     await this.alerts.dispatch(triggered);
 
-    // favorite flights bound to this monitor: track current price + hits
+    // favorite flights bound to this monitor: track price, hits + alternatives
     for (const watch of this.db.watchesForSearch(search.id)) {
       const matching = watch.airline ? scored.filter((s) => s.airline === watch.airline) : scored;
       const low = matching.length
         ? Math.min(...matching.map((s) => s.normalizedPrice))
         : lowest;
+      // Similar Flights Engine: rank the watched flight's alternatives
+      const dna: FlightDna = {
+        airline: watch.airline,
+        flightNumber: watch.flightNumber,
+        stops: watch.stops,
+        departureTime: (watch.flight as { departureTime?: string } | undefined)?.departureTime ?? null,
+        durationMinutes: (watch.flight as { durationMinutes?: number } | undefined)?.durationMinutes ?? null,
+        price: watch.priceAtSave,
+      };
+      const similar = rankSimilar(dna, scored);
       this.db.updateWatchedFlight(watch.id, {
         lastPrice: low,
         triggered: low !== null && low <= watch.targetPrice,
+        similar,
       });
+      await this.maybeSendSimilarDeal(search, watch, similar);
     }
     return triggered.length;
+  }
+
+  /** Re-check triggered price alerts against a fresh (no-cache) search. */
+  private async verifyTriggered(search: SavedSearch, triggered: TriggeredAlert[]): Promise<TriggeredAlert[]> {
+    try {
+      const fresh = await this.registry.search(search.query, { fresh: true });
+      const freshScored = this.analysis.analyze(fresh.results);
+      const confirmed = evaluateRules(triggered.map((t) => t.rule), freshScored, search.lastLowestPrice);
+      const confirmedIds = new Set(confirmed.map((c) => c.rule.id));
+      const dropped = triggered.filter((t) => !confirmedIds.has(t.rule.id));
+      for (const d of dropped) {
+        this.db.logEvent('info', 'alert_dropped_on_verification', { ruleId: d.rule.id, reason: d.reason });
+      }
+      return confirmed;
+    } catch {
+      // verification search failed entirely → fall back to the original signal
+      return triggered;
+    }
+  }
+
+  /** "We found a very similar flight for less" — the Spotify-for-flights alert. */
+  private async maybeSendSimilarDeal(
+    search: SavedSearch,
+    watch: WatchedFlight,
+    similar: ReturnType<typeof rankSimilar>
+  ): Promise<void> {
+    const best = similar.find(
+      (s) => s.similarity >= 70 && (s.price <= watch.priceAtSave * SIMILAR_DEAL_RATIO || s.price <= watch.targetPrice)
+    );
+    if (!best) return;
+    if (watch.similarAlertedAt) {
+      const last = Date.parse(watch.similarAlertedAt.includes('T') ? watch.similarAlertedAt : watch.similarAlertedAt + 'Z');
+      if (Number.isFinite(last) && Date.now() - last < SIMILAR_ALERT_COOLDOWN_H * 3600_000) return;
+    }
+    const rule = this.db.listAlerts(search.id)[0];
+    if (!rule) return;
+    const SYM: Record<string, string> = { ILS: '₪', EUR: '€', USD: '$', GBP: '£' };
+    const money = (n: number, c: string) => `${SYM[c] ?? c + ' '}${Math.round(n).toLocaleString('en')}`;
+    const saving = Math.round(watch.priceAtSave - best.price);
+    const delivered = await this.alerts.sendCustom(rule.id, rule.channels, {
+      title: `מצאנו טיסה דומה במחיר נמוך יותר: ${watch.origin} → ${watch.destination} · ${money(best.price, best.currency)}`,
+      body: [
+        `הטיסה ששמרת: ${watch.airlineName ?? watch.airline ?? ''} ${watch.flightNumber ?? ''} במחיר ${money(watch.priceAtSave, watch.currency)}`,
+        `האפשרות החדשה: ${best.airlineName ?? best.airline} ${best.flightNumber ?? ''} · ${best.stops === 0 ? 'טיסה ישירה' : `${best.stops} עצירות`}`,
+        `דמיון לטיסה ששמרת: ${best.similarity}%`,
+        `חיסכון: ${money(saving, watch.currency)}`,
+        `תאריכים: ${watch.departureDate}${watch.returnDate ? ` → ${watch.returnDate}` : ''}`,
+      ].join('\n'),
+      url: best.bookingUrl,
+    });
+    if (delivered) this.db.updateWatchedFlight(watch.id, { similarAlerted: true });
   }
 
   start(pollSeconds = 60): void {

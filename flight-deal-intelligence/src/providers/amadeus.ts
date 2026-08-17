@@ -4,7 +4,7 @@
  * Google Flights — works from any datacenter. Enabled when
  * AMADEUS_CLIENT_ID + AMADEUS_CLIENT_SECRET are set.
  */
-import type { FlightSearchAdapter, ProviderCapabilities } from './adapter.js';
+import type { FlightSearchAdapter, ProviderCapabilities, ProviderCostTier } from './adapter.js';
 import { ProviderError } from './adapter.js';
 import type { FlightResult, FlightSegment, SearchQuery } from '../core/types.js';
 import { currencyService } from '../core/currency.js';
@@ -34,6 +34,8 @@ interface AmadeusOffer {
 export class AmadeusAdapter implements FlightSearchAdapter {
   readonly name = 'amadeus';
   readonly priority = 12;
+  readonly costTier: ProviderCostTier = 'LOW_COST';
+  readonly timeoutMs = 25000;
   readonly capabilities: ProviderCapabilities = {
     roundTrip: true,
     multiCity: false,

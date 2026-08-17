@@ -219,6 +219,17 @@ CREATE TABLE IF NOT EXISTS search_preferences (
   preferences_json TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS provider_route_stats (
+  provider TEXT NOT NULL,
+  route TEXT NOT NULL,
+  runs INTEGER NOT NULL DEFAULT 0,
+  ok_runs INTEGER NOT NULL DEFAULT 0,
+  results_sum INTEGER NOT NULL DEFAULT 0,
+  lowest_price REAL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (provider, route)
+);
+
 CREATE TABLE IF NOT EXISTS search_sessions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,
@@ -640,6 +651,45 @@ export class FlightDatabase {
       lastErrorAt: (row.lastErrorAt as string) ?? null,
       lastError: lastError?.error ?? null,
     };
+  }
+
+  // ---- route-provider learning (V4 §19-§20) -------------------------------
+
+  recordProviderRouteRun(
+    provider: string,
+    route: string,
+    ok: boolean,
+    resultCount: number,
+    lowestPrice: number | null
+  ): void {
+    this.db
+      .prepare(
+        `INSERT INTO provider_route_stats (provider, route, runs, ok_runs, results_sum, lowest_price, updated_at)
+         VALUES (?,?,1,?,?,?,datetime('now'))
+         ON CONFLICT(provider, route) DO UPDATE SET
+           runs = runs + 1,
+           ok_runs = ok_runs + excluded.ok_runs,
+           results_sum = results_sum + excluded.results_sum,
+           lowest_price = CASE
+             WHEN excluded.lowest_price IS NULL THEN lowest_price
+             WHEN lowest_price IS NULL THEN excluded.lowest_price
+             ELSE MIN(lowest_price, excluded.lowest_price) END,
+           updated_at = datetime('now')`
+      )
+      .run(provider, route, ok ? 1 : 0, resultCount, lowestPrice);
+  }
+
+  providerRouteStats(route: string): { provider: string; runs: number; okRuns: number; resultsSum: number; lowestPrice: number | null }[] {
+    const rows = this.db
+      .prepare(`SELECT provider, runs, ok_runs, results_sum, lowest_price FROM provider_route_stats WHERE route = ?`)
+      .all(route) as Record<string, unknown>[];
+    return rows.map((r) => ({
+      provider: r.provider as string,
+      runs: r.runs as number,
+      okRuns: r.ok_runs as number,
+      resultsSum: r.results_sum as number,
+      lowestPrice: (r.lowest_price as number) ?? null,
+    }));
   }
 
   // ---- meta-search KPIs ---------------------------------------------------

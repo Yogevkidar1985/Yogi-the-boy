@@ -167,6 +167,37 @@ describe('watched flights (favorites with a target price)', () => {
   });
 });
 
+describe('provider circuit breaker + route learning (V4)', () => {
+  it('opens the circuit after repeated failures and skips the provider', async () => {
+    const db = new FlightDatabase(':memory:');
+    const registry = new ProviderRegistry(db);
+    registry.register(new FailingProvider());
+    registry.register(new MockFlightProvider());
+    const q = buildQuery({ origin: 'TLV', destination: 'ATH', departureDate: '2026-11-01' });
+    // 3 distinct fresh searches → 3 failures → circuit opens
+    for (let i = 1; i <= 3; i++) {
+      await registry.search(buildQuery({ origin: 'TLV', destination: 'ATH', departureDate: `2026-11-0${i}` }), { fresh: true });
+    }
+    expect(registry.status('failing')).toBe('CIRCUIT_OPEN');
+    const outcome = await registry.search(q, { fresh: true });
+    const failingAttempt = outcome.attempted.find((a) => a.provider === 'failing');
+    expect(failingAttempt?.error).toMatch(/circuit open/);
+    expect(outcome.results.length).toBeGreaterThan(0); // mock still answers
+  });
+
+  it('learns per-route provider performance', async () => {
+    const db = new FlightDatabase(':memory:');
+    const registry = new ProviderRegistry(db);
+    registry.register(new MockFlightProvider());
+    await registry.search(buildQuery({ origin: 'TLV', destination: 'LHR', departureDate: '2026-11-05' }), { fresh: true });
+    const stats = db.providerRouteStats('TLV-LHR');
+    expect(stats).toHaveLength(1);
+    expect(stats[0]!.okRuns).toBe(1);
+    expect(stats[0]!.resultsSum).toBeGreaterThan(0);
+    expect(stats[0]!.lowestPrice).toBeGreaterThan(0);
+  });
+});
+
 describe('smart scheduling (§28)', () => {
   it('anomaly → 30 minutes', () => {
     expect(nextInterval(180, 180, null, true)).toBe(30);

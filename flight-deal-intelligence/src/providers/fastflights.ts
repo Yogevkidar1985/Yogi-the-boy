@@ -71,6 +71,8 @@ interface BridgeResponse {
 export class FastFlightsAdapter implements FlightSearchAdapter {
   readonly name = 'fast-flights';
   readonly priority = 10; // preferred primary (§70)
+  readonly costTier = 'FREE' as const;
+  readonly timeoutMs = 40000;
   readonly capabilities: ProviderCapabilities = {
     roundTrip: true,
     multiCity: false,

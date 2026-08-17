@@ -47,6 +47,7 @@ const CABIN_FACTOR: Record<CabinClass, number> = {
 export class MockFlightProvider implements FlightSearchAdapter {
   readonly name = 'mock';
   readonly priority = 1000; // last resort by default
+  readonly costTier = 'FREE' as const;
   readonly capabilities: ProviderCapabilities = {
     roundTrip: true,
     multiCity: true,

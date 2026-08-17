@@ -1068,8 +1068,12 @@ $$('.triptype .chip').forEach(b => b.addEventListener('click', () => {
       $('#tgTopTxt').textContent = 'חיבור התראות טלגרם';
     }
     const provs = await api('/api/providers');
-    $('#providers').innerHTML = 'מקורות: ' + provs.map(p =>
-      `<span class="ltr">${esc(p.name)} (${Math.round(p.successRate * 100)}%)</span>`).join(' · ');
+    const STATUS_HE = {
+      ACTIVE: 'פעיל', DISABLED: 'כבוי', DEGRADED: 'לא יציב', RATE_LIMITED: 'מוגבל זמנית',
+      AUTH_ERROR: 'שגיאת הרשאה', CIRCUIT_OPEN: 'בהשהיה', UNKNOWN: '',
+    };
+    $('#providers').innerHTML = 'מקורות חיפוש: ' + provs.map(p =>
+      `<span class="ltr" title="${esc(p.costTier)}">${esc(p.name)}</span>${STATUS_HE[p.status] ? ' (' + STATUS_HE[p.status] + ')' : ''}`).join(' · ');
   } catch { $('#health').textContent = 'לא מחובר'; }
 })();
 
@@ -1128,6 +1132,7 @@ function flightRow(f, idx) {
         ${a.vsAverage != null && a.vsAverage < -0.05 ? `<span class="badge badge-success">${Math.round(Math.abs(a.vsAverage) * 100)}% מתחת לממוצע</span>` : ''}
         ${f.consensus && f.consensus.sourceCount > 1 ? `<span class="badge badge-info" title="אותה טיסה נמצאה ביותר ממקור אחד">אושר ב-${f.consensus.sourceCount} מקורות</span>` : ''}
         ${f.priceConfidence != null ? `<span class="badge ${f.priceConfidence >= 80 ? 'badge-success' : f.priceConfidence >= 55 ? 'badge-neutral' : 'badge-warning'}" title="עד כמה אפשר לסמוך על המחיר המוצג: טריות, מספר מקורות והסכמה ביניהם">אמון מחיר ${f.priceConfidence}</span>` : ''}
+        ${f.selfTransfer ? '<span class="badge badge-warning" title="מסלול המורכב מכרטיסים נפרדים — הקישור בין הטיסות באחריותך, לא באחריות חברת התעופה">הרכבה עצמית — כרטיסים נפרדים</span>' : ''}
         ${a.isErrorFareCandidate ? '<span class="badge badge-warning">מומלץ לוודא מול חברת התעופה</span>' : ''}
       </div>
       ${why ? `<ul class="whylist">${why}</ul>` : ''}
@@ -1303,7 +1308,10 @@ $('#searchForm').addEventListener('submit', async (ev) => {
     }
     flights = data.flights;
     activeAirlines.clear();
-    $('#resultsTitle').innerHTML = `תוצאות <span class="ltr">${p.get('origin')} → ${p.get('destination')}</span> <span class="muted">(${data.count} טיסות · מקור ${esc(data.provider)})</span>`;
+    const tried = data.attempted || [];
+    const answered = tried.filter(a => a.ok).length;
+    const srcLine = tried.length > 1 ? ` · נבדקו ${tried.length} מקורות, ${answered} ענו` : ` · מקור ${esc(data.provider)}`;
+    $('#resultsTitle').innerHTML = `תוצאות <span class="ltr">${p.get('origin')} → ${p.get('destination')}</span> <span class="muted">(${data.count} טיסות${srcLine})</span>`;
     renderAirlineChips(); renderFlights();
     $('#resultsSec').hidden = false;
     $('#routeInput').value = `${p.get('origin')}-${p.get('destination')}`;

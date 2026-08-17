@@ -20,6 +20,8 @@ const CABIN_ARG: Record<CabinClass, string> = {
 export class FliAdapter implements FlightSearchAdapter {
   readonly name = 'fli';
   readonly priority = 20;
+  readonly costTier = 'FREE' as const;
+  readonly timeoutMs = 40000;
   readonly capabilities: ProviderCapabilities = {
     roundTrip: true,
     multiCity: false,

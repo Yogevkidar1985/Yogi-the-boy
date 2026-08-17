@@ -98,6 +98,8 @@ export interface FlightResult {
   rawProviderData?: unknown;
   /** Every provider that returned this same itinerary (filled by dedup). */
   sources?: PriceSource[];
+  /** Separate tickets / virtual interlining — NOT a protected connection. */
+  selfTransfer?: boolean;
 }
 
 /** Cross-provider agreement for one itinerary (meta-search consensus). */

@@ -634,7 +634,16 @@ app.get('/api/airlines', (_req, res) => {
 });
 
 app.get('/api/providers', (_req, res) => {
-  res.json(registry.list().map((a) => ({ name: a.name, priority: a.priority, ...registry.health(a.name) })));
+  res.json(
+    registry.list().map((a) => ({
+      name: a.name,
+      priority: a.priority,
+      status: registry.status(a.name),
+      costTier: a.costTier ?? 'FREE',
+      capabilities: a.capabilities,
+      ...registry.health(a.name),
+    }))
+  );
 });
 
 app.get('/api/links', (req, res) => {

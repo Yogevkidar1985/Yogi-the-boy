@@ -2,6 +2,10 @@
  * Provider adapter architecture (§3): every data source is an isolated adapter
  * behind one interface. Failures are non-fatal (§77); each call has a timeout
  * and retry with exponential backoff (§39).
+ *
+ * V4 meta-search additions: provider status model, cost tiers (free discovery
+ * first, paid escalation), per-provider timeout classes and a capability
+ * matrix that is declared per adapter — never hard-coded as "yes" globally.
  */
 import type { FlightResult, SearchQuery } from '../core/types.js';
 
@@ -10,13 +14,32 @@ export interface ProviderCapabilities {
   multiCity: boolean;
   flexibleDates: boolean;
   liveNetwork: boolean; // needs outbound network access
+  /** results may combine separate tickets (virtual interlining) */
+  selfTransfer?: boolean;
+  /** usable for fresh price verification of top deals */
+  priceVerification?: boolean;
 }
+
+export type ProviderCostTier = 'FREE' | 'LOW_COST' | 'PAID' | 'PREMIUM';
+
+export type ProviderStatus =
+  | 'ACTIVE'
+  | 'DISABLED'
+  | 'DEGRADED'
+  | 'RATE_LIMITED'
+  | 'AUTH_ERROR'
+  | 'CIRCUIT_OPEN'
+  | 'UNKNOWN';
 
 export interface FlightSearchAdapter {
   readonly name: string;
   readonly capabilities: ProviderCapabilities;
   /** Static priority hint; actual selection also weighs reliability (§70). */
   readonly priority: number;
+  /** FREE providers run first for discovery; PAID escalate on value (V4 §25). */
+  readonly costTier?: ProviderCostTier;
+  /** Hard per-request cap for this adapter; registry default applies if unset. */
+  readonly timeoutMs?: number;
   isAvailable(): Promise<boolean>;
   search(query: SearchQuery): Promise<FlightResult[]>;
 }

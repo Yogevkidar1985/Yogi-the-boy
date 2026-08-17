@@ -28,6 +28,8 @@ interface SerpItinerary {
 export class SerpApiAdapter implements FlightSearchAdapter {
   readonly name = 'serpapi';
   readonly priority = 15;
+  readonly costTier = 'PAID' as const;
+  readonly timeoutMs = 30000;
   readonly capabilities: ProviderCapabilities = {
     roundTrip: true,
     multiCity: false,

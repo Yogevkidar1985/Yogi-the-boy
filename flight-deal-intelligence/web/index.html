@@ -888,7 +888,7 @@ window.track = async (origin, destination, departureDate, returnDate) => {
 
 // ---- deals ----
 async function loadDeals() {
-  const deals = await api('/api/deals?limit=8');
+  const deals = await api('/api/deals?limit=24');
   if (!deals.length) return;
   $('#deals').innerHTML = deals.map(d => `<div class="card dealcard">
     <span class="dest"><span class="ltr">${esc(d.origin)} → ${esc(d.destination)}</span></span>

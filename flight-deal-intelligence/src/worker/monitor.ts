@@ -42,9 +42,46 @@ export class MonitorWorker {
   private alerts = new AlertEngine();
   private timer: NodeJS.Timeout | null = null;
 
+  /**
+   * Hot-deal discovery: twice a day (DEAL_SCAN_HOURS, default 12h) scan a
+   * rotating slice of destinations from DEFAULT_ORIGIN so the deals feed
+   * refreshes with 20+ new scored deals per scan (~40+/day).
+   */
+  private async dealScan(): Promise<void> {
+    const scanHours = Number(process.env.DEAL_SCAN_HOURS ?? 12);
+    const last = this.db.db
+      .prepare(`SELECT MAX(created_at) AS t FROM system_events WHERE event='deal_scan'`)
+      .get() as { t: string | null };
+    if (last.t && Date.now() - Date.parse(last.t + 'Z') < scanHours * 3600_000) return;
+    this.db.logEvent('info', 'deal_scan', { startedAt: new Date().toISOString() });
+
+    const { ANYWHERE_DESTINATIONS } = await import('../core/airports.js');
+    const { buildQuery } = await import('../agent/agent.js');
+    const origin = process.env.DEFAULT_ORIGIN ?? 'TLV';
+    const maxQueries = Number(process.env.DEAL_SCAN_MAX_QUERIES ?? 20);
+    // rotate the destination slice each scan so deals keep changing
+    const scanIndex = Math.floor(Date.now() / (scanHours * 3600_000));
+    const dests = Array.from({ length: maxQueries }, (_, i) =>
+      ANYWHERE_DESTINATIONS[(scanIndex * maxQueries + i) % ANYWHERE_DESTINATIONS.length]!
+    );
+    for (const dest of dests) {
+      try {
+        // deterministic-but-varied departure 15-45 days out per destination
+        const daysOut = 15 + ((scanIndex + dest.charCodeAt(0) + dest.charCodeAt(2)) % 31);
+        const departureDate = new Date(Date.now() + daysOut * 86400000).toISOString().slice(0, 10);
+        const outcome = await this.registry.search(buildQuery({ origin, destination: dest, departureDate }));
+        this.analysis.analyze(outcome.results);
+      } catch (err) {
+        this.db.logEvent('warn', 'deal_scan_route_failed', { dest, error: String(err) });
+      }
+    }
+    console.log(`[worker] deal scan complete: ${dests.length} routes refreshed`);
+  }
+
   /** Run every saved search whose interval has elapsed. */
   async tick(): Promise<{ ran: number; alertsSent: number }> {
     await currencyService.refresh();
+    await this.dealScan();
     let ran = 0;
     let alertsSent = 0;
     for (const search of this.db.listSavedSearches()) {

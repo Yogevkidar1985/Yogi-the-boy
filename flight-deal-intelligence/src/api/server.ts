@@ -234,6 +234,28 @@ app.get('/api/flights/calendar', (req, res) => {
   res.json({ route, month: parsed.data.month, days });
 });
 
+/** Lows by DEPARTURE date over a horizon — feeds the departure-price graph. */
+app.get('/api/flights/departure-prices', (req, res) => {
+  const schema = z.object({
+    origin: z.string().length(3),
+    destination: z.string().length(3),
+    days: z.coerce.number().int().min(7).max(180).default(60),
+  });
+  const parsed = schema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const route = routeKey(parsed.data.origin, parsed.data.destination);
+  const rows = db.db
+    .prepare(
+      `SELECT departure_date AS day, MIN(price) AS low
+       FROM price_snapshots
+       WHERE route = ? AND collected_at >= datetime('now', '-7 days')
+         AND departure_date >= date('now') AND departure_date <= date('now', ?)
+       GROUP BY departure_date ORDER BY day`
+    )
+    .all(route, `+${parsed.data.days} days`) as { day: string; low: number }[];
+  res.json({ route, currency: currencyService.systemCurrency, days: rows });
+});
+
 app.get('/api/flights/:id', (req, res) => {
   const row = db.db.prepare(`SELECT * FROM flight_results WHERE id = ?`).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'not found' });

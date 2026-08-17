@@ -501,6 +501,42 @@
   .dlg-actions { display: flex; gap: var(--sp-2); justify-content: flex-start; margin-top: var(--sp-2); }
   .seg { display: flex; gap: var(--sp-1); flex-wrap: wrap; }
 
+  /* departure-price graph */
+  .depgraph { overflow-x: auto; padding: 8px 2px 2px; }
+  .depgraph svg { display: block; }
+  .depgraph .bar { fill: var(--primary); opacity: .55; cursor: pointer; transition: opacity var(--t-fast); }
+  .depgraph .bar:hover { opacity: .9; }
+  .depgraph .bar.min { fill: var(--success); opacity: .9; }
+  .depgraph text { fill: var(--ink-3); font-size: 10px; font-family: var(--font-family); }
+
+  /* price slider */
+  .pricefilter { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; font-size: var(--fs-sm); color: var(--ink-2); }
+  .pricefilter input[type="range"] { flex: 1; max-width: 260px; accent-color: var(--primary); min-height: 24px; }
+
+  /* mobile filters bottom sheet */
+  #filterSheet { margin: auto 0 0; width: 100vw; max-width: 100vw; border-radius: var(--radius-lg) var(--radius-lg) 0 0; border-bottom: none; }
+  #filterSheet .dlg-body { max-height: 70dvh; overflow-y: auto; }
+  #filterSheetBtn { display: none; }
+
+  /* mobile bottom navigation */
+  .bottomnav {
+    display: none; position: fixed; bottom: 0; inset-inline: 0; z-index: 70;
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  }
+  .bottomnav a {
+    flex: 1; text-align: center; text-decoration: none; color: var(--ink-2);
+    font-size: 11px; font-weight: 600; display: flex; flex-direction: column;
+    align-items: center; gap: 2px; padding: 4px 0; min-height: 44px; border-radius: var(--radius-sm);
+  }
+  .bottomnav a:active { background: var(--surface-2); }
+  @media (max-width: 700px) {
+    #filterSheetBtn { display: inline-flex; }
+    .bottomnav { display: flex; }
+    body { padding-bottom: 64px; }
+    #resultsSec #filterZone { display: none; } /* moves into the bottom sheet */
+  }
+
   /* flight details drawer: side panel on desktop, full screen on mobile */
   #flightDrawer {
     margin: 0 0 0 auto; inset-inline-end: 0; inset-inline-start: auto;
@@ -655,6 +691,7 @@
   <section id="dateStripSec" hidden>
     <h3 class="sec">מחירים לפי תאריך <span class="muted">(מהתצפיות שנאספו — מודגש בירוק הזול ביותר)</span></h3>
     <div class="datestrip" id="dateStrip"></div>
+    <div class="card depgraph" id="depGraph" hidden></div>
   </section>
 
   <section id="resultsSec" hidden>
@@ -670,15 +707,25 @@
       <button data-sort="fast" aria-selected="false"><span class="t">הכי מהיר</span><span class="v" id="vFast">—</span></button>
       <button data-sort="deal" aria-selected="false"><span class="t">הדיל הטוב ביותר</span><span class="v" id="vDeal">—</span></button>
     </div>
-    <div class="filters" id="quickFilters" role="group" aria-label="סינון">
-      <button class="chip qf" data-k="stops" data-v="0" aria-pressed="false">ישירה בלבד</button>
-      <button class="chip qf" data-k="stops" data-v="1" aria-pressed="false">עד עצירה אחת</button>
-      <button class="chip qf" data-k="dep" data-v="morning" aria-pressed="false">המראה בבוקר (5–12)</button>
-      <button class="chip qf" data-k="dep" data-v="afternoon" aria-pressed="false">צהריים (12–18)</button>
-      <button class="chip qf" data-k="dep" data-v="evening" aria-pressed="false">ערב (18–24)</button>
-      <button class="chip qf" data-k="dur" data-v="short" aria-pressed="false">עד 8 שעות</button>
+    <button class="btn btn-ghost btn-sm" id="filterSheetBtn" style="margin:10px 0">סינון <span id="filterCount"></span></button>
+    <div id="filterZone">
+      <div class="filters" id="quickFilters" role="group" aria-label="סינון">
+        <button class="chip qf" data-k="stops" data-v="0" aria-pressed="false">ישירה בלבד</button>
+        <button class="chip qf" data-k="stops" data-v="1" aria-pressed="false">עד עצירה אחת</button>
+        <button class="chip qf" data-k="dep" data-v="morning" aria-pressed="false">המראה בבוקר (5–12)</button>
+        <button class="chip qf" data-k="dep" data-v="afternoon" aria-pressed="false">צהריים (12–18)</button>
+        <button class="chip qf" data-k="dep" data-v="evening" aria-pressed="false">ערב (18–24)</button>
+        <button class="chip qf" data-k="arr" data-v="day" aria-pressed="false">נחיתה ביום (6–18)</button>
+        <button class="chip qf" data-k="arr" data-v="night" aria-pressed="false">נחיתה בערב/לילה</button>
+        <button class="chip qf" data-k="dur" data-v="short" aria-pressed="false">עד 8 שעות</button>
+      </div>
+      <div class="pricefilter" id="priceFilter" hidden>
+        <span>מחיר מקסימלי</span>
+        <input type="range" id="priceSlider" aria-label="מחיר מקסימלי">
+        <b class="num" id="priceSliderVal"></b>
+      </div>
+      <div class="filters" id="airlineChips"></div>
     </div>
-    <div class="filters" id="airlineChips"></div>
     <div id="flightList"></div>
     <div id="recsBox"></div>
   </section>
@@ -875,6 +922,24 @@
   </form>
 </dialog>
 
+<dialog id="filterSheet">
+  <div class="dlg-head"><h3>סינון תוצאות</h3><button class="dlg-close" data-close="filterSheet" aria-label="סגירה"></button></div>
+  <div class="dlg-body">
+    <div id="sheetBody"></div>
+    <div class="dlg-actions" style="position:sticky; bottom:0; background:var(--surface); padding-top:8px">
+      <button class="btn btn-primary" style="flex:1" id="sheetApply">הצג תוצאות</button>
+      <button class="btn btn-ghost" id="sheetReset">איפוס</button>
+    </div>
+  </div>
+</dialog>
+
+<nav class="bottomnav" aria-label="ניווט תחתון">
+  <a href="#searchTop"><span id="bnSearch"></span>חיפוש</a>
+  <a href="#deals"><span id="bnDeals"></span>דילים</a>
+  <a href="#watchesSec"><span id="bnSaved"></span>שמורות</a>
+  <a href="#alertsSec"><span id="bnAlerts"></span>התראות</a>
+</nav>
+
 <dialog id="flightDrawer">
   <div class="dlg-head"><h3 id="fdTitle">פרטי טיסה</h3><button class="dlg-close" data-close="flightDrawer" aria-label="סגירה"></button></div>
   <div class="dlg-body" id="fdBody"></div>
@@ -940,6 +1005,10 @@ $('#icHeartSec').innerHTML = icon('heart', 18);
 $('#icBellSec').innerHTML = icon('bell', 18);
 $('#swapBtn').innerHTML = icon('swap', 16);
 $$('.dlg-close').forEach((b) => b.innerHTML = icon('x', 18));
+$('#bnSearch').innerHTML = icon('search', 18);
+$('#bnDeals').innerHTML = icon('down', 18);
+$('#bnSaved').innerHTML = icon('heart', 18);
+$('#bnAlerts').innerHTML = icon('bell', 18);
 
 /* ---- theme toggle: light / dark, persisted ---- */
 (() => {
@@ -1402,7 +1471,8 @@ function renderPriceLevel() {
   }
 }
 
-const quick = { stops: null, dep: null, dur: null };
+const quick = { stops: null, dep: null, arr: null, dur: null };
+let maxPriceFilter = null;
 $$('#quickFilters .qf').forEach(b => b.addEventListener('click', () => {
   const k = b.dataset.k, v = b.dataset.v;
   quick[k] = quick[k] === v ? null : v;
@@ -1412,6 +1482,7 @@ $$('#quickFilters .qf').forEach(b => b.addEventListener('click', () => {
 }));
 
 function depHour(f) { const m = String(f.departureTime).match(/T(\d{2})/); return m ? Number(m[1]) : null; }
+function arrHour(f) { const m = String(f.arrivalTime).match(/T(\d{2})/); return m ? Number(m[1]) : null; }
 
 function renderFlights() {
   renderPriceLevel();
@@ -1422,7 +1493,15 @@ function renderFlights() {
     const h = depHour(f); if (h === null) return true;
     return quick.dep === 'morning' ? h >= 5 && h < 12 : quick.dep === 'afternoon' ? h >= 12 && h < 18 : h >= 18;
   });
+  if (quick.arr) list = list.filter(f => {
+    const h = arrHour(f); if (h === null) return true;
+    return quick.arr === 'day' ? h >= 6 && h < 18 : h >= 18 || h < 6;
+  });
   if (quick.dur === 'short') list = list.filter(f => !f.durationMinutes || f.durationMinutes <= 480);
+  if (maxPriceFilter !== null) list = list.filter(f => f.normalizedPrice <= maxPriceFilter);
+  const btn = $('#sheetApply');
+  if (btn) btn.textContent = `הצג ${list.length} טיסות`;
+  $('#filterCount').textContent = list.length !== flights.length ? `(${list.length}/${flights.length})` : '';
   renderedList = list.slice(0, 12);
   $('#flightList').innerHTML = renderedList.map((f, i) => flightRow(f, i)).join('') ||
     '<p class="muted">אין תוצאות מתאימות לסינון. נסו תאריכים גמישים, שדות תעופה סמוכים או Freestyle.</p>';
@@ -1445,8 +1524,80 @@ $$('.sorttabs button').forEach(b => b.addEventListener('click', () => {
   renderFlights();
 }));
 
+/* ---- price slider: bounds from the actual result set ---- */
+function initPriceSlider() {
+  const box = $('#priceFilter'), sl = $('#priceSlider');
+  if (!flights.length) { box.hidden = true; return; }
+  const prices = flights.map(f => f.normalizedPrice);
+  const min = Math.floor(Math.min(...prices)), max = Math.ceil(Math.max(...prices));
+  if (min === max) { box.hidden = true; return; }
+  box.hidden = false;
+  sl.min = min; sl.max = max; sl.value = max; sl.step = Math.max(1, Math.round((max - min) / 60));
+  maxPriceFilter = null;
+  $('#priceSliderVal').textContent = fmt(max);
+}
+$('#priceSlider').addEventListener('input', () => {
+  const v = Number($('#priceSlider').value);
+  maxPriceFilter = v >= Number($('#priceSlider').max) ? null : v;
+  $('#priceSliderVal').textContent = fmt(v);
+  renderFlights();
+});
+
+/* ---- mobile filters bottom sheet: same DOM, moved in and out ---- */
+const filterHome = () => $('#resultsSec');
+$('#filterSheetBtn').addEventListener('click', () => {
+  $('#sheetBody').appendChild($('#filterZone'));
+  renderFlights();
+  $('#filterSheet').showModal();
+});
+function closeSheet() {
+  const zone = $('#filterZone');
+  const anchor = $('#flightList');
+  anchor.parentNode.insertBefore(zone, anchor);
+  $('#filterSheet').close();
+}
+$('#sheetApply').addEventListener('click', closeSheet);
+$('#filterSheet .dlg-close').addEventListener('click', closeSheet);
+$('#sheetReset').addEventListener('click', () => {
+  quick.stops = quick.dep = quick.arr = quick.dur = null;
+  maxPriceFilter = null;
+  activeAirlines.clear();
+  $$('#quickFilters .qf').forEach(x => x.setAttribute('aria-pressed', 'false'));
+  if (!$('#priceFilter').hidden) { $('#priceSlider').value = $('#priceSlider').max; $('#priceSliderVal').textContent = fmt(Number($('#priceSlider').max)); }
+  renderAirlineChips(); renderFlights();
+});
+
+/* ---- departure-price graph: real lows per departure date, click to search ---- */
+async function renderDepGraph(origin, destination) {
+  const box = $('#depGraph');
+  try {
+    const { days, currency } = await api(`/api/flights/departure-prices?origin=${origin}&destination=${destination}&days=60`);
+    if (days.length < 3) { box.hidden = true; return; }
+    const W = Math.max(560, days.length * 34), H = 130, P = { l: 6, r: 40, t: 12, b: 22 };
+    const lows = days.map(d => d.low);
+    const minV = Math.min(...lows), maxV = Math.max(...lows);
+    const x = i => P.l + i * ((W - P.l - P.r) / days.length);
+    const bw = Math.max(10, (W - P.l - P.r) / days.length - 6);
+    const y = v => H - P.b - ((v - minV * 0.9) / (maxV - minV * 0.9 || 1)) * (H - P.t - P.b);
+    const bars = days.map((d, i) =>
+      `<rect class="bar ${d.low === minV ? 'min' : ''}" x="${x(i).toFixed(1)}" y="${y(d.low).toFixed(1)}" width="${bw.toFixed(1)}" height="${(H - P.b - y(d.low)).toFixed(1)}" rx="3" data-day="${d.day}"><title>${d.day} · ${fmt(d.low, currency)}</title></rect>` +
+      (i % Math.ceil(days.length / 8) === 0 ? `<text x="${(x(i) + bw / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle">${d.day.slice(5)}</text>` : '')
+    ).join('');
+    box.innerHTML = `<div class="muted" style="padding:0 8px 4px">המחיר הנמוך שנצפה לכל תאריך יציאה (60 יום קדימה) — לחיצה על עמודה מחפשת בתאריך</div>
+      <svg width="${W}" height="${H}" style="direction:ltr">${bars}
+      <text x="${W - 4}" y="${y(minV) + 4}" text-anchor="end" style="fill:var(--success-ink); font-weight:700">${fmt(minV, currency)}</text></svg>`;
+    box.hidden = false;
+    box.querySelectorAll('.bar').forEach(r => r.addEventListener('click', () => {
+      setDate('fDep', r.dataset.day);
+      if (tripType === 'round') setDate('fRet', new Date(Date.parse(r.dataset.day) + 7 * 864e5).toISOString().slice(0, 10));
+      $('#searchForm').requestSubmit();
+    }));
+  } catch { box.hidden = true; }
+}
+
 /* ---- date strip ---- */
 async function loadDateStrip(origin, destination, selectedDate) {
+  renderDepGraph(origin, destination);
   try {
     const { dates } = await api(`/api/routes/${origin}-${destination}/cheapest-dates?days=90`);
     if (!dates.length) { $('#dateStripSec').hidden = true; return; }
@@ -1529,7 +1680,7 @@ $('#searchForm').addEventListener('submit', async (ev) => {
     const answered = tried.filter(a => a.ok).length;
     const srcLine = tried.length > 1 ? ` · נבדקו ${tried.length} מקורות, ${answered} ענו` : ` · מקור ${esc(data.provider)}`;
     $('#resultsTitle').innerHTML = `תוצאות <span class="ltr">${p.get('origin')} → ${p.get('destination')}</span> <span class="muted">(${data.count} טיסות${srcLine})</span>`;
-    renderAirlineChips(); renderFlights();
+    initPriceSlider(); renderAirlineChips(); renderFlights();
     $('#resultsSec').hidden = false;
     $('#routeInput').value = `${p.get('origin')}-${p.get('destination')}`;
     loadDateStrip(p.get('origin'), p.get('destination'), p.get('departureDate'));
@@ -1577,7 +1728,7 @@ function renderAiReport(r) {
   flights = r.top || [];
   activeAirlines.clear();
   $('#resultsTitle').innerHTML = `תוצאות הסריקה הגלובלית <span class="muted">(${r.totalQueries} מסלולים נבדקו · ${r.totalResults} מחירים · ${(r.elapsedMs/1000).toFixed(0)} שנ׳)</span>`;
-  renderAirlineChips(); renderFlights();
+  initPriceSlider(); renderAirlineChips(); renderFlights();
   $('#resultsSec').hidden = false;
   if (r.recommendations?.length) {
     $('#recsBox').innerHTML = r.recommendations.map(x => `<div class="card" style="padding:10px 14px; margin-top:8px"><span class="muted">${esc(x)}</span></div>`).join('');

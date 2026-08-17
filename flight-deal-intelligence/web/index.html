@@ -734,6 +734,7 @@
     <div id="priceLevel" style="margin-bottom:10px"></div>
     <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" id="findBetterBtn" hidden>מצא מחיר טוב יותר — בדיקת תאריכים סמוכים</button>
+      <button class="btn btn-ghost btn-sm" id="smartCompareBtn" hidden>השוואה חכמה — הזולה מול הדיל מול המהירה</button>
     </div>
     <div id="betterBox"></div>
     <div class="sorttabs" role="tablist" aria-label="מיון">
@@ -1720,6 +1721,7 @@ $('#searchForm').addEventListener('submit', async (ev) => {
       pax: p.get('adults'), cabin: p.get('cabin'),
     };
     $('#findBetterBtn').hidden = false;
+    $('#smartCompareBtn').hidden = data.count < 2;
     $('#betterBox').innerHTML = '';
     // shareable URL: the search state lives in the address bar
     const urlP = new URLSearchParams({ from: lastSearch.origin, to: lastSearch.dest, dep: lastSearch.dep, pax: lastSearch.pax, cabin: lastSearch.cabin });
@@ -1855,18 +1857,50 @@ function toggleCompare(f) {
   renderFlights();
 }
 $('#compareClear').addEventListener('click', () => { compareSet.clear(); $('#compareBar').classList.remove('on'); renderFlights(); });
-$('#compareGo').addEventListener('click', () => {
-  const fs = [...compareSet.values()];
-  if (fs.length < 2) { toast('בחרו לפחות 2 טיסות להשוואה', 'err'); return; }
+/**
+ * Bottom-line pick: weighted balance of price (40%), deal score (25%),
+ * duration (20%) and stops (15%), each normalized within the compared set.
+ */
+function compareVerdict(fs) {
+  const minP = Math.min(...fs.map(f => f.normalizedPrice));
+  const maxP = Math.max(...fs.map(f => f.normalizedPrice));
+  const minD = Math.min(...fs.map(f => f.durationMinutes || 1e9));
+  const maxD = Math.max(...fs.map(f => f.durationMinutes || 1e9));
+  const norm = (v, lo, hi) => hi === lo ? 1 : 1 - (v - lo) / (hi - lo);
+  let best = null, bestScore = -1;
+  for (const f of fs) {
+    const s = norm(f.normalizedPrice, minP, maxP) * 0.4
+      + ((f.analysis?.dealScore ?? 50) / 100) * 0.25
+      + norm(f.durationMinutes || maxD, minD, maxD) * 0.2
+      + (f.stops === 0 ? 1 : f.stops === 1 ? 0.5 : 0) * 0.15;
+    if (s > bestScore) { bestScore = s; best = f; }
+  }
+  const reasons = [];
+  if (best.normalizedPrice === minP) reasons.push('הזולה מבין השלוש');
+  else reasons.push(`+${fmt(best.normalizedPrice - minP)} מהזולה`);
+  if (best.stops === 0) reasons.push('ישירה');
+  if ((best.durationMinutes || 1e9) === minD) reasons.push('הקצרה ביותר');
+  if ((best.analysis?.dealScore ?? 0) === Math.max(...fs.map(f => f.analysis?.dealScore ?? 0))) reasons.push('ציון העסקה הגבוה');
+  return { best, reasons };
+}
+
+function renderCompare(fs) {
   const minPrice = Math.min(...fs.map(f => f.normalizedPrice));
   const maxScore = Math.max(...fs.map(f => f.analysis?.dealScore ?? 0));
   const minDur = Math.min(...fs.map(f => f.durationMinutes || 1e9));
   const minStops = Math.min(...fs.map(f => f.stops));
+  const v = compareVerdict(fs);
   const row = (label, cells) => `<tr><td>${label}</td>${cells.join('')}</tr>`;
   const td = (html, win) => `<td class="${win ? 'win' : ''}">${html}</td>`;
-  $('#compareBody').innerHTML = `<table class="cmp">
-    ${row('', fs.map(f => `<td class="colhead">${esc(f.airlineName || f.airline)}<br><span class="muted ltr">${esc(f.flightNumber || '')}</span></td>`))}
-    ${row('מחיר', fs.map(f => td(`<span class="cmp-price num">${fmt(f.normalizedPrice, f.normalizedCurrency)}</span>${f.normalizedPrice > minPrice ? `<br><span class="muted num">+${fmt(f.normalizedPrice - minPrice)}</span>` : '<br><span class="muted">הזול ביותר</span>'}`, f.normalizedPrice === minPrice)))}
+  $('#compareBody').innerHTML = `
+    <div class="card" style="padding:10px 14px; margin-bottom:10px; border-inline-start:4px solid var(--primary)">
+      <b>השורה התחתונה:</b> ${esc(v.best.airlineName || v.best.airline)} <span class="ltr">${esc(v.best.flightNumber || '')}</span>
+      ב-<b class="num">${fmt(v.best.normalizedPrice, v.best.normalizedCurrency)}</b> — האיזון הטוב ביותר (${v.reasons.slice(0, 3).join(' · ')}).
+      <span class="muted">הערכת מערכת לפי מחיר, ציון עסקה, משך ועצירות.</span>
+    </div>
+    <table class="cmp">
+    ${row('', fs.map(f => `<td class="colhead">${esc(f.airlineName || f.airline)}<br><span class="muted ltr">${esc(f.flightNumber || '')}</span>${f === v.best ? '<br><span class="badge badge-success">הבחירה המומלצת</span>' : ''}</td>`))}
+    ${row('מחיר', fs.map((f, i) => td(`<span class="cmp-price num" data-cmpprice="${i}">${fmt(f.normalizedPrice, f.normalizedCurrency)}</span>${f.normalizedPrice > minPrice ? `<br><span class="muted num">+${fmt(f.normalizedPrice - minPrice)}</span>` : '<br><span class="muted">הזול ביותר</span>'}`, f.normalizedPrice === minPrice)))}
     ${row('ציון עסקה', fs.map(f => td(f.analysis ? `${f.analysis.dealScore}/100` : '—', (f.analysis?.dealScore ?? -1) === maxScore)))}
     ${row('עצירות', fs.map(f => td(f.stops === 0 ? 'ישירה' : f.stops, f.stops === minStops)))}
     ${row('משך', fs.map(f => td(durTxt(f.durationMinutes), (f.durationMinutes || 1e9) === minDur)))}
@@ -1874,10 +1908,54 @@ $('#compareGo').addEventListener('click', () => {
     ${row('מול הממוצע', fs.map(f => `<td>${f.analysis?.vsAverage != null ? Math.round(f.analysis.vsAverage * -100) + '% מתחת' : '—'}</td>`))}
     ${row('אמון מחיר', fs.map(f => `<td>${f.priceConfidence ?? '—'}</td>`))}
     ${row('מקורות', fs.map(f => `<td>${f.consensus?.sourceCount ?? 1}</td>`))}
+    ${row('בדיקה חיה', fs.map((f, i) => `<td><button class="btn btn-ghost btn-sm" data-cmpverify="${i}">בדוק מחיר</button><div class="muted" data-cmpstatus="${i}"></div></td>`))}
     ${row('', fs.map(f => `<td><a class="btn btn-primary btn-sm" href="${esc(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה</a></td>`))}
   </table>`;
+  $$('#compareBody [data-cmpverify]').forEach(b => b.addEventListener('click', async () => {
+    const i = Number(b.dataset.cmpverify);
+    const f = fs[i];
+    b.disabled = true; b.textContent = 'בודק…';
+    const st = document.querySelector(`[data-cmpstatus="${i}"]`);
+    try {
+      const r = await api('/api/flights/verify', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origin: f.origin, destination: f.destination, departureDate: f.departureDate,
+          returnDate: f.returnDate ?? undefined, airline: f.airline,
+          flightNumber: f.flightNumber || undefined, expectedPrice: f.normalizedPrice,
+        }),
+      });
+      if (!r.available) { st.textContent = 'לא נמצאה בבדיקה טרייה'; }
+      else if (r.priceChanged) {
+        f.normalizedPrice = r.currentPrice;
+        document.querySelector(`[data-cmpprice="${i}"]`).textContent = fmt(r.currentPrice, r.currency);
+        st.innerHTML = `<span style="color:var(--warning-ink)">המחיר עודכן</span>`;
+      } else { st.innerHTML = `<span style="color:var(--success-ink)">אומת עכשיו</span>`; }
+      b.textContent = 'נבדק';
+    } catch { b.disabled = false; b.textContent = 'בדוק מחיר'; toast('האימות נכשל', 'err'); }
+  }));
   $('#compareDialog').showModal();
+}
+
+$('#compareGo').addEventListener('click', () => {
+  const fs = [...compareSet.values()];
+  if (fs.length < 2) { toast('בחרו לפחות 2 טיסות להשוואה', 'err'); return; }
+  renderCompare(fs);
 });
+
+/* Smart compare: auto-pick the cheapest, best-deal and fastest candidates. */
+function smartCompare() {
+  if (flights.length < 2) return;
+  const picks = new Map();
+  const add = (f) => { if (f && picks.size < 3) picks.set(flightKey(f), f); };
+  add([...flights].sort((a, b) => a.normalizedPrice - b.normalizedPrice)[0]);
+  add([...flights].sort((a, b) => (b.analysis?.dealScore ?? 0) - (a.analysis?.dealScore ?? 0)).find(f => !picks.has(flightKey(f))));
+  add([...flights].sort((a, b) => (a.durationMinutes || 1e9) - (b.durationMinutes || 1e9)).find(f => !picks.has(flightKey(f))));
+  add([...flights].sort((a, b) => b.valueScore - a.valueScore).find(f => !picks.has(flightKey(f))));
+  if (picks.size < 2) { toast('אין מספיק טיסות שונות להשוואה', 'err'); return; }
+  renderCompare([...picks.values()]);
+}
+$('#smartCompareBtn').addEventListener('click', smartCompare);
 
 /* ---- cheapest month strip ---- */
 async function loadMonthStrip(origin, destination) {

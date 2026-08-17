@@ -666,8 +666,18 @@ function flightRow(f) {
       <span class="pr num ${isCheap ? 'cheap' : ''}">${fmt(f.normalizedPrice, f.normalizedCurrency)}</span>
       <span class="per">נבדק לפני ${f.freshnessMinutes ?? '?'} דק׳ · ${esc(f.provider)}</span>
       <a class="book-btn" href="${esc(f.bookingUrl)}" target="_blank" rel="noopener">להזמנה ↗</a>
-      <div class="linkrow">
-        <a href="${esc(f.deepLink)}" target="_blank" rel="noopener">השוואה נוספת</a>
+      <div class="linkrow" style="flex-wrap:wrap">
+        ${(() => {
+          const r = { origin: f.origin, destination: f.destination, departureDate: f.departureDate, returnDate: f.returnDate };
+          const dep = r.departureDate, ret = r.returnDate ? '/' + r.returnDate : '';
+          const d6 = dep.replaceAll('-', '').slice(2), r6 = r.returnDate ? '/' + r.returnDate.replaceAll('-', '').slice(2) : '';
+          return [
+            ['Kayak', `https://www.kayak.com/flights/${r.origin}-${r.destination}/${dep}${ret}`],
+            ['Momondo', `https://www.momondo.com/flight-search/${r.origin}-${r.destination}/${dep}${ret}`],
+            ['Skyscanner', `https://www.skyscanner.com/transport/flights/${r.origin.toLowerCase()}/${r.destination.toLowerCase()}/${d6}${r6}/`],
+            ['Kiwi', `https://www.kiwi.com/en/search/results/${r.origin.toLowerCase()}/${r.destination.toLowerCase()}/${dep}${r.returnDate ? '/' + r.returnDate : '/no-return'}`],
+          ].map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${n} ↗</a>`).join('');
+        })()}
       </div>
       <button class="track" onclick='track(${JSON.stringify(f.origin)},${JSON.stringify(f.destination)},${JSON.stringify(f.departureDate)},${JSON.stringify(f.returnDate ?? null)})'>🔔 עקוב אחרי המסלול</button>
     </div>

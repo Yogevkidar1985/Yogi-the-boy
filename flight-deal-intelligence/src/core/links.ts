@@ -28,10 +28,22 @@ export function skyscannerUrl(q: { origin: string; destination: string; departur
   return `https://www.skyscanner.com/transport/flights/${q.origin.toLowerCase()}/${q.destination.toLowerCase()}/${d}${r}/`;
 }
 
+export function kayakUrl(q: { origin: string; destination: string; departureDate: string; returnDate?: string }): string {
+  const base = `https://www.kayak.com/flights/${q.origin}-${q.destination}/${q.departureDate}`;
+  return q.returnDate ? `${base}/${q.returnDate}` : base;
+}
+
+export function momondoUrl(q: { origin: string; destination: string; departureDate: string; returnDate?: string }): string {
+  const base = `https://www.momondo.com/flight-search/${q.origin}-${q.destination}/${q.departureDate}`;
+  return q.returnDate ? `${base}/${q.returnDate}` : base;
+}
+
 export function bookingLinks(q: SearchQuery | { origin: string; destination: string; departureDate: string; returnDate?: string }) {
   return {
     googleFlights: googleFlightsUrl(q),
     kiwi: kiwiUrl(q),
     skyscanner: skyscannerUrl(q),
+    kayak: kayakUrl(q),
+    momondo: momondoUrl(q),
   };
 }

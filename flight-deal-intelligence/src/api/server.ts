@@ -709,6 +709,22 @@ app.get('/api/deals', (req, res) => {
     const s = stats.get(route)!;
     const price = r.normalized_price as number;
     const freshness = Math.round((Date.now() - Date.parse(String(r.collected_at))) / 60000);
+    // when this route+date was first observed — the only honest basis for a
+    // "new deal" badge (a price re-checked today is not a new deal)
+    const seen = db.db
+      .prepare(
+        `SELECT MIN(collected_at) AS first_seen FROM price_snapshots
+         WHERE route = ? AND departure_date = ?`
+      )
+      .get(route, String(r.departure_date)) as { first_seen: string | null };
+    const firstSeenMinutes = (() => {
+      if (!seen.first_seen) return null;
+      // timestamps arrive either as ISO with Z or as SQLite "YYYY-MM-DD HH:MM:SS"
+      const t = Date.parse(
+        /[TZ]/.test(seen.first_seen) ? seen.first_seen : seen.first_seen.replace(' ', 'T') + 'Z'
+      );
+      return Number.isFinite(t) ? Math.round((Date.now() - t) / 60000) : null;
+    })();
     // real previous price for THIS route+date — a savings claim needs evidence (§6)
     const prev = db.previousLowForDate(route, String(r.departure_date), 30);
     const dropPct = prev && prev > price ? Math.round(((prev - price) / prev) * 100) : 0;
@@ -720,7 +736,9 @@ app.get('/api/deals', (req, res) => {
       freshness_minutes: freshness,
       prev_price: prev,
       drop_pct: dropPct,
-      is_new: foundMinutes >= 0 && foundMinutes <= 45,
+      first_seen_minutes: firstSeenMinutes,
+      // genuinely new = first observed within the last 24h, not merely re-scored
+      is_new: firstSeenMinutes !== null && firstSeenMinutes <= 1440,
       // honesty status: a stale observation is a "last seen price", not a live one
       price_status: freshness <= 15 ? 'VERIFIED_RECENT' : freshness <= 90 ? 'RECENT' : 'STALE',
     };

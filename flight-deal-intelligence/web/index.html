@@ -1437,6 +1437,8 @@ let flights = [];
 let renderedList = [];
 let currentSort = 'best';
 let savedKeys = new Set();
+/** route|departureDate of every saved watch — powers the deal-card heart. */
+let savedRoutes = new Set();
 
 function flightKey(f) { return [f.origin, f.destination, f.departureDate, f.airline, f.flightNumber].join('|'); }
 
@@ -2455,19 +2457,43 @@ async function loadDeals() {
     const stale = d.price_status === 'STALE';
     const prevShown = d.prev_price && d.prev_price > d.normalized_price ? d.prev_price : (d.savings > 0 ? d.typical_price : null);
     return `<div class="card dealcard ${stale ? 'stale' : ''}">
-    <span class="dest"><span class="ltr">${esc(d.origin)} → ${esc(d.destination)}</span>
-      ${d.is_new && !stale ? '<span class="badge badge-info">חדש על הלוח</span>' : ''}</span>
+    <span class="dest" style="display:flex; align-items:center; gap:8px">
+      <span class="ltr grow" style="flex:1">${esc(d.origin)} → ${esc(d.destination)}</span>
+      ${d.is_new && !stale ? '<span class="badge badge-info">דיל חדש</span>' : ''}
+      <button class="heart ${savedRoutes.has(d.route + '|' + d.departure_date) ? 'saved' : ''}"
+        data-dsave="${i}" style="width:32px; height:32px"
+        title="שמירת הדיל — נמשיך לחפש עבורך אפשרויות דומות וזולות יותר"
+        aria-label="שמירת הדיל למעקב">${icon('heart', 15)}</button>
+    </span>
     <span class="pr num">${fmt(d.normalized_price, d.normalized_currency)}${prevShown ? `<span class="old num">${fmt(prevShown, d.normalized_currency)}</span>` : ''}</span>
     <span>${st ? `<span class="badge ${st[1]}">${st[0]} · ${Math.round(d.score)}</span>` : ''}
       ${d.drop_pct > 0 ? `<span class="badge badge-success">ירידה של ${d.drop_pct}%</span>` : d.savings > 0 ? `<span class="badge badge-success">חיסכון ${fmt(d.savings, d.normalized_currency)}</span>` : ''}</span>
-    <span class="muted">${esc(d.airline_name || d.airline)} · ${d.stops === 0 ? 'ישירה' : d.stops + ' עצירות'} · <span class="ltr">${esc(d.departure_date)}</span></span>
+    <span class="muted">${esc(d.airline_name || d.airline)} · ${d.stops === 0 ? 'ישירה' : d.stops + ' עצירות'} · <span class="ltr">${esc(d.departure_date)}</span>${
+      d.first_seen_minutes != null && d.first_seen_minutes > 1440
+        ? ` · נמצא לראשונה לפני ${Math.round(d.first_seen_minutes / 1440)} ימים` : ''}</span>
     <span style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
       <a href="${safeUrl(d.booking_url)}" target="_blank" rel="noopener">להזמנה</a>
       <button class="btn btn-ghost btn-sm" data-dverify="${i}">בדוק מחיר</button>
+      <button class="btn btn-ghost btn-sm" data-dmore="${i}">מצא עוד כאלה</button>
       <button class="btn btn-ghost btn-sm cmpbtn" data-dcmp="${i}" aria-pressed="${dealCompare.has(i)}">השווה</button>
     </span>
     <span data-dfresh="${i}">${freshnessLabel(d)}</span>
   </div>`; }).join('');
+  // heart a deal: it becomes a watch, and the worker keeps hunting around it
+  $$('#deals [data-dsave]').forEach(b => b.addEventListener('click', () => {
+    openWatchDialog(dealAsFlight(lastDeals[Number(b.dataset.dsave)]));
+  }));
+  // "find more like this": search the same route/date to surface alternatives
+  $$('#deals [data-dmore]').forEach(b => b.addEventListener('click', () => {
+    const d = lastDeals[Number(b.dataset.dmore)];
+    $('#fOrigin').value = d.origin; $('#fOrigin').dataset.code = d.origin;
+    $('#fDest').value = d.destination; $('#fDest').dataset.code = d.destination;
+    setDate('fDep', d.departure_date);
+    if (d.return_date) setDate('fRet', d.return_date);
+    else { tripType = 'oneway'; $('#fRet').value = ''; delete $('#fRet').dataset.iso; }
+    $('#searchForm').requestSubmit();
+    toast('מחפש אפשרויות נוספות במסלול ובתאריך של הדיל');
+  }));
   // cross-route deal comparison: pick 2-3 deals from the live board
   $$('#deals [data-dcmp]').forEach(b => b.addEventListener('click', () => {
     const i = Number(b.dataset.dcmp);
@@ -2586,9 +2612,10 @@ $('#watchForm').addEventListener('submit', async (ev) => {
       }),
     });
     savedKeys.add(flightKey(f));
+    savedRoutes.add(`${f.origin}-${f.destination}|${f.departureDate}`);
     $('#watchDialog').close();
-    renderFlights(); loadWatches(); loadAlerts(); loadMonitors();
-    toast('הטיסה נשמרה. כשהמחיר יירד מתחת ליעד — תישלח התראה לטלגרם.');
+    renderFlights(); loadWatches(); loadAlerts(); loadMonitors(); loadDeals();
+    toast('נשמר. נמשיך לחפש עבורך אפשרויות דומות וזולות יותר.');
   } catch { toast('השמירה נכשלה', 'err'); }
 });
 
@@ -2627,6 +2654,7 @@ async function loadWatches() {
       </div>`;
     }).join('');
     savedKeys = new Set(watches.map(w => [w.origin, w.destination, w.departureDate, w.airline, w.flightNumber].join('|')));
+    savedRoutes = new Set(watches.map(w => `${w.route}|${w.departureDate}`));
     $$('#watchGrid [data-wdel]').forEach(b => b.addEventListener('click', async () => {
       await api('/api/watches/' + b.dataset.wdel, { method: 'DELETE' });
       loadWatches(); loadAlerts(); loadMonitors();

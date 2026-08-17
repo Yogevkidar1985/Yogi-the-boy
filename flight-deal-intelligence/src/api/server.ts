@@ -17,6 +17,7 @@ import { searchCities, resolveAirport, cityForCode } from '../core/cities.js';
 import { routeKey } from '../core/types.js';
 import { currencyService } from '../core/currency.js';
 import { bookingLinks } from '../core/links.js';
+import { bus, liveState } from '../core/bus.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const db = getDatabase();
@@ -543,6 +544,19 @@ app.post('/api/alerts/test', async (_req, res) => {
 
 // ---- deals dashboard feed (§41) ------------------------------------------
 
+/** Real engine status for the live header — never a fake clock (§12, §37). */
+app.get('/api/live-status', (_req, res) => {
+  res.json({
+    workerEnabled: process.env.RUN_WORKER === '1',
+    active: liveState.lastTickAt !== null,
+    lastTickAt: liveState.lastTickAt,
+    nextTickAt: liveState.nextTickAt,
+    lastRefreshAt: liveState.lastRefreshAt,
+    refreshMinutes: Number(process.env.DEAL_REFRESH_MINUTES ?? 10),
+    stats: db.liveStats(),
+  });
+});
+
 app.get('/api/deals', (req, res) => {
   const limit = Math.min(50, Number(req.query.limit ?? 20));
   // one card per route+departure date: the best-scoring most recent offer (§41)
@@ -569,13 +583,28 @@ app.get('/api/deals', (req, res) => {
     if (!stats.has(route)) stats.set(route, analysis.routeStatistics(route));
     const s = stats.get(route)!;
     const price = r.normalized_price as number;
+    const freshness = Math.round((Date.now() - Date.parse(String(r.collected_at))) / 60000);
+    // real previous price for THIS route+date — a savings claim needs evidence (§6)
+    const prev = db.previousLowForDate(route, String(r.departure_date), 30);
+    const dropPct = prev && prev > price ? Math.round(((prev - price) / prev) * 100) : 0;
+    const foundMinutes = Math.round((Date.now() - Date.parse(String(r.computed_at).replace(' ', 'T') + 'Z')) / 60000);
     return {
       ...r,
       typical_price: s?.average ?? null,
       savings: s ? Math.round((s.average - price) * 100) / 100 : null,
-      freshness_minutes: Math.round((Date.now() - Date.parse(String(r.collected_at))) / 60000),
+      freshness_minutes: freshness,
+      prev_price: prev,
+      drop_pct: dropPct,
+      is_new: foundMinutes >= 0 && foundMinutes <= 45,
+      // honesty status: a stale observation is a "last seen price", not a live one
+      price_status: freshness <= 15 ? 'VERIFIED_RECENT' : freshness <= 90 ? 'RECENT' : 'STALE',
     };
   });
+  const sort = String(req.query.sort ?? 'score');
+  const price = (d: (typeof deals)[number]) => Number((d as Record<string, unknown>).normalized_price);
+  if (sort === 'price') deals.sort((a, b) => price(a) - price(b));
+  else if (sort === 'drop') deals.sort((a, b) => b.drop_pct - a.drop_pct);
+  else if (sort === 'new') deals.sort((a, b) => a.freshness_minutes - b.freshness_minutes);
   res.json(deals);
 });
 
@@ -702,6 +731,9 @@ export function broadcast(event: string, data: unknown): void {
     client.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   }
 }
+
+// worker → UI live updates (same-process deployments, RUN_WORKER=1)
+bus.on('deals', () => broadcast('deals', { at: new Date().toISOString() }));
 
 // entrypoint
 if (import.meta.url === `file://${process.argv[1]}`) {

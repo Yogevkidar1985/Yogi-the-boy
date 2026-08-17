@@ -13,6 +13,13 @@ import { AlertEngine, evaluateRules, type TriggeredAlert } from '../alerts/engin
 import { rankSimilar, type FlightDna } from '../analyzer/similarity.js';
 import { routeKey, type SavedSearch, type ScoredFlight, type WatchedFlight } from '../core/types.js';
 import { currencyService } from '../core/currency.js';
+import { bus, liveState } from '../core/bus.js';
+import { buildQuery } from '../agent/agent.js';
+
+/** How often the top deals on the board are re-checked against live sources. */
+const DEAL_REFRESH_MINUTES = Number(process.env.DEAL_REFRESH_MINUTES ?? 10);
+/** How many board deals are revalidated per refresh cycle (quota-friendly). */
+const DEAL_REFRESH_ROUTES = Number(process.env.DEAL_REFRESH_ROUTES ?? 5);
 
 /** Similar-deal alerts: at most one per watch per this many hours. */
 const SIMILAR_ALERT_COOLDOWN_H = Number(process.env.SIMILAR_ALERT_COOLDOWN_HOURS ?? 24);
@@ -84,10 +91,62 @@ export class MonitorWorker {
     console.log(`[worker] deal scan complete: ${dests.length} routes refreshed`);
   }
 
+  /**
+   * Live board revalidation: the freshest-scored top deals whose price is
+   * older than the refresh window get a fresh, cache-free re-check. Price
+   * drops become deal events; every cycle notifies the UI over SSE.
+   */
+  private lastRefreshAt = 0;
+  private async refreshTopDeals(): Promise<void> {
+    if (Date.now() - this.lastRefreshAt < DEAL_REFRESH_MINUTES * 60_000) return;
+    this.lastRefreshAt = Date.now();
+    const rows = this.db.db
+      .prepare(
+        `SELECT ds.route, fr.departure_date AS dep, fr.return_date AS ret, MAX(fr.collected_at) AS seen
+         FROM deal_scores ds JOIN flight_results fr ON fr.id = ds.flight_result_id
+         WHERE ds.computed_at >= datetime('now', '-2 days')
+         GROUP BY ds.route, fr.departure_date
+         HAVING seen < datetime('now', ?)
+         ORDER BY MAX(ds.score) DESC LIMIT ?`
+      )
+      .all(`-${DEAL_REFRESH_MINUTES} minutes`, DEAL_REFRESH_ROUTES) as { route: string; dep: string; ret: string | null }[];
+    let changed = false;
+    for (const r of rows) {
+      const [origin, destination] = r.route.split('-');
+      if (!origin || !destination) continue;
+      try {
+        const prevLow = this.db.previousLowForDate(r.route, r.dep, 5);
+        const outcome = await this.registry.search(
+          buildQuery({ origin, destination, departureDate: r.dep, returnDate: r.ret ?? undefined }),
+          { fresh: true }
+        );
+        const scored = this.analysis.analyze(outcome.results);
+        changed = true;
+        if (scored.length) {
+          const newLow = Math.min(...scored.map((s) => s.normalizedPrice));
+          if (prevLow && newLow < prevLow * 0.95) {
+            this.db.recordDealEvent({
+              kind: 'PRICE_DROP', route: r.route, departureDate: r.dep,
+              prevPrice: prevLow, newPrice: newLow,
+              dropPct: Math.round(((prevLow - newLow) / prevLow) * 100),
+            });
+          }
+        } else {
+          this.db.recordDealEvent({ kind: 'PRICE_EXPIRED', route: r.route, departureDate: r.dep });
+        }
+      } catch (err) {
+        this.db.logEvent('warn', 'deal_refresh_failed', { route: r.route, error: String(err) });
+      }
+    }
+    liveState.lastRefreshAt = new Date().toISOString();
+    if (changed) bus.emit('deals');
+  }
+
   /** Run every saved search whose interval has elapsed. */
   async tick(): Promise<{ ran: number; alertsSent: number }> {
     await currencyService.refresh();
     await this.dealScan();
+    await this.refreshTopDeals();
     let ran = 0;
     let alertsSent = 0;
     for (const search of this.db.listSavedSearches()) {
@@ -230,8 +289,13 @@ export class MonitorWorker {
   start(pollSeconds = 60): void {
     console.log(`[worker] monitoring loop started (poll every ${pollSeconds}s)`);
     const loop = async () => {
+      liveState.lastTickAt = new Date().toISOString();
+      liveState.nextTickAt = new Date(Date.now() + pollSeconds * 1000).toISOString();
       const { ran, alertsSent } = await this.tick();
-      if (ran > 0) console.log(`[worker] ran ${ran} searches, sent ${alertsSent} alerts`);
+      if (ran > 0) {
+        console.log(`[worker] ran ${ran} searches, sent ${alertsSent} alerts`);
+        bus.emit('deals');
+      }
     };
     void loop();
     this.timer = setInterval(() => void loop(), pollSeconds * 1000);

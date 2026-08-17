@@ -230,6 +230,18 @@ CREATE TABLE IF NOT EXISTS provider_route_stats (
   PRIMARY KEY (provider, route)
 );
 
+CREATE TABLE IF NOT EXISTS deal_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  route TEXT NOT NULL,
+  departure_date TEXT,
+  prev_price REAL,
+  new_price REAL,
+  drop_pct REAL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_deal_events_created ON deal_events(created_at);
+
 CREATE TABLE IF NOT EXISTS search_sessions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,
@@ -706,6 +718,50 @@ export class FlightDatabase {
       resultsSum: r.results_sum as number,
       lowestPrice: (r.lowest_price as number) ?? null,
     }));
+  }
+
+  // ---- live deal events (price drops, new deals) --------------------------
+
+  recordDealEvent(e: {
+    kind: 'PRICE_DROP' | 'NEW_DEAL' | 'PRICE_EXPIRED';
+    route: string;
+    departureDate?: string;
+    prevPrice?: number | null;
+    newPrice?: number | null;
+    dropPct?: number | null;
+  }): void {
+    this.db
+      .prepare(
+        `INSERT INTO deal_events (kind, route, departure_date, prev_price, new_price, drop_pct)
+         VALUES (?,?,?,?,?,?)`
+      )
+      .run(e.kind, e.route, e.departureDate ?? null, e.prevPrice ?? null, e.newPrice ?? null, e.dropPct ?? null);
+  }
+
+  /** Previous observed low for a route+date BEFORE the current observation window. */
+  previousLowForDate(route: string, departureDate: string, beforeMinutes = 30): number | null {
+    const row = this.db
+      .prepare(
+        `SELECT MIN(price) AS low FROM price_snapshots
+         WHERE route = ? AND departure_date = ?
+           AND collected_at < datetime('now', ?)
+           AND collected_at >= datetime('now', '-7 days')`
+      )
+      .get(route, departureDate, `-${beforeMinutes} minutes`) as { low: number | null };
+    return row.low ?? null;
+  }
+
+  liveStats(): { drops24h: number; newDeals1h: number; checked24h: number } {
+    const drops = this.db
+      .prepare(`SELECT COUNT(*) AS n FROM deal_events WHERE kind='PRICE_DROP' AND created_at >= datetime('now','-1 day')`)
+      .get() as { n: number };
+    const fresh = this.db
+      .prepare(`SELECT COUNT(DISTINCT route) AS n FROM deal_scores WHERE computed_at >= datetime('now','-1 hour')`)
+      .get() as { n: number };
+    const checked = this.db
+      .prepare(`SELECT COALESCE(SUM(total_results),0) AS n FROM search_sessions WHERE created_at >= datetime('now','-1 day')`)
+      .get() as { n: number };
+    return { drops24h: drops.n, newDeals1h: fresh.n, checked24h: checked.n };
   }
 
   // ---- meta-search KPIs ---------------------------------------------------

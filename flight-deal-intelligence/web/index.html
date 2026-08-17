@@ -136,6 +136,7 @@
     margin: 0; background: var(--page); color: var(--ink);
     font-family: var(--font-family);
     font-size: var(--fs-body); line-height: 1.55;
+    overflow-x: clip; /* mobile guard: nothing may scroll the page sideways */
   }
   h1, h2, h3, h4, button, input, select, textarea { font-family: inherit; }
   .ltr { direction: ltr; unicode-bidi: isolate; }
@@ -150,9 +151,15 @@
     border-bottom: 1px solid rgba(255,255,255,.08);
   }
   .topbar-inner {
-    max-width: 1080px; margin: 0 auto; padding: 10px 20px;
-    display: flex; align-items: center; gap: var(--sp-5);
+    max-width: 1080px; margin: 0 auto; padding: 10px 16px;
+    display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap;
   }
+  .theme-btn {
+    background: rgba(255,255,255,.1); color: var(--hero-ink); border: 1px solid rgba(255,255,255,.25);
+    border-radius: var(--radius-full); width: 34px; height: 34px; min-width: 34px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .theme-btn:hover { background: rgba(255,255,255,.2); }
   .brand { display: flex; align-items: center; gap: 10px; font-size: var(--fs-h3); font-weight: 700; }
   .brand .logo {
     width: 30px; height: 30px; border-radius: 8px; background: var(--primary);
@@ -401,8 +408,18 @@
   .linkrow a { color: var(--primary); text-decoration: none; font-weight: 600; }
   .linkrow a:hover { text-decoration: underline; }
 
-  /* deals grid */
-  .deals { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--sp-3); }
+  /* deals grid — min(100%, …) keeps cards inside narrow phone viewports */
+  .deals { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: var(--sp-3); }
+  .dealcard.stale { opacity: .68; }
+  .statsrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: var(--sp-2); margin: var(--sp-4) 0 0; }
+  .statsrow .tile { padding: var(--sp-3) var(--sp-4); text-align: center; }
+  .statsrow .v { font-size: 22px; font-weight: 800; }
+  .statsrow .k { font-size: var(--fs-caption); color: var(--ink-3); }
+  .livepill { display: inline-flex; align-items: center; gap: 7px; font-size: var(--fs-caption); color: var(--hero-ink-2); }
+  .livepill .dot { width: 8px; height: 8px; border-radius: 50%; background: #e5b567; }
+  .livepill.on .dot { background: #37d59a; animation: pulse 2.2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+  @media (prefers-reduced-motion: reduce) { .livepill.on .dot { animation: none; } }
   .dealcard { padding: var(--sp-4); display: flex; flex-direction: column; gap: 6px; transition: background var(--t-fast); }
   .dealcard:hover { background: var(--surface-2); }
   .dealcard .dest { font-weight: 700; font-size: var(--fs-h3); }
@@ -412,7 +429,7 @@
   .dealcard a:hover { text-decoration: underline; }
 
   /* watches (favorites) */
-  .watchgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--sp-3); }
+  .watchgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: var(--sp-3); }
   .watch { padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2); }
   .watch .route { font-weight: 700; font-size: var(--fs-h3); display: flex; align-items: center; gap: 8px; justify-content: space-between; }
   .watch .meta { color: var(--ink-3); font-size: var(--fs-sm); }
@@ -501,7 +518,8 @@
 
 <header class="topbar">
   <div class="topbar-inner">
-    <span class="brand"><span class="logo" id="logoIcon"></span> Flight Deal Intelligence <span class="muted" id="health" style="font-weight:400">מתחבר…</span></span>
+    <span class="brand"><span class="logo" id="logoIcon"></span> Flight Deal Intelligence</span>
+    <span class="livepill" id="livePill"><span class="dot"></span><span id="health">מתחבר…</span></span>
     <nav class="topnav" aria-label="ניווט">
       <a href="#searchTop">חיפוש</a>
       <a href="#watchesSec">טיסות שמורות</a>
@@ -511,6 +529,7 @@
     <select id="currencySel" aria-label="מטבע תצוגה" class="ltr" style="margin-inline-start:auto; background:rgba(255,255,255,.1); color:var(--hero-ink); border:1px solid rgba(255,255,255,.25); border-radius:var(--radius-full); padding:6px 12px; font-family:inherit; font-size:var(--fs-sm); cursor:pointer">
       <option value="">מטבע</option>
     </select>
+    <button id="themeBtn" class="theme-btn" type="button" aria-label="החלפת מצב תצוגה" title="מצב בהיר / כהה"></button>
     <button id="tgTopBtn" class="tg-top" type="button" style="margin-inline-start:0"><span class="dot"></span><span id="tgTopTxt">התראות טלגרם</span></button>
   </div>
 </header>
@@ -671,7 +690,20 @@
     </details>
   </section>
 
-  <h3 class="sec">עסקאות מובילות עכשיו</h3>
+  <div class="statsrow" id="statsRow" hidden>
+    <div class="card tile"><div class="v num" id="stChecked">—</div><div class="k">מחירים נבדקו ב-24 שעות</div></div>
+    <div class="card tile"><div class="v num" id="stDrops">—</div><div class="k">ירידות מחיר ב-24 שעות</div></div>
+    <div class="card tile"><div class="v num" id="stNew">—</div><div class="k">דילים רועננו בשעה האחרונה</div></div>
+    <div class="card tile"><div class="v num" id="stCycle">—</div><div class="k">מחזור רענון הדילים</div></div>
+  </div>
+
+  <h3 class="sec">הדילים על הלוח <span class="muted" id="dealsUpdated"></span></h3>
+  <div class="filters" role="group" aria-label="מיון דילים">
+    <button class="chip dsort" data-dsort="score" aria-pressed="true">הדילים הטובים ביותר</button>
+    <button class="chip dsort" data-dsort="price" aria-pressed="false">הכי זול</button>
+    <button class="chip dsort" data-dsort="drop" aria-pressed="false">ירידות המחיר הגדולות</button>
+    <button class="chip dsort" data-dsort="new" aria-pressed="false">נבדקו לאחרונה</button>
+  </div>
   <div class="deals" id="deals"><p class="muted">עוד אין עסקאות — חפשו משהו והמנוע יתחיל ללמוד מחירים.</p></div>
 
   <section id="historySec">
@@ -861,6 +893,8 @@ const ICONS = {
   external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
   clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
   down: '<polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.3 17.7-1.4 1.4"/><path d="m19.1 4.9-1.4 1.4"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
   up: '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
 };
@@ -874,6 +908,52 @@ $('#icHeartSec').innerHTML = icon('heart', 18);
 $('#icBellSec').innerHTML = icon('bell', 18);
 $('#swapBtn').innerHTML = icon('swap', 16);
 $$('.dlg-close').forEach((b) => b.innerHTML = icon('x', 18));
+
+/* ---- theme toggle: light / dark, persisted ---- */
+(() => {
+  const btn = $('#themeBtn');
+  const apply = (t) => {
+    if (t) document.documentElement.dataset.theme = t;
+    else delete document.documentElement.dataset.theme;
+    const dark = t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches);
+    btn.innerHTML = icon(dark ? 'sun' : 'moon', 16);
+    btn.title = dark ? 'מעבר למצב בהיר' : 'מעבר למצב כהה';
+  };
+  let theme = localStorage.getItem('theme') || '';
+  apply(theme);
+  btn.addEventListener('click', () => {
+    const dark = document.documentElement.dataset.theme === 'dark' ||
+      (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+    theme = dark ? 'light' : 'dark';
+    localStorage.setItem('theme', theme);
+    apply(theme);
+  });
+})();
+
+/* ---- live engine status: real timestamps, never a fake clock ---- */
+async function loadLiveStatus() {
+  try {
+    const s = await api('/api/live-status');
+    const pill = $('#livePill');
+    const t = (iso) => iso ? new Date(iso).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+    if (s.active) {
+      pill.classList.add('on');
+      $('#health').textContent = `המנוע פעיל · עדכון אחרון ${t(s.lastTickAt)} · הבא ${t(s.nextTickAt)}`;
+    } else {
+      pill.classList.remove('on');
+      $('#health').textContent = s.workerEnabled ? 'המנוע עולה…' : 'מנוע הרקע כבוי — מחירים מתעדכנים בחיפוש בלבד';
+    }
+    if (s.stats) {
+      $('#statsRow').hidden = false;
+      $('#stChecked').textContent = (s.stats.checked24h ?? 0).toLocaleString('en');
+      $('#stDrops').textContent = (s.stats.drops24h ?? 0).toLocaleString('en');
+      $('#stNew').textContent = (s.stats.newDeals1h ?? 0).toLocaleString('en');
+      $('#stCycle').textContent = `${s.refreshMinutes} דק׳`;
+    }
+  } catch { /* header stays quiet */ }
+}
+loadLiveStatus();
+setInterval(loadLiveStatus, 30000);
 
 /* ---- toasts (no alert() popups) ---- */
 function toast(msg, kind = 'ok') {
@@ -1529,21 +1609,75 @@ window.track = async (origin, destination, departureDate, returnDate) => {
   } catch { toast('הוספת המעקב נכשלה', 'err'); }
 };
 
-/* ---- deals feed ---- */
+/* ---- live deal board ---- */
+let dealSort = 'score';
+let lastDeals = [];
+$$('.dsort').forEach(b => b.addEventListener('click', () => {
+  dealSort = b.dataset.dsort;
+  $$('.dsort').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  loadDeals();
+}));
+
+function freshnessLabel(d) {
+  if (d.price_status === 'VERIFIED_RECENT') {
+    return `<span class="badge badge-success">נבדק ${d.freshness_minutes <= 1 ? 'ממש עכשיו' : 'לפני ' + d.freshness_minutes + ' דק׳'}</span>`;
+  }
+  if (d.price_status === 'RECENT') return `<span class="muted">נבדק לפני ${d.freshness_minutes} דק׳</span>`;
+  const h = Math.round(d.freshness_minutes / 60);
+  return `<span class="badge badge-neutral">מחיר אחרון שנצפה — לפני ${h >= 2 ? h + ' שעות' : d.freshness_minutes + ' דק׳'}</span>`;
+}
+
 async function loadDeals() {
-  const deals = await api('/api/deals?limit=24');
+  const deals = await api('/api/deals?limit=24&sort=' + dealSort);
   if (!deals.length) return;
-  $('#deals').innerHTML = deals.map(d => {
+  lastDeals = deals;
+  $('#dealsUpdated').textContent = `עודכן ${new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
+  $('#deals').innerHTML = deals.map((d, i) => {
     const st = dealState(Math.round(d.score));
-    return `<div class="card dealcard">
-    <span class="dest"><span class="ltr">${esc(d.origin)} → ${esc(d.destination)}</span></span>
-    <span class="pr num">${fmt(d.normalized_price, d.normalized_currency)}${d.typical_price && d.savings > 0 ? `<span class="old num">${fmt(d.typical_price, d.normalized_currency)}</span>` : ''}</span>
+    const stale = d.price_status === 'STALE';
+    const prevShown = d.prev_price && d.prev_price > d.normalized_price ? d.prev_price : (d.savings > 0 ? d.typical_price : null);
+    return `<div class="card dealcard ${stale ? 'stale' : ''}">
+    <span class="dest"><span class="ltr">${esc(d.origin)} → ${esc(d.destination)}</span>
+      ${d.is_new && !stale ? '<span class="badge badge-info">חדש על הלוח</span>' : ''}</span>
+    <span class="pr num">${fmt(d.normalized_price, d.normalized_currency)}${prevShown ? `<span class="old num">${fmt(prevShown, d.normalized_currency)}</span>` : ''}</span>
     <span>${st ? `<span class="badge ${st[1]}">${st[0]} · ${Math.round(d.score)}</span>` : ''}
-      ${d.savings > 0 ? `<span class="badge badge-success">חיסכון ${fmt(d.savings, d.normalized_currency)}</span>` : ''}</span>
+      ${d.drop_pct > 0 ? `<span class="badge badge-success">ירידה של ${d.drop_pct}%</span>` : d.savings > 0 ? `<span class="badge badge-success">חיסכון ${fmt(d.savings, d.normalized_currency)}</span>` : ''}</span>
     <span class="muted">${esc(d.airline_name || d.airline)} · ${d.stops === 0 ? 'ישירה' : d.stops + ' עצירות'} · <span class="ltr">${esc(d.departure_date)}</span></span>
-    <a href="${esc(d.booking_url)}" target="_blank" rel="noopener">להזמנה</a>
-    <span class="muted">נבדק לפני ${d.freshness_minutes} דק׳</span>
+    <span style="display:flex; gap:10px; align-items:center">
+      <a href="${esc(d.booking_url)}" target="_blank" rel="noopener">להזמנה</a>
+      <button class="btn btn-ghost btn-sm" data-dverify="${i}">בדוק מחיר</button>
+    </span>
+    <span data-dfresh="${i}">${freshnessLabel(d)}</span>
   </div>`; }).join('');
+  $$('#deals [data-dverify]').forEach(b => b.addEventListener('click', async () => {
+    const d = lastDeals[Number(b.dataset.dverify)];
+    b.disabled = true; b.textContent = 'בודק…';
+    try {
+      const r = await api('/api/flights/verify', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origin: d.origin, destination: d.destination, departureDate: d.departure_date,
+          returnDate: d.return_date || undefined, airline: d.airline || undefined,
+          expectedPrice: d.normalized_price,
+        }),
+      });
+      const fresh = document.querySelector(`[data-dfresh="${b.dataset.dverify}"]`);
+      if (!r.available) {
+        if (fresh) fresh.innerHTML = '<span class="badge badge-neutral">המחיר כבר לא זמין</span>';
+        toast('ההצעה לא נמצאה בבדיקה טרייה', 'err');
+      } else if (r.priceChanged) {
+        if (fresh) fresh.innerHTML = `<span class="badge badge-warning">המחיר השתנה: ${fmt(r.currentPrice, r.currency)} (היה ${fmt(r.expectedPrice, r.currency)})</span>`;
+        toast(`המחיר השתנה: ${fmt(r.currentPrice, r.currency)}`);
+      } else {
+        if (fresh) fresh.innerHTML = '<span class="badge badge-success">המחיר אומת עכשיו</span>';
+        toast('המחיר אומת — עדיין בתוקף');
+      }
+      b.textContent = 'נבדק';
+    } catch {
+      b.disabled = false; b.textContent = 'בדוק מחיר';
+      toast('האימות נכשל — נסו שוב', 'err');
+    }
+  }));
 }
 
 /* ---- telegram ---- */
@@ -1935,7 +2069,7 @@ function drawChart(series) {
 loadDeals(); loadMonitors(); loadAlerts(); loadWatches(); loadChart();
 try {
   const es = new EventSource('/api/events');
-  es.addEventListener('deals', () => { loadDeals(); loadMonitors(); loadAlerts(); loadWatches(); });
+  es.addEventListener('deals', () => { loadDeals(); loadMonitors(); loadAlerts(); loadWatches(); loadLiveStatus(); });
 } catch {}
 </script>
 </body>

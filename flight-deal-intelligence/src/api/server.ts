@@ -20,6 +20,7 @@ import { bookingLinks } from '../core/links.js';
 import { bus, liveState } from '../core/bus.js';
 import { providerInfo } from '../providers/config.js';
 import { ProviderStore } from '../providers/store.js';
+import { discoverMapping } from '../providers/discover.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const db = getDatabase();
@@ -924,6 +925,95 @@ app.patch('/api/admin/providers/:id', requireAdmin, (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/**
+ * Probe an engine before it is saved: make ONE real request and read the
+ * response back, so the field mapping comes from what the API actually
+ * returns instead of from guesswork. The key never leaves the server.
+ */
+const probeBody = z.object({
+  urlTemplate: z.string().url(),
+  apiKey: z.string().max(500).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+  origin: z.string().length(3).optional(),
+  destination: z.string().length(3).optional(),
+  departureDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+
+/** Refuse to point the prober at the machine it runs on or a private network. */
+function isPrivateHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, '');
+  if (h === 'localhost' || h.endsWith('.localhost') || h === '::1' || h.startsWith('fe80:') || h.startsWith('fc') || h.startsWith('fd')) return true;
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return a === 127 || a === 10 || a === 0 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31) || (a === 169 && b === 254);
+}
+
+app.post('/api/admin/providers/probe', requireAdmin, async (req, res) => {
+  const parsed = probeBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const p = parsed.data;
+  const day = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const vars: Record<string, string> = {
+    KEY: p.apiKey ?? '',
+    origin: p.origin ?? process.env.DEFAULT_ORIGIN ?? 'TLV',
+    destination: p.destination ?? 'LHR',
+    departureDate: p.departureDate ?? day,
+    returnDate: '',
+    adults: '1', children: '0', infants: '0',
+    cabin: 'ECONOMY', cabinTitle: 'Economy', cabinLower: 'economy',
+    currency: currencyService.systemCurrency,
+  };
+  const url = p.urlTemplate.replace(/\{(\w+)\}/g, (_, k: string) => encodeURIComponent(vars[k] ?? ''));
+  let target: URL;
+  try { target = new URL(url); } catch { return res.status(400).json({ error: 'כתובת לא תקינה' }); }
+  // self-hosted setups may legitimately run an engine on the same network, over
+  // plain http; both have to be opted into explicitly, never assumed
+  const localAllowed = process.env.ALLOW_PRIVATE_PROBE === '1';
+  if (isPrivateHost(target.hostname) && !localAllowed) {
+    return res.status(400).json({ error: 'לא ניתן לבדוק כתובות ברשת פנימית' });
+  }
+  if (target.protocol !== 'https:' && !localAllowed) {
+    return res.status(400).json({ error: 'נדרשת כתובת https — מפתח API לא נשלח בחיבור לא מוצפן' });
+  }
+
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  for (const [k, v] of Object.entries(p.headers ?? {})) headers[k] = v.replace(/\{KEY\}/g, p.apiKey ?? '');
+
+  const started = Date.now();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 25000);
+  try {
+    const r = await fetch(url, { headers, signal: ctrl.signal });
+    const text = await r.text();
+    const latencyMs = Date.now() - started;
+    let body: unknown;
+    try { body = JSON.parse(text); } catch {
+      return res.json({
+        ok: false, httpStatus: r.status, latencyMs,
+        error: r.ok ? 'התשובה אינה JSON' : `השרת החזיר ${r.status}`,
+        bodyPreview: text.slice(0, 400),
+      });
+    }
+    if (!r.ok) {
+      return res.json({
+        ok: false, httpStatus: r.status, latencyMs,
+        error: `השרת החזיר ${r.status} — בדקו את המפתח ואת הפרמטרים`,
+        bodyPreview: JSON.stringify(body).slice(0, 400),
+      });
+    }
+    const d = discoverMapping(body);
+    res.json({ ok: true, httpStatus: r.status, latencyMs, ...d });
+  } catch (err) {
+    res.json({
+      ok: false, latencyMs: Date.now() - started,
+      error: ctrl.signal.aborted ? 'הבקשה חרגה מזמן ההמתנה' : (err instanceof Error ? err.message : String(err)),
+    });
+  } finally {
+    clearTimeout(timer);
   }
 });
 

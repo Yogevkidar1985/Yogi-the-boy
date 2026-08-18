@@ -140,9 +140,13 @@
       <p class="muted" style="margin-top:0">כל מנוע שהמערכת יודעת לעבוד מולו. לחיצה על <b>הוסף</b>
         ממלאת את הטופס שמתחת — נשאר רק להדביק מפתח, ללחוץ <b>זיהוי אוטומטי</b> ולשמור.</p>
       <div class="row" id="catFilter" role="group" aria-label="סינון קטלוג">
-        <button class="btn btn-g on" data-cat="all">הכל</button>
-        <button class="btn btn-g" data-cat="usable">מוכן להפעלה</button>
-        <button class="btn btn-g" data-cat="prices">מקורות מחיר בלבד</button>
+        <button class="btn btn-g on" data-cat="all">הכל <span data-n></span></button>
+        <button class="btn btn-g" data-cat="usable">מוכן להפעלה <span data-n></span></button>
+        <button class="btn btn-g" data-cat="prices">מקורות מחיר <span data-n></span></button>
+        <button class="btn btn-g" data-cat="blocked">חסום כרגע <span data-n></span></button>
+      </div>
+      <div class="field" style="margin-top:8px">
+        <input id="catSearch" placeholder="חיפוש מנוע לפי שם או ספק" aria-label="חיפוש בקטלוג">
       </div>
       <div id="catList"></div>
     </div>
@@ -283,17 +287,33 @@ const READY_HE = {
   READY:      ['מוכן — נדרש מפתח בלבד', 'b-ok'],
   NEEDS_URL:  ['נדרשת כתובת מהתיעוד', 'b-warn'],
   NEEDS_LOOKUP: ['נדרש שלב זיהוי מזהים', 'b-warn'],
+  NEEDS_OAUTH: ['נדרש אימות OAuth', 'b-warn'],
   CLOSED:     ['סגור להרשמה עצמית', 'b-err'],
   STATUS_ONLY:['סטטוס בלבד — ללא מחירים', 'b-n'],
 };
+const CAT_HE = {
+  PRICE_API: 'API מחירים', META: 'מטא-סרץ׳ / OTA', GDS: 'GDS', NDC: 'אגרגטור NDC',
+  AIRLINE: 'חברת תעופה', AWARD: 'כרטיסי נקודות', MARKETPLACE: 'חנות API', STATUS: 'סטטוס טיסות',
+};
+const BLOCKED = new Set(['CLOSED', 'NEEDS_OAUTH', 'NEEDS_LOOKUP']);
 let catalogue = [];
 let catMode = 'all';
+let catQuery = '';
+
+const catMatches = (t, mode) =>
+  mode === 'all' ? true
+  : mode === 'usable' ? (t.readiness === 'READY' || t.readiness === 'BUILT_IN')
+  : mode === 'prices' ? t.readiness !== 'STATUS_ONLY'
+  : BLOCKED.has(t.readiness);
 
 function renderCatalogue() {
-  const list = catalogue.filter((t) =>
-    catMode === 'all' ? true
-    : catMode === 'usable' ? (t.readiness === 'READY' || t.readiness === 'BUILT_IN')
-    : t.readiness !== 'STATUS_ONLY');
+  const q = catQuery.trim().toLowerCase();
+  const list = catalogue.filter((t) => catMatches(t, catMode) &&
+    (!q || `${t.label} ${t.vendor} ${t.id}`.toLowerCase().includes(q)));
+  $('#catFilter').querySelectorAll('[data-cat]').forEach((b) => {
+    b.querySelector('[data-n]').textContent =
+      `(${catalogue.filter((t) => catMatches(t, b.dataset.cat)).length})`;
+  });
   $('#catList').innerHTML = list.map((t, i) => {
     const r = READY_HE[t.readiness] || READY_HE.NEEDS_URL;
     const env = t.envVars?.length
@@ -304,7 +324,8 @@ function renderCatalogue() {
     const canFill = t.readiness !== 'BUILT_IN' && t.readiness !== 'CLOSED' && t.readiness !== 'STATUS_ONLY';
     return `<div class="cat">
       <div class="row">
-        <span class="t grow">${esc(t.label)} <span class="muted ltr">${esc(t.vendor)}</span></span>
+        <span class="t grow">${esc(t.label)} <span class="muted ltr">${esc(t.vendor)}</span>
+          <span class="badge b-n">${esc(CAT_HE[t.category] || t.category)}</span></span>
         <span class="badge ${r[1]}">${r[0]}</span>
         ${t.installed ? '<span class="badge b-ok">מותקן</span>' : ''}
       </div>
@@ -337,6 +358,7 @@ function renderCatalogue() {
   }));
 }
 
+$('#catSearch').addEventListener('input', () => { catQuery = $('#catSearch').value; renderCatalogue(); });
 $('#catFilter').querySelectorAll('[data-cat]').forEach(b => b.addEventListener('click', () => {
   catMode = b.dataset.cat;
   $('#catFilter').querySelectorAll('[data-cat]').forEach(x => x.classList.toggle('on', x === b));

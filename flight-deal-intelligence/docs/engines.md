@@ -17,78 +17,100 @@
 
 ---
 
-## קבוצה א׳ — מקורות מחירים בהרשמה עצמית (אלה שמחזירים מחירי טיסות)
+## כל המנועים בקטלוג (46)
 
-| # | מנוע | קישור להרשמה / מפתח | מה מקבלים | הטמעה |
+הרשימה נוצרת מהקוד עצמו (`npx tsx scripts/print-catalogue.ts`) ולכן תמיד מעודכנת.
+
+**משמעות המצבים:**
+
+| מצב | מה נדרש ממך |
+|---|---|
+| מתאם מובנה | משתנה סביבה ב-Render, זהו |
+| מוכן — מפתח בלבד | הוסף מהקטלוג, הדבק מפתח, זיהוי אוטומטי, שמור |
+| כתובת מהתיעוד | העתק את ה-endpoint מהספק, השאר זהה |
+| נדרש זיהוי מזהים | הספק לא מקבל קודי IATA — נדרשת תוספת קוד אצלנו |
+| נדרש OAuth | הספק דורש החלפת טוקן — נדרשת תוספת קוד אצלנו |
+| סגור | אין הרשמה עצמית; המתאם ימתין לגישה |
+| סטטוס בלבד | ללא מחירים — לא מתאים כמנוע חיפוש |
+
+| מנוע | קטגוריה | מצב | קישור להרשמה | משתני סביבה |
 |---|---|---|---|---|
-| 1 | **Travelpayouts / Aviasales** | https://www.travelpayouts.com/ | מחירים זולים במטמון | מובנה: `TRAVELPAYOUTS_TOKEN`, `TRAVELPAYOUTS_MARKER` |
-| 2 | **SerpAPI (Google Flights)** | https://serpapi.com/users/sign_up · מפתח: https://serpapi.com/manage-api-key | תוצאות Google Flights אמיתיות | מובנה: `SERPAPI_API_KEY` |
-| 3 | **Duffel** | https://app.duffel.com/join | NDC ישיר מחברות תעופה | מובנה: `DUFFEL_API_TOKEN` (טוקן `test` = נתוני דמה) |
-| 4 | **FlightAPI.io** | https://www.flightapi.io/ | מחירים מ-700+ חברות ומוכרים, 20 קריאות חינם לניסיון | מסך הניהול. כתובת: `https://api.flightapi.io/onewaytrip/{KEY}/{origin}/{destination}/{departureDate}/{adults}/{children}/{infants}/{cabinTitle}/{currency}` |
-| 5 | **Sky Scrapper (נתוני Skyscanner)** | https://rapidapi.com/apiheya/api/sky-scrapper | חיפוש טיסות בזמן אמת, ~100 קריאות חינם בחודש | מסך הניהול + כותרות RapidAPI (למטה) |
-| 6 | **Booking.com Flights** | https://rapidapi.com/ — קטגוריית Travel | חיפוש טיסות | מסך הניהול + כותרות RapidAPI |
-| 7 | **Kiwi.com (דרך RapidAPI)** | https://rapidapi.com/ — חיפוש "Kiwi" | virtual interlining, מסלולים יצירתיים | מסך הניהול + כותרות RapidAPI |
-| 8 | **Seats.aero** | https://developers.seats.aero/ | זמינות ומחירי **כרטיסי נקודות/אוורד** | מסך הניהול |
-| 9 | **Ryanair (רשמי)** | https://developer.ryanair.com/apis | מחירים וזמינות של Ryanair בלבד | מסך הניהול, ללא מפתח |
-| 10 | **Zyla API Hub / api.market** | https://zylalabs.com · https://api.market/ | חנויות API עם עשרות מנועי טיסות | מסך הניהול, מפתח אחד לכל החנות |
-
-### כותרות ל-RapidAPI (שורות 5–7)
-
-```json
-{"x-rapidapi-key":"{KEY}","x-rapidapi-host":"sky-scrapper.p.rapidapi.com"}
-```
-
-`x-rapidapi-host` משתנה לפי ה-API שבחרתם — הוא מופיע בעמוד ה-API ב-RapidAPI.
-מפתח RapidAPI אחד עובד מול **כל** ה-APIs שם, כך שאפשר להוסיף כמה מנועים עם אותו מפתח.
+| Duffel — NDC | NDC | מתאם מובנה | https://app.duffel.com/join | DUFFEL_API_TOKEN |
+| SerpAPI — Google Flights | API מחירים | מתאם מובנה | https://serpapi.com/users/sign_up | SERPAPI_API_KEY |
+| Travelpayouts / Aviasales | API מחירים | מתאם מובנה | https://www.travelpayouts.com/ | TRAVELPAYOUTS_TOKEN, TRAVELPAYOUTS_MARKER |
+| Aviasales — הכרטיסים הזולים | API מחירים | מוכן — מפתח בלבד | https://www.travelpayouts.com/ |  |
+| Aviasales — לוח מחירים חודשי | API מחירים | מוכן — מפתח בלבד | https://www.travelpayouts.com/ |  |
+| FlightAPI.io | API מחירים | מוכן — מפתח בלבד | https://www.flightapi.io/ |  |
+| Ryanair — מחירים ישירים | חברת תעופה | מוכן — מפתח בלבד | https://developer.ryanair.com/apis |  |
+| Seats.aero — כרטיסי נקודות | נקודות | מוכן — מפתח בלבד | https://seats.aero/apikey |  |
+| Air France-KLM Developer | חברת תעופה | כתובת מהתיעוד | https://developer.airfranceklm.com/ |  |
+| api.market (MagicAPI) | חנות API | כתובת מהתיעוד | https://api.market/ |  |
+| British Airways / IAG | חברת תעופה | כתובת מהתיעוד | https://developer.iairgroup.com/ |  |
+| Flights Scraper Sky | חנות API | כתובת מהתיעוד | https://rapidapi.com/ntd119/api/flights-sky |  |
+| Google Flights (RapidAPI) | חנות API | כתובת מהתיעוד | https://rapidapi.com/DataCrawler/api/google-flights2 |  |
+| Kiwi.com (דרך RapidAPI) | חנות API | כתובת מהתיעוד | https://rapidapi.com/search/kiwi |  |
+| PointsYeah — כרטיסי נקודות | נקודות | כתובת מהתיעוד | https://www.pointsyeah.com/ |  |
+| SearchApi — Google Flights | API מחירים | כתובת מהתיעוד | https://www.searchapi.io/google-flights-api |  |
+| Zyla API Hub | חנות API | כתובת מהתיעוד | https://zylalabs.com/ |  |
+| Booking.com Flights | חנות API | נדרש זיהוי מזהים | https://rapidapi.com/DataCrawler/api/booking-com15 |  |
+| Sky Scrapper (נתוני Skyscanner) | חנות API | נדרש זיהוי מזהים | https://rapidapi.com/apiheya/api/sky-scrapper |  |
+| Lufthansa Group Open API | חברת תעופה | נדרש OAuth | https://developer.lufthansa.com/ |  |
+| Sabre Dev Studio | GDS | נדרש OAuth | https://developer.sabre.com/ |  |
+| Travelport+ APIs | GDS | נדרש OAuth | https://developer.travelport.com/ |  |
+| AirGateway — NDC | NDC | סגור | https://airgateway.com/products/airgateway-api/ |  |
+| Amadeus — GDS | GDS | סגור | https://developers.amadeus.com/ | AMADEUS_CLIENT_ID, AMADEUS_CLIENT_SECRET |
+| AwardFares | נקודות | סגור | https://awardfares.com/ |  |
+| easyJet | חברת תעופה | סגור | https://www.easyjet.com/ |  |
+| eDreams ODIGEO | מטא-סרץ׳/OTA | סגור | https://www.edreamsodigeo.com/ |  |
+| Expedia Rapid / Partner | מטא-סרץ׳/OTA | סגור | https://developers.expediagroup.com/ |  |
+| Kayak Affiliate | מטא-סרץ׳/OTA | סגור | https://www.kayak.com/affiliates |  |
+| Kiwi.com Tequila | מטא-סרץ׳/OTA | סגור | https://tequila.kiwi.com/portal | KIWI_API_KEY |
+| Mystifly | NDC | סגור | https://www.mystifly.com/ |  |
+| PKFARE | NDC | סגור | https://www.pkfare.com/ |  |
+| point.me | נקודות | סגור | https://point.me/ |  |
+| Skyscanner Travel API | מטא-סרץ׳/OTA | סגור | https://www.partners.skyscanner.net/ |  |
+| TBO Air API | NDC | סגור | https://www.tboholidays.com/ |  |
+| TPConnects — NDC | NDC | סגור | https://tpconnects.com/ |  |
+| Travelfusion | NDC | סגור | https://www.travelfusion.com/ |  |
+| Trip.com Affiliate | מטא-סרץ׳/OTA | סגור | https://www.trip.com/partners/ |  |
+| Verteil — NDC | NDC | סגור | https://www.verteil.com/ |  |
+| Wego Partner API | מטא-סרץ׳/OTA | סגור | https://www.wego.com/affiliates |  |
+| Wizz Air | חברת תעופה | סגור | https://wizzair.com/ |  |
+| AeroDataBox | סטטוס | סטטוס בלבד | https://rapidapi.com/aedbx-aedbx/api/aerodatabox |  |
+| Aviationstack | סטטוס | סטטוס בלבד | https://aviationstack.com/ |  |
+| FlightAware AeroAPI | סטטוס | סטטוס בלבד | https://www.flightaware.com/commercial/aeroapi/ |  |
+| FlightLabs | סטטוס | סטטוס בלבד | https://www.goflightlabs.com/ |  |
+| Flightradar24 | סטטוס | סטטוס בלבד | https://fr24api.flightradar24.com/ | FLIGHTRADAR_API_KEY |
 
 ---
 
-## קבוצה ב׳ — מקורות סטטוס/לוחות זמנים (לא מחירים)
+## סדר עבודה מומלץ
 
-חשוב: אלה **לא** מחזירים מחירים. הם שימושיים להעשרה (מספרי טיסה, עיכובים, סוג מטוס),
-אבל אם תגדירו אותם כמנוע חיפוש הם יחזירו אפס תוצאות — כי אין בתשובה שדה מחיר.
+1. **Travelpayouts** — הרשמה חינם. טוקן אחד מפעיל 3 מנועים: המתאם המובנה,
+   "הכרטיסים הזולים" ו"לוח מחירים חודשי".
+2. **SerpAPI** — מכסה חינמית, תוצאות Google Flights אמיתיות. משתנה סביבה.
+3. **RapidAPI** — חשבון אחד, מפתח אחד, ומוסיפים ממנו 5 מנועים מהקטלוג
+   (רק `x-rapidapi-host` משתנה בין אחד לשני).
+4. **FlightAPI.io**, **Seats.aero**, **Ryanair** — כתובת כבר בקטלוג, מפתח ושמור.
+   Ryanair לא דורש מפתח בכלל.
+5. **Air France-KLM**, **Lufthansa**, **IAG** — פורטלי מפתחים עם הרשמה עצמית.
 
-| מנוע | קישור | למה משמש |
+## מה עדיין חסום — ודורש תוספת קוד, לא מפתח
+
+| חסם | מי מושפע | מה נדרש |
 |---|---|---|
-| Aviationstack | https://aviationstack.com/ | סטטוס טיסות, לוחות זמנים |
-| AeroDataBox | https://rapidapi.com/aedbx-aedbx/api/aerodatabox | לוחות זמנים, מטוסים |
-| FlightAware AeroAPI | https://www.flightaware.com/commercial/aeroapi/ | מעקב טיסות |
-| FlightLabs | https://www.goflightlabs.com/ | סטטוס, לוחות זמנים |
-| FlightRadar24 | https://fr24api.flightradar24.com/ | מעקב (מוגדר אצלנו כהעשרה: `FLIGHTRADAR_API_KEY`) |
+| זיהוי מזהים לפני חיפוש | Sky Scrapper, Booking.com | קריאה מקדימה שממירה IATA למזהה פנימי, ואז החיפוש |
+| אימות OAuth | Sabre, Travelport, Lufthansa | החלפת client id/secret בטוקן, עם רענון לפני פקיעה |
+| תאריך מתוך התשובה | Aviasales /prices/latest | מיפוי `departureDate` מהתשובה במקום חותמת התאריך שנשאל |
 
----
-
-## קבוצה ג׳ — סגורים להרשמה עצמית
-
-| מנוע | מצב (אוגוסט 2026) | קישור |
-|---|---|---|
-| **Amadeus** | Self-Service נסגר 17.7.2026; Enterprise בלבד | https://developers.amadeus.com/ |
-| **Kiwi Tequila (ישיר)** | שותפים בלבד; נדרש פרויקט עם 50,000+ MAU | https://tequila.kiwi.com/portal |
-| **Skyscanner Travel API** | שותפות מסחרית, אישור פרטני | https://www.partners.skyscanner.net/ |
-| Sabre / Travelport / Mystifly | חוזה B2B, לרוב דורש IATA/ARC | אתרי הספקים |
-
----
-
-## סדר עבודה מומלץ להיום
-
-1. **Travelpayouts** ו-**SerpAPI** — הרשמה עצמית מיידית, מכסה חינמית. משתני סביבה ב-Render.
-2. **RapidAPI** — פותחים חשבון אחד, ומוסיפים ממנו 3–5 מנועים במסך הניהול עם אותו מפתח.
-   זו הדרך המהירה ביותר להגיע ל-10 מנועים פעילים.
-3. **FlightAPI.io** ו-**Duffel** — הרשמה עצמית, מפתח לכל אחד.
-4. **Ryanair** ו-**Seats.aero** — נישתיים אבל מוסיפים כיסוי שאין למנועים הכלליים.
-
-לכל מנוע שמוסיפים: **זיהוי אוטומטי → שמירה → כפתור בדיקה** בטבלה. מנוע שהבדיקה שלו
-נכשלת לא יזיק לחיפוש (יש timeout, מפסק אוטומטי אחרי 3 כשלים, והחיפוש ממשיך בלעדיו),
-אבל גם לא יתרום — לכן שווה לוודא ירוק לכל אחד.
-
----
+שלושת אלה פותחים יחד עוד 6 מנועים. אף אחד מהם לא תלוי במפתח — זו עבודה בצד שלנו.
 
 ## מגבלות שחשוב להכיר
 
-- **מכסות חינם נגמרות מהר.** מנוע ב-100 קריאות לחודש יתרום מעט מאוד בחיפוש מקבילי.
-  קבעו לו `בקשות לדקה` נמוך, או השאירו אותו מושהה ותפעילו רק לאימות מחיר.
+- **מכסות חינם נגמרות מהר.** מנוע ב-100 קריאות לחודש יתרום מעט בחיפוש מקבילי.
+  קבעו לו `בקשות לדקה` נמוך, או השאירו מושהה ותפעילו רק לאימות מחיר.
 - **לא כל מנוע מחזיר קישור הזמנה.** בלי `bookingUrl` המערכת מייצרת קישור חיפוש כללי
   ולא מתחזה לקישור הזמנה ישיר.
 - **מטבע.** אם ה-API לא מחזיר שדה מטבע — בדקו בתיעוד באיזה מטבע הוא עובד. מחיר במטבע
   שגוי יהרוס את ההשוואה בין המנועים.
-- **scraping.** המערכת לא עוקפת הגנות בוט ולא מפרה תנאי שימוש. מנוע שדורש זאת לא ייתמך.
+- **הגנות בוט.** המערכת לא עוקפת הגנות ולא מפרה תנאי שימוש. ספק שדורש זאת מסומן כסגור.

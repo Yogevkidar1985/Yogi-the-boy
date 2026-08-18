@@ -143,6 +143,7 @@
   }
   .theme-btn:hover { background: rgba(255,255,255,.2); }
   .brand { display: flex; align-items: center; gap: 10px; font-size: var(--fs-h3); font-weight: 700; }
+  .brand-short { display: none; }
   .brand .logo {
     width: 30px; height: 30px; border-radius: 8px; background: var(--primary);
     display: inline-flex; align-items: center; justify-content: center; color: #fff;
@@ -405,6 +406,7 @@
   .statsrow .v { font-size: 22px; font-weight: 800; }
   .statsrow .k { font-size: var(--fs-caption); color: var(--ink-3); }
   .livepill { display: inline-flex; align-items: center; gap: 7px; font-size: var(--fs-caption); color: var(--hero-ink-2); }
+  .tg-ic { display: none; align-items: center; }
   .livepill .dot { width: 8px; height: 8px; border-radius: 50%; background: #e5b567; }
   .livepill.on .dot { background: #37d59a; animation: pulse 2.2s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
@@ -526,6 +528,33 @@
     #resultsSec #filterZone { display: none; } /* moves into the bottom sheet */
   }
 
+  /* ---- mobile top bar: one compact row that gets out of the way ----
+     On a narrow screen the full bar wrapped onto three rows and pinned ~150px
+     of dark chrome over the content. Here it stays a single ~52px row, hides
+     as you scroll down, and slides back the moment you scroll up. */
+  @media (max-width: 700px) {
+    .topbar { transition: transform var(--t-med, .25s) ease; will-change: transform; }
+    .topbar.hidden-bar { transform: translateY(-100%); }
+    .topbar-inner { flex-wrap: nowrap; gap: 8px; padding: 8px 12px; }
+    /* a short wordmark instead of a name clipped mid-syllable */
+    .brand { font-size: var(--fs-sm); gap: 7px; min-width: 0; white-space: nowrap; }
+    .brand-full { display: none; }
+    .brand-short { display: inline; }
+    .brand .logo { width: 26px; height: 26px; min-width: 26px; }
+    .livepill { flex-shrink: 0; }
+    .livepill #health { display: none; }  /* the dot alone carries the state */
+    #currencySel { padding: 6px 8px !important; flex-shrink: 0; }
+    .theme-btn { width: 38px; height: 38px; min-width: 38px; }
+    .tg-top { padding: 0; flex-shrink: 0; width: 38px; height: 38px; justify-content: center; }
+    .tg-top #tgTopTxt { display: none; }
+    .tg-top .tg-ic { display: inline-flex; }
+    /* the visible circles stay small; the tappable area is a full 44px */
+    .theme-btn, .tg-top { position: relative; }
+    .theme-btn::after, .tg-top::after { content: ''; position: absolute; inset: -3px; }
+  }
+  /* anchor jumps must not land underneath the sticky bar */
+  html { scroll-padding-top: 60px; }
+
   /* flight comparison */
   .comparebar {
     position: fixed; bottom: 12px; inset-inline-start: 50%; transform: translateX(50%);
@@ -574,6 +603,10 @@
 
   /* toasts */
   #toasts { position: fixed; bottom: 20px; inset-inline-start: 20px; z-index: 100; display: flex; flex-direction: column; gap: var(--sp-2); }
+  /* on a phone the bottom navigation owns the lower edge — toasts clear it */
+  @media (max-width: 700px) {
+    #toasts { bottom: calc(74px + env(safe-area-inset-bottom)); inset-inline: 12px; }
+  }
   .toast {
     background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: var(--radius-md);
     box-shadow: var(--shadow-md); padding: 12px 16px; font-size: var(--fs-sm); max-width: 340px;
@@ -596,7 +629,7 @@
 
 <header class="topbar">
   <div class="topbar-inner">
-    <span class="brand"><span class="logo" id="logoIcon"></span> Flight Deal Intelligence</span>
+    <span class="brand"><span class="logo" id="logoIcon"></span><span class="brand-full">Flight Deal Intelligence</span><span class="brand-short">Flight Deals</span></span>
     <span class="livepill" id="livePill"><span class="dot"></span><span id="health">מתחבר…</span></span>
     <nav class="topnav" aria-label="ניווט">
       <a href="#searchTop">חיפוש</a>
@@ -610,7 +643,7 @@
       <option value="">מטבע</option>
     </select>
     <button id="themeBtn" class="theme-btn" type="button" aria-label="החלפת מצב תצוגה" title="מצב בהיר / כהה"></button>
-    <button id="tgTopBtn" class="tg-top" type="button" style="margin-inline-start:0"><span class="dot"></span><span id="tgTopTxt">התראות טלגרם</span></button>
+    <button id="tgTopBtn" class="tg-top" type="button" style="margin-inline-start:0" aria-label="התראות טלגרם" title="התראות טלגרם"><span class="dot"></span><span class="tg-ic" id="tgTopIc"></span><span id="tgTopTxt">התראות טלגרם</span></button>
   </div>
 </header>
 
@@ -1122,6 +1155,7 @@ $('#bnSearch').innerHTML = icon('search', 18);
 $('#bnDeals').innerHTML = icon('down', 18);
 $('#bnSaved').innerHTML = icon('heart', 18);
 $('#bnAlerts').innerHTML = icon('bell', 18);
+$('#tgTopIc').innerHTML = icon('bell', 16);
 
 /* ---- theme toggle: light by default, dark only by explicit choice ----
    The default is LIGHT for everyone, regardless of the operating system
@@ -1143,6 +1177,30 @@ $('#bnAlerts').innerHTML = icon('bell', 18);
     localStorage.setItem('theme', next);
     apply(next);
   });
+})();
+
+/* ---- mobile: let the top bar step aside while reading ----
+   It stays put on desktop. On a phone it hides as the page scrolls down and
+   returns immediately on any upward scroll, so the header is one gesture away
+   without permanently covering the screen. */
+(() => {
+  const bar = document.querySelector('.topbar');
+  let lastY = window.scrollY;
+  let ticking = false;
+  const update = () => {
+    const y = Math.max(0, window.scrollY);
+    // ignore sub-pixel jitter and the elastic overscroll at the very top
+    if (Math.abs(y - lastY) > 6) {
+      bar.classList.toggle('hidden-bar', y > 140 && y > lastY);
+      lastY = y;
+    }
+    ticking = false;
+  };
+  addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(update); }
+  }, { passive: true });
+  // a dialog or an anchor jump should never leave the bar stuck off-screen
+  addEventListener('hashchange', () => bar.classList.remove('hidden-bar'));
 })();
 
 /* ---- live engine status: real timestamps, never a fake clock ---- */

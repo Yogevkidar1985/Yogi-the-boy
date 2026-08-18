@@ -446,6 +446,21 @@
   .benchmark .typmark { position: absolute; top: -2px; width: 2px; height: 9px; background: var(--ink-3); }
   .benchmark .labels { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-3); margin-top: 3px; }
 
+  /* ---- Budget Wall: real threshold buckets, converted with real rates ---- */
+  .budgetwall { margin-bottom: var(--sp-4); }
+  .budgetwall h3 { font-size: var(--fs-h3); font-weight: 700; margin: 0 0 var(--sp-2); }
+  .budget-tabs { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-3); }
+  .budget-tab {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 84px;
+    padding: 10px 14px; border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--surface); cursor: pointer; font-family: inherit;
+  }
+  .budget-tab .n { font-size: var(--fs-h3); font-weight: 800; }
+  .budget-tab .lbl { font-size: var(--fs-caption); color: var(--ink-2); }
+  .budget-tab[aria-pressed="true"] { border-color: var(--primary); background: var(--primary-soft); }
+  .budget-tab[disabled] { opacity: .4; cursor: default; }
+  .budgetwall .rowscroll { display: flex; gap: var(--sp-3); overflow-x: auto; padding-bottom: 4px; }
+
   #allDealsDetails { margin-top: var(--sp-4); }
   #allDealsDetails summary { cursor: pointer; font-size: var(--fs-h3); font-weight: 700; padding: var(--sp-2) 0; list-style: none; display: flex; align-items: center; gap: 8px; }
   #allDealsDetails summary::-webkit-details-marker { display: none; }
@@ -898,6 +913,7 @@
     </div>
     <p class="muted" id="discoveryEmpty">עוד אין מספיק נתונים — חפשו משהו והמנוע יתחיל ללמוד מחירים.</p>
     <div id="dealHero"></div>
+    <div id="budgetWall"></div>
     <div id="discoveryRows"></div>
   </section>
 
@@ -1141,6 +1157,19 @@ const fmt = (n, c) => {
   const d = toDisplay(n, c);
   return `${SYM[d.c] ?? d.c + ' '}${Math.round(d.n).toLocaleString('en')}`;
 };
+/** Convert into a SPECIFIC target currency (unlike toDisplay, which always
+    targets the user's chosen display currency) — using the same real,
+    server-provided rates. Returns null when a rate isn't available, so a
+    missing rate quietly omits a bucket rather than showing a wrong number. */
+function convertTo(n, from, target) {
+  if (n == null) return null;
+  if (from === target) return n;
+  if (!RATES) return null;
+  const rSrc = from === RATES.base ? 1 : RATES.rates[from];
+  const rDst = target === RATES.base ? 1 : RATES.rates[target];
+  if (!rSrc || !rDst) return null;
+  return n * (rDst / rSrc);
+}
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 /**
  * Booking links come from external providers, so they are untrusted input:
@@ -1539,6 +1568,9 @@ function rerenderPrices() {
       rerenderPrices();
     });
     if (DISPLAY_CURRENCY) rerenderPrices();
+    // the Budget Wall needs real rates regardless of the chosen display
+    // currency, so refresh it as soon as rates arrive even if nothing else does
+    else if (dealPool.length) renderBudgetWall();
   } catch { /* selector stays minimal without rates */ }
 })();
 
@@ -2823,6 +2855,75 @@ function wireDiscCards(root) {
   }));
 }
 
+/* ---- Budget Wall: "under ₪X" and "around €X" real threshold buckets ----
+   Every count and every card comes from the live deal pool converted with
+   real, server-provided exchange rates. A currency the rates don't cover is
+   omitted entirely rather than showing a misleading zero. */
+const ILS_THRESHOLDS = [100, 150, 200, 250, 300];
+const EUR_BANDS = [[0, 29], [30, 39], [40, 49], [50, 59], [60, 69]];
+let budgetActive = null; // { cur: 'ILS'|'EUR', key: string, test(price) }
+
+function dealPriceIn(d, cur) {
+  return convertTo(d.normalized_price, d.normalized_currency, cur);
+}
+
+function renderBudgetWall() {
+  const box = $('#budgetWall');
+  const pool = dealPool.filter((d) => d.price_status !== 'STALE');
+  if (!pool.length) { box.innerHTML = ''; return; }
+
+  const ilsPrices = pool.map((d) => dealPriceIn(d, 'ILS'));
+  const eurPrices = pool.map((d) => dealPriceIn(d, 'EUR'));
+  const haveIls = ilsPrices.some((p) => p !== null);
+  const haveEur = eurPrices.some((p) => p !== null);
+  if (!haveIls && !haveEur) { box.innerHTML = ''; return; }
+
+  const ilsTabs = haveIls ? ILS_THRESHOLDS.map((t) => {
+    const n = ilsPrices.filter((p) => p !== null && p <= t).length;
+    const key = `ILS_UNDER_${t}`;
+    return `<button class="budget-tab" data-bkey="${key}" ${n === 0 ? 'disabled' : ''}
+      aria-pressed="${budgetActive?.key === key}"><span class="n">${n}</span><span class="lbl">מתחת ל-₪${t}</span></button>`;
+  }).join('') : '';
+
+  const eurTabs = haveEur ? EUR_BANDS.map(([lo, hi]) => {
+    const n = eurPrices.filter((p) => p !== null && p >= lo && p <= hi).length;
+    const key = `EUR_BAND_${lo}_${hi}`;
+    return `<button class="budget-tab" data-bkey="${key}" ${n === 0 ? 'disabled' : ''}
+      aria-pressed="${budgetActive?.key === key}"><span class="n">${n}</span><span class="lbl ltr">€${lo}–€${hi}</span></button>`;
+  }).join('') : '';
+
+  box.innerHTML = `
+    ${haveIls ? `<div class="budgetwall"><h3>לפי תקציב</h3><div class="budget-tabs" role="group" aria-label="סינון לפי תקציב בשקלים">${ilsTabs}</div></div>` : ''}
+    ${haveEur ? `<div class="budgetwall"><h3>טיסות סביב €50</h3><div class="budget-tabs" role="group" aria-label="סינון לפי טווח יורו">${eurTabs}</div></div>` : ''}
+    <div id="budgetResult"></div>`;
+
+  const activate = (key, cur, test) => {
+    budgetActive = budgetActive?.key === key ? null : { cur, key, test };
+    box.querySelectorAll('[data-bkey]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.bkey === budgetActive?.key)));
+    renderBudgetResult();
+  };
+  box.querySelectorAll('[data-bkey^="ILS_UNDER_"]').forEach((b) => b.addEventListener('click', () => {
+    const t = Number(b.dataset.bkey.replace('ILS_UNDER_', ''));
+    activate(b.dataset.bkey, 'ILS', (d) => { const p = dealPriceIn(d, 'ILS'); return p !== null && p <= t; });
+  }));
+  box.querySelectorAll('[data-bkey^="EUR_BAND_"]').forEach((b) => b.addEventListener('click', () => {
+    const [, , lo, hi] = b.dataset.bkey.split('_').map((x, i) => i < 2 ? x : Number(x));
+    activate(b.dataset.bkey, 'EUR', (d) => { const p = dealPriceIn(d, 'EUR'); return p !== null && p >= lo && p <= hi; });
+  }));
+  renderBudgetResult();
+}
+
+function renderBudgetResult() {
+  const out = $('#budgetResult');
+  if (!budgetActive) { out.innerHTML = ''; return; }
+  const pool = dealPool.filter((d) => d.price_status !== 'STALE');
+  const matches = pool.filter(budgetActive.test).sort((a, b) => dealPrice(a) - dealPrice(b)).slice(0, 8);
+  out.innerHTML = matches.length
+    ? `<div class="rowscroll">${matches.map(discCard).join('')}</div>`
+    : '<p class="muted">אין כרגע דילים בטווח הזה — נמשיך לחפש.</p>';
+  wireDiscCards(out);
+}
+
 function renderDiscovery() {
   const pool = dealPool.filter((d) => d.price_status !== 'STALE');
   $('#discoveryEmpty').hidden = pool.length > 0;
@@ -2879,6 +2980,7 @@ async function loadDeals() {
   initDealPriceSlider();
   renderDeals();
   renderDiscovery();
+  renderBudgetWall();
 }
 
 function renderDeals() {

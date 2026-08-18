@@ -29,6 +29,52 @@ const SIMILAR_DEAL_RATIO = Number(process.env.SIMILAR_DEAL_RATIO ?? 0.85);
 const MIN_INTERVAL_MIN = 30;
 const MAX_INTERVAL_MIN = 24 * 60;
 
+/**
+ * Deal Hunter route priority (§15-17 of the hunter spec): which destinations
+ * the next scan should spend its budget on, ranked from real observed
+ * signals only — never invented seasonality or demand.
+ *
+ *   +5 per recent price-drop event on that route (a route that is actually
+ *      moving deserves more attention than one sitting flat)
+ *   +staleness bonus, capped, so a route that hasn't been scanned in a while
+ *      is never starved forever by routes that keep winning on drops —
+ *      every destination still gets a turn eventually (§85 diversity)
+ *   +a fixed bonus for a route never scanned at all, so day one coverage
+ *      isn't blocked by routes with pre-existing history
+ *
+ * Pure and DB-free so it can be unit tested directly, same as nextInterval.
+ */
+export function scoreDestination(
+  route: string,
+  dropCounts: Map<string, number>,
+  lastScanned: Map<string, number>, // route -> epoch ms
+  nowMs: number
+): number {
+  const drops = dropCounts.get(route) ?? 0;
+  const last = lastScanned.get(route);
+  if (last === undefined) return 5 * drops + 8; // never scanned: guaranteed early turn
+  const hoursSince = (nowMs - last) / 3600_000;
+  const staleness = Math.min(10, hoursSince / 12); // caps out after ~5 days
+  return 5 * drops + staleness;
+}
+
+/** Pick the top-N destinations by score, ties broken by route name so the
+    result is deterministic (useful for tests and for reproducible scans). */
+export function pickHuntTargets(
+  candidates: string[],
+  dropCounts: Map<string, number>,
+  lastScanned: Map<string, number>,
+  nowMs: number,
+  n: number,
+  routeFor: (dest: string) => string
+): string[] {
+  return [...candidates]
+    .map((dest) => ({ dest, score: scoreDestination(routeFor(dest), dropCounts, lastScanned, nowMs) }))
+    .sort((a, b) => b.score - a.score || a.dest.localeCompare(b.dest))
+    .slice(0, n)
+    .map((c) => c.dest);
+}
+
 export function nextInterval(
   baseMinutes: number,
   currentMinutes: number,
@@ -72,10 +118,26 @@ export class MonitorWorker {
     const { buildQuery } = await import('../agent/agent.js');
     const origin = process.env.DEFAULT_ORIGIN ?? 'TLV';
     const maxQueries = Number(process.env.DEAL_SCAN_MAX_QUERIES ?? 20);
-    // rotate the destination slice each scan so deals keep changing
     const scanIndex = Math.floor(Date.now() / (scanHours * 3600_000));
-    const dests = Array.from({ length: maxQueries }, (_, i) =>
-      ANYWHERE_DESTINATIONS[(scanIndex * maxQueries + i) % ANYWHERE_DESTINATIONS.length]!
+
+    // real signals only: recent price-drop events and when each route was
+    // last actually scanned — no invented seasonality or demand score
+    const dropDays = Number(process.env.HUNTER_DROP_WINDOW_DAYS ?? 14);
+    const dropRows = this.db.db
+      .prepare(`SELECT route, COUNT(*) AS n FROM deal_events WHERE kind='PRICE_DROP' AND created_at >= datetime('now', ?) GROUP BY route`)
+      .all(`-${dropDays} days`) as { route: string; n: number }[];
+    const dropCounts = new Map(dropRows.map((r) => [r.route, r.n]));
+    const lastRows = this.db.db
+      .prepare(`SELECT route, MAX(updated_at) AS t FROM provider_route_stats GROUP BY route`)
+      .all() as { route: string; t: string }[];
+    const lastScanned: Map<string, number> = new Map(
+      lastRows
+        .map((r): [string, number] => [r.route, Date.parse(r.t.includes('T') ? r.t : r.t + 'Z')])
+        .filter(([, t]) => Number.isFinite(t))
+    );
+    const dests = pickHuntTargets(
+      ANYWHERE_DESTINATIONS, dropCounts, lastScanned, Date.now(), maxQueries,
+      (dest) => routeKey(origin, dest)
     );
     for (const dest of dests) {
       try {

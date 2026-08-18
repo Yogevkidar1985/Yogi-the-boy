@@ -27,8 +27,28 @@ describe('engine catalogue', () => {
   });
 
   it('never offers a request template for an engine that cannot search', () => {
-    for (const t of ENGINE_CATALOGUE.filter((x) => x.readiness === 'STATUS_ONLY' || x.readiness === 'CLOSED')) {
-      expect(t.urlTemplate, t.id).toBeUndefined();
+    const cannot = ENGINE_CATALOGUE.filter(
+      (x) => x.readiness === 'STATUS_ONLY' || x.readiness === 'CLOSED' || x.readiness === 'NEEDS_OAUTH');
+    for (const t of cannot) expect(t.urlTemplate, t.id).toBeUndefined();
+  });
+
+  it('gives every entry a category', () => {
+    const known = new Set(['PRICE_API', 'META', 'GDS', 'NDC', 'AIRLINE', 'AWARD', 'MARKETPLACE', 'STATUS']);
+    for (const t of ENGINE_CATALOGUE) expect(known.has(t.category), t.id).toBe(true);
+  });
+
+  it('covers every part of the market, not one corner of it', () => {
+    const byCat = new Map<string, number>();
+    for (const t of ENGINE_CATALOGUE) byCat.set(t.category, (byCat.get(t.category) ?? 0) + 1);
+    for (const c of ['PRICE_API', 'META', 'GDS', 'NDC', 'AIRLINE', 'AWARD', 'MARKETPLACE', 'STATUS']) {
+      expect(byCat.get(c) ?? 0, c).toBeGreaterThan(0);
+    }
+    expect(ENGINE_CATALOGUE.length).toBeGreaterThanOrEqual(40);
+  });
+
+  it('marks an engine closed rather than hinting at a way around its protection', () => {
+    for (const t of ENGINE_CATALOGUE) {
+      expect(t.note, t.id).not.toMatch(/\bscraping\b|עוקף|bypass|circumvent/i);
     }
   });
 

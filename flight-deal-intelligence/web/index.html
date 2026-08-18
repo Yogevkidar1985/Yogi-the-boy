@@ -400,6 +400,58 @@
 
   /* deals grid — min(100%, …) keeps cards inside narrow phone viewports */
   .deals { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: var(--sp-3); }
+
+  /* ---- Discovery Center: curated deal sections, not a calendar grid ---- */
+  #discoverySec { margin: var(--sp-5) 0 var(--sp-4); }
+  .dischead { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-3); }
+  .dischead h2 { font-size: var(--fs-h2); font-weight: 800; margin: 0; }
+
+  /* the single most notable deal, given real visual weight */
+  .deal-hero {
+    display: grid; grid-template-columns: 1fr auto; gap: var(--sp-4); align-items: center;
+    padding: var(--sp-5); margin-bottom: var(--sp-5); border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, var(--hero) 0%, #14335e 100%); color: var(--hero-ink);
+    box-shadow: var(--shadow-lg);
+  }
+  .deal-hero .label { font-size: var(--fs-sm); font-weight: 700; color: var(--hero-ink-2); text-transform: none; letter-spacing: .02em; }
+  .deal-hero .route { font-size: var(--fs-h1); font-weight: 800; margin: 4px 0 2px; }
+  .deal-hero .price { font-size: 40px; font-weight: 800; line-height: 1; }
+  .deal-hero .price .old { color: var(--hero-ink-2); text-decoration: line-through; font-size: var(--fs-h3); font-weight: 400; margin-inline-start: 10px; }
+  .deal-hero .why { color: var(--hero-ink-2); font-size: var(--fs-body); margin-top: 6px; max-width: 60ch; }
+  .deal-hero .why b { color: var(--hero-ink); font-weight: 600; }
+  .deal-hero .actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; min-width: 160px; }
+  @media (max-width: 700px) { .deal-hero { grid-template-columns: 1fr; text-align: start; } .deal-hero .actions { flex-direction: row; } }
+
+  /* curated rows: horizontal scroll of compact product-like cards */
+  .disc-row { margin-bottom: var(--sp-4); }
+  .disc-row h3 { font-size: var(--fs-h3); font-weight: 700; margin: 0 0 var(--sp-2); display: flex; align-items: center; gap: 8px; }
+  .disc-row .rowscroll { display: flex; gap: var(--sp-3); overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity; }
+  .disc-card {
+    scroll-snap-align: start; flex: 0 0 auto; width: 240px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: var(--sp-3); display: flex; flex-direction: column; gap: 6px;
+    box-shadow: var(--shadow-sm); transition: transform var(--t-fast), box-shadow var(--t-fast);
+  }
+  .disc-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .disc-card .route { font-weight: 700; font-size: var(--fs-body-lg); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .disc-card .price { font-size: var(--fs-price); font-weight: 800; }
+  .disc-card .price .old { color: var(--ink-3); text-decoration: line-through; font-size: var(--fs-sm); font-weight: 400; margin-inline-start: 6px; }
+  .disc-card .meta { color: var(--ink-2); font-size: var(--fs-caption); }
+  .disc-card .why1 { color: var(--ink-2); font-size: var(--fs-caption); }
+  .disc-card .heart { align-self: flex-end; }
+
+  /* honest two-point benchmark: current price vs. the route's typical price */
+  .benchmark { margin: 2px 0; }
+  .benchmark .track { position: relative; height: 5px; border-radius: 3px; background: var(--surface-2); overflow: visible; }
+  .benchmark .fill { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--success); }
+  .benchmark .typmark { position: absolute; top: -2px; width: 2px; height: 9px; background: var(--ink-3); }
+  .benchmark .labels { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-3); margin-top: 3px; }
+
+  #allDealsDetails { margin-top: var(--sp-4); }
+  #allDealsDetails summary { cursor: pointer; font-size: var(--fs-h3); font-weight: 700; padding: var(--sp-2) 0; list-style: none; display: flex; align-items: center; gap: 8px; }
+  #allDealsDetails summary::-webkit-details-marker { display: none; }
+  #allDealsDetails summary::before { content: '▸'; display: inline-block; transition: transform var(--t-fast); color: var(--ink-3); }
+  #allDealsDetails[open] summary::before { transform: rotate(90deg); }
+
   .dealcard.stale { opacity: .68; }
   .statsrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: var(--sp-2); margin: var(--sp-4) 0 0; }
   .statsrow .tile { padding: var(--sp-3) var(--sp-4); text-align: center; }
@@ -839,40 +891,52 @@
     <div class="card tile"><div class="v num" id="stCycle">—</div><div class="k">מחזור רענון הדילים</div></div>
   </div>
 
-  <h3 class="sec">הדילים על הלוח <span class="muted" id="dealsUpdated"></span></h3>
-  <div class="filters" role="group" aria-label="מיון דילים">
-    <button class="chip dsort" data-dsort="score" aria-pressed="true">הדילים הטובים ביותר</button>
-    <button class="chip dsort" data-dsort="price" aria-pressed="false">הכי זול</button>
-    <button class="chip dsort" data-dsort="drop" aria-pressed="false">ירידות המחיר הגדולות</button>
-    <button class="chip dsort" data-dsort="new" aria-pressed="false">נבדקו לאחרונה</button>
-  </div>
-  <div class="card dealfilters" id="dealFilterZone">
-    <div class="dfhead">
-      <b>סינון הדילים</b>
-      <span class="muted" id="dealCount"></span>
-      <button class="btn btn-ghost btn-sm" id="dealClear" hidden>ניקוי הסינון</button>
+  <section id="discoverySec">
+    <div class="dischead">
+      <h2>מצאנו את הדילים הכי מעניינים כרגע</h2>
+      <span class="muted" id="dealsUpdated"></span>
     </div>
-    <div class="filters" id="dealQuick" role="group" aria-label="סינון דילים">
-      <button class="chip qf" data-dk="stops" data-dv="0" aria-pressed="false">ישירות בלבד</button>
-      <button class="chip qf" data-dk="stops" data-dv="1" aria-pressed="false">עד עצירה אחת</button>
-      <button class="chip qf" data-dk="dur" data-dv="short" aria-pressed="false">עד 8 שעות</button>
-      <button class="chip qf" data-dk="trip" data-dv="oneway" aria-pressed="false">כיוון אחד</button>
-      <button class="chip qf" data-dk="trip" data-dv="round" aria-pressed="false">הלוך ושוב</button>
-      <button class="chip qf" data-dk="when" data-dv="30" aria-pressed="false">30 הימים הקרובים</button>
-      <button class="chip qf" data-dk="when" data-dv="90" aria-pressed="false">3 החודשים הקרובים</button>
-      <button class="chip qf" data-dk="quality" data-dv="strong" aria-pressed="false">עסקאות חזקות בלבד</button>
+    <p class="muted" id="discoveryEmpty">עוד אין מספיק נתונים — חפשו משהו והמנוע יתחיל ללמוד מחירים.</p>
+    <div id="dealHero"></div>
+    <div id="discoveryRows"></div>
+  </section>
+
+  <details id="allDealsDetails">
+    <summary>כל הדילים על הלוח <span class="muted" id="allDealsCount"></span></summary>
+    <div class="filters" role="group" aria-label="מיון דילים">
+      <button class="chip dsort" data-dsort="score" aria-pressed="true">הדילים הטובים ביותר</button>
+      <button class="chip dsort" data-dsort="price" aria-pressed="false">הכי זול</button>
+      <button class="chip dsort" data-dsort="drop" aria-pressed="false">ירידות המחיר הגדולות</button>
+      <button class="chip dsort" data-dsort="new" aria-pressed="false">נבדקו לאחרונה</button>
     </div>
-    <div class="pricefilter" id="dealPriceFilter" hidden>
-      <span>מחיר מקסימלי</span>
-      <input type="range" id="dealPriceSlider" aria-label="מחיר מקסימלי לדיל">
-      <b class="num" id="dealPriceVal"></b>
+    <div class="card dealfilters" id="dealFilterZone">
+      <div class="dfhead">
+        <b>סינון הדילים</b>
+        <span class="muted" id="dealCount"></span>
+        <button class="btn btn-ghost btn-sm" id="dealClear" hidden>ניקוי הסינון</button>
+      </div>
+      <div class="filters" id="dealQuick" role="group" aria-label="סינון דילים">
+        <button class="chip qf" data-dk="stops" data-dv="0" aria-pressed="false">ישירות בלבד</button>
+        <button class="chip qf" data-dk="stops" data-dv="1" aria-pressed="false">עד עצירה אחת</button>
+        <button class="chip qf" data-dk="dur" data-dv="short" aria-pressed="false">עד 8 שעות</button>
+        <button class="chip qf" data-dk="trip" data-dv="oneway" aria-pressed="false">כיוון אחד</button>
+        <button class="chip qf" data-dk="trip" data-dv="round" aria-pressed="false">הלוך ושוב</button>
+        <button class="chip qf" data-dk="when" data-dv="30" aria-pressed="false">30 הימים הקרובים</button>
+        <button class="chip qf" data-dk="when" data-dv="90" aria-pressed="false">3 החודשים הקרובים</button>
+        <button class="chip qf" data-dk="quality" data-dv="strong" aria-pressed="false">עסקאות חזקות בלבד</button>
+      </div>
+      <div class="pricefilter" id="dealPriceFilter" hidden>
+        <span>מחיר מקסימלי</span>
+        <input type="range" id="dealPriceSlider" aria-label="מחיר מקסימלי לדיל">
+        <b class="num" id="dealPriceVal"></b>
+      </div>
+      <div class="filters" id="dealOriginChips" role="group" aria-label="שדה מוצא"></div>
+      <div class="filters" id="dealAirlineChips" role="group" aria-label="חברות תעופה"></div>
     </div>
-    <div class="filters" id="dealOriginChips" role="group" aria-label="שדה מוצא"></div>
-    <div class="filters" id="dealAirlineChips" role="group" aria-label="חברות תעופה"></div>
-  </div>
-  <div id="dealRelax"></div>
-  <div class="deals" id="deals"><p class="muted">עוד אין עסקאות — חפשו משהו והמנוע יתחיל ללמוד מחירים.</p></div>
-  <div class="dealmore"><button class="btn btn-ghost" id="dealMore" hidden></button></div>
+    <div id="dealRelax"></div>
+    <div class="deals" id="deals"><p class="muted">עוד אין עסקאות — חפשו משהו והמנוע יתחיל ללמוד מחירים.</p></div>
+    <div class="dealmore"><button class="btn btn-ghost" id="dealMore" hidden></button></div>
+  </details>
 
   <section id="historySec">
     <h3 class="sec">היסטוריית מחירים</h3>
@@ -2692,6 +2756,118 @@ function freshnessLabel(d) {
   return `<span class="badge badge-neutral">מחיר אחרון שנצפה — לפני ${h >= 2 ? h + ' שעות' : d.freshness_minutes + ' דק׳'}</span>`;
 }
 
+/* ---- Discovery Center: curated sections built only from real fields ----
+   Every statement here is derived from a value the server already computed
+   (score, typical_price, savings, drop_pct, freshness, first_seen). Nothing
+   about volatility, prediction, or "buy now" is shown, because we have no
+   real signal to back a claim like that. */
+
+/** One or two honest, data-backed reasons this deal is worth a look. */
+function explainDeal(d) {
+  const reasons = [];
+  if (d.savings > 0 && d.typical_price) {
+    const pct = Math.round((d.savings / d.typical_price) * 100);
+    reasons.push(`<b>${pct}% מתחת</b> למחיר הטיפוסי במסלול`);
+  }
+  if (d.drop_pct > 0) reasons.push(`ירד ב-<b>${d.drop_pct}%</b> מהבדיקה הקודמת`);
+  if (d.stops === 0) reasons.push('טיסה <b>ישירה</b>');
+  if (d.price_status === 'VERIFIED_RECENT') reasons.push('המחיר <b>אומת ממש עכשיו</b>');
+  if (d.first_seen_minutes != null && d.first_seen_minutes <= 1440) reasons.push('<b>התגלה היום</b>');
+  return reasons;
+}
+
+/** A two-point bar: where the current price sits against the route's own
+    historical typical price. No invented market-wide range. */
+function benchmarkBar(d) {
+  if (!d.typical_price || d.typical_price <= 0) return '';
+  const cur = d.normalized_price, typ = d.typical_price;
+  const lo = Math.min(cur, typ) * 0.92, hi = Math.max(cur, typ) * 1.08;
+  const pct = (v) => Math.max(2, Math.min(98, ((v - lo) / (hi - lo)) * 100));
+  const belowTypical = cur <= typ;
+  return `<div class="benchmark">
+    <div class="track">
+      <div class="fill" style="width:${pct(cur)}%; background:${belowTypical ? 'var(--success)' : 'var(--warning-ink)'}"></div>
+      <div class="typmark" style="inset-inline-start:${pct(typ)}%"></div>
+    </div>
+    <div class="labels"><span>עכשיו: ${fmt(cur, d.normalized_currency)}</span><span>טיפוסי: ${fmt(typ, d.normalized_currency)}</span></div>
+  </div>`;
+}
+
+/** Compact card for a curated row. Supports save + "find more" only — full
+    detail (compare, verify) is one click away in "כל הדילים" below. */
+function discCard(d) {
+  const st = dealState(Math.round(d.score));
+  const prevShown = d.prev_price && d.prev_price > d.normalized_price ? d.prev_price : (d.savings > 0 ? d.typical_price : null);
+  const reasons = explainDeal(d);
+  return `<div class="disc-card" data-key="${esc(dealKey(d))}">
+    <span class="route">
+      <span class="ltr">${esc(d.origin)} → ${esc(d.destination)}</span>
+      <button class="heart ${savedRoutes.has(d.route + '|' + d.departure_date) ? 'saved' : ''}" data-hsave
+        style="width:28px; height:28px" title="שמירת הדיל" aria-label="שמירת הדיל למעקב">${icon('heart', 13)}</button>
+    </span>
+    <span class="price">${fmt(d.normalized_price, d.normalized_currency)}${prevShown ? `<span class="old">${fmt(prevShown, d.normalized_currency)}</span>` : ''}</span>
+    ${benchmarkBar(d)}
+    <span class="meta">${esc(d.airline_name || d.airline)} · ${d.stops === 0 ? 'ישירה' : d.stops + ' עצירות'} · <span class="ltr">${esc(d.departure_date)}</span></span>
+    ${st ? `<span class="badge ${st[1]}" style="align-self:flex-start">${st[0]}</span>` : ''}
+    ${reasons.length ? `<span class="why1">${reasons[0]}</span>` : ''}
+    <a class="ltr" style="font-size:var(--fs-caption); font-weight:600" href="${safeUrl(d.booking_url)}" target="_blank" rel="noopener">להזמנה</a>
+  </div>`;
+}
+
+function wireDiscCards(root) {
+  root.querySelectorAll('[data-hsave]').forEach((b) => b.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    const key = b.closest('[data-key]').dataset.key;
+    const d = dealPool.find((x) => dealKey(x) === key);
+    if (d) openWatchDialog(dealAsFlight(d));
+  }));
+}
+
+function renderDiscovery() {
+  const pool = dealPool.filter((d) => d.price_status !== 'STALE');
+  $('#discoveryEmpty').hidden = pool.length > 0;
+  if (!pool.length) { $('#dealHero').innerHTML = ''; $('#discoveryRows').innerHTML = ''; return; }
+
+  const byScore = [...pool].sort((a, b) => b.score - a.score);
+  const hero = byScore[0];
+  const heroReasons = hero.score >= 75 ? explainDeal(hero) : [];
+
+  $('#dealHero').innerHTML = hero.score >= 75 ? `<div class="deal-hero" data-key="${esc(dealKey(hero))}">
+    <div>
+      <div class="label">הדיל הבולט של היום</div>
+      <div class="route ltr">${esc(hero.origin)} → ${esc(hero.destination)}</div>
+      <div class="price">${fmt(hero.normalized_price, hero.normalized_currency)}${
+        hero.savings > 0 ? `<span class="old">${fmt(hero.typical_price, hero.normalized_currency)}</span>` : ''}</div>
+      ${heroReasons.length ? `<div class="why">${heroReasons.join(' · ')}</div>` : ''}
+    </div>
+    <div class="actions">
+      <a class="btn btn-primary" href="${safeUrl(hero.booking_url)}" target="_blank" rel="noopener">להזמנה</a>
+      <button class="btn btn-ghost" data-hsave style="color:#fff; border-color:rgba(255,255,255,.4)">שמירה למעקב</button>
+    </div>
+  </div>` : '';
+
+  // Each row ranks the pool by its own real signal. A genuinely great deal
+  // can honestly belong to more than one row (cheapest AND best value AND
+  // new, all at once) — that overlap is real, not a bug, so rows are NOT
+  // mutually exclusive. The only exclusion is the hero itself, so the one
+  // deal already given the big banner doesn't also open the first row.
+  const withoutHero = (list) => hero.score >= 75 ? list.filter((d) => dealKey(d) !== dealKey(hero)) : list;
+  const rows = [
+    { title: 'התמורה הטובה ביותר', list: withoutHero([...pool].sort((a, b) => b.score - a.score)).slice(0, 6) },
+    { title: 'המחירים הנמוכים ביותר כרגע', list: withoutHero([...pool].sort((a, b) => dealPrice(a) - dealPrice(b))).slice(0, 6) },
+    { title: 'ירידות המחיר הגדולות', list: withoutHero([...pool].filter((d) => d.drop_pct > 0).sort((a, b) => b.drop_pct - a.drop_pct)).slice(0, 6) },
+    { title: 'דילים שהתגלו עכשיו', list: withoutHero([...pool].filter((d) => d.is_new).sort((a, b) => (a.first_seen_minutes ?? 1e9) - (b.first_seen_minutes ?? 1e9))).slice(0, 6) },
+  ].filter((r) => r.list.length >= 2);
+
+  $('#discoveryRows').innerHTML = rows.map((r) => `<div class="disc-row">
+    <h3>${esc(r.title)}</h3>
+    <div class="rowscroll">${r.list.map(discCard).join('')}</div>
+  </div>`).join('');
+
+  wireDiscCards($('#dealHero'));
+  wireDiscCards($('#discoveryRows'));
+}
+
 async function loadDeals() {
   // a wide pool so the filters have something real to work on; the board
   // itself pages through it rather than silently cutting the list off
@@ -2699,8 +2875,10 @@ async function loadDeals() {
   if (!deals.length) return;
   dealPool = deals;
   $('#dealsUpdated').textContent = `עודכן ${new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
+  $('#allDealsCount').textContent = `(${dealPool.length})`;
   initDealPriceSlider();
   renderDeals();
+  renderDiscovery();
 }
 
 function renderDeals() {

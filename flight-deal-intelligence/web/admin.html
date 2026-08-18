@@ -70,7 +70,13 @@
   details summary{cursor:pointer;font-weight:600;font-size:13.5px}
   .tpl{background:var(--surface-2);border-radius:8px;padding:10px;margin-top:8px}
   .tpl code{font-family:ui-monospace,Menlo,monospace;font-size:12px;word-break:break-all}
-  #gate{max-width:420px;margin:60px auto}
+  #gate{max-width:480px;margin:60px auto}
+  .setup{background:var(--warn-bg);color:var(--warn-ink);border-radius:10px;padding:12px 14px;font-size:13.5px}
+  .setup p{margin:6px 0}
+  .setup code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+  .setup a{color:inherit}
+  .steps{padding-inline-start:18px;margin:8px 0}
+  .steps li{margin-bottom:5px}
 </style>
 </head>
 <body>
@@ -83,11 +89,28 @@
   <div id="gate" class="card" hidden>
     <h2 style="margin-top:0">כניסת מנהל</h2>
     <p class="muted" id="gateNote"></p>
-    <div class="field">
-      <label for="tok">Admin token</label>
-      <input id="tok" type="password" class="ltr" placeholder="הערך של ADMIN_TOKEN">
+    <div id="gateSetup" class="setup" hidden>
+      <b>השרת עדיין לא הוגדר, ולכן שדה הסיסמה מושבת</b>
+      <p>המשתנה <code class="ltr">ADMIN_TOKEN</code> אינו מוגדר בשרת. כל עוד הוא ריק אין סיסמה
+        להשוות אליה, ולכן אין מה להקליד כאן. כך מגדירים:</p>
+      <ol class="steps">
+        <li><a class="ltr" href="https://dashboard.render.com" target="_blank" rel="noopener">dashboard.render.com</a>
+          ← השירות שלכם ← <b>Environment</b></li>
+        <li><b>Add Environment Variable</b>: <code class="ltr">ADMIN_TOKEN</code> = סיסמה שתבחרו</li>
+        <li>עוד משתנה: <code class="ltr">ADMIN_SECRET</code> = מחרוזת אקראית של 20+ תווים
+          (מצפינה את מפתחות ה-API)</li>
+        <li><b>Save Changes</b> — Render מפרס מחדש; ממתינים 1–3 דקות</li>
+        <li>חוזרים לכאן ולוחצים <b>בדיקה מחדש</b></li>
+      </ol>
+      <button class="btn btn-g" id="gateRetry">בדיקה מחדש</button>
     </div>
-    <button class="btn btn-p" id="gateGo">כניסה</button>
+    <div id="gateForm">
+      <div class="field">
+        <label for="tok">Admin token</label>
+        <input id="tok" type="password" class="ltr" placeholder="הערך של ADMIN_TOKEN">
+      </div>
+      <button class="btn btn-p" id="gateGo">כניסה</button>
+    </div>
   </div>
 
   <div id="app" hidden>
@@ -165,27 +188,58 @@ const api = async (path, opts = {}) => {
 
 function showGate(note) {
   $('#gate').hidden = false; $('#app').hidden = true;
-  if (note) $('#gateNote').textContent = note;
+  $('#gateNote').textContent = note || '';
 }
 
+/** The token field is only usable once the server actually has a token to
+    compare against — otherwise typing into it could never succeed. */
 async function boot() {
-  const st = await (await fetch('/api/admin/status')).json();
-  if (!st.adminTokenConfigured) {
-    showGate('כדי להפעיל את מסך הניהול, הגדירו ב-Render את המשתנה ADMIN_TOKEN (סיסמה שתבחרו) וגם ADMIN_SECRET (מחרוזת ארוכה להצפנת המפתחות).');
-    $('#tok').disabled = true; $('#gateGo').disabled = true;
+  let st;
+  try {
+    st = await (await fetch('/api/admin/status')).json();
+  } catch {
+    showGate('לא ניתן להגיע לשרת כרגע. רעננו את העמוד ונסו שוב.');
     return;
   }
+  const ready = Boolean(st.adminTokenConfigured);
+  $('#gateSetup').hidden = ready;
+  $('#gateForm').hidden = !ready;
+  if (!ready) { showGate(''); return; }
   if (!st.secretConfigured) {
     $('#gateNote').textContent = 'שימו לב: ADMIN_SECRET לא מוגדר — לא ניתן יהיה לשמור מפתחות API עד שיוגדר.';
   }
   if (TOKEN) { try { await load(); return; } catch { /* fall through to gate */ } }
-  showGate();
+  $('#gate').hidden = false; $('#app').hidden = true;
 }
 
-$('#gateGo').addEventListener('click', async () => {
-  TOKEN = $('#tok').value.trim();
-  try { await load(); sessionStorage.setItem('adminToken', TOKEN); } catch {}
+$('#gateRetry').addEventListener('click', async () => {
+  const b = $('#gateRetry');
+  b.disabled = true; b.textContent = 'בודק…';
+  await boot();
+  b.disabled = false; b.textContent = 'בדיקה מחדש';
+  if (!$('#gateSetup').hidden) {
+    $('#gateNote').textContent = 'השרת עדיין מדווח ש-ADMIN_TOKEN אינו מוגדר. אם הגדרתם אותו זה עתה, המתינו לסיום הפריסה ב-Render ונסו שוב.';
+  }
 });
+
+async function signIn() {
+  const value = $('#tok').value.trim();
+  if (!value) { $('#gateNote').textContent = 'יש להזין את הסיסמה שהוגדרה ב-ADMIN_TOKEN.'; return; }
+  TOKEN = value;
+  $('#gateGo').disabled = true;
+  try {
+    await load();
+    sessionStorage.setItem('adminToken', TOKEN);
+  } catch (e) {
+    // 401 already replaced the note with "הטוקן שגוי"; anything else is shown as-is
+    if (String(e.message) !== 'unauthorized') {
+      $('#gateNote').textContent = `הכניסה נכשלה: ${e.message}`;
+    }
+  }
+  $('#gateGo').disabled = false;
+}
+$('#gateGo').addEventListener('click', signIn);
+$('#tok').addEventListener('keydown', (e) => { if (e.key === 'Enter') signIn(); });
 
 async function load() {
   const list = await api('/api/admin/providers');

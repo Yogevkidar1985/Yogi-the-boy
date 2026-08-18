@@ -78,6 +78,11 @@
   .kv .p{font-family:ui-monospace,Menlo,monospace;word-break:break-all}
   .kv .s{color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .warn{background:var(--warn-bg);color:var(--warn-ink);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:13px}
+  .cat{border-top:1px solid var(--border);padding:10px 0}
+  .cat:first-of-type{border-top:none}
+  .cat .t{font-weight:700}
+  .cat .n{color:var(--ink-2);font-size:13px;margin:3px 0 6px}
+  .btn-g.on{border-color:var(--primary);color:var(--ink)}
   .rawjson{max-height:180px;overflow:auto;background:var(--surface);border:1px solid var(--border);
     border-radius:8px;padding:8px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;
     white-space:pre-wrap;word-break:break-all;margin-top:8px;direction:ltr;text-align:left}
@@ -128,6 +133,18 @@
       <b>איך זה עובד</b>
       <p class="muted">כל מנוע שמוסיפים כאן נשמר בבסיס הנתונים, מצטרף מיד לחיפוש המקבילי (בלי פריסה מחדש),
         ומקבל מגבלות קצב משלו. מפתחות ה-API נשמרים מוצפנים (AES-256-GCM) ואינם מוחזרים לדפדפן — רק סימון שקיים מפתח.</p>
+    </div>
+
+    <h2>קטלוג מנועים — הוספה בלחיצה</h2>
+    <div class="card">
+      <p class="muted" style="margin-top:0">כל מנוע שהמערכת יודעת לעבוד מולו. לחיצה על <b>הוסף</b>
+        ממלאת את הטופס שמתחת — נשאר רק להדביק מפתח, ללחוץ <b>זיהוי אוטומטי</b> ולשמור.</p>
+      <div class="row" id="catFilter" role="group" aria-label="סינון קטלוג">
+        <button class="btn btn-g on" data-cat="all">הכל</button>
+        <button class="btn btn-g" data-cat="usable">מוכן להפעלה</button>
+        <button class="btn btn-g" data-cat="prices">מקורות מחיר בלבד</button>
+      </div>
+      <div id="catList"></div>
     </div>
 
     <h2>המנועים שלי (<span id="count">0</span>)</h2>
@@ -260,6 +277,79 @@ async function signIn() {
 $('#gateGo').addEventListener('click', signIn);
 $('#tok').addEventListener('keydown', (e) => { if (e.key === 'Enter') signIn(); });
 
+/* ---- engine catalogue ---- */
+const READY_HE = {
+  BUILT_IN:   ['מתאם מובנה', 'b-ok'],
+  READY:      ['מוכן — נדרש מפתח בלבד', 'b-ok'],
+  NEEDS_URL:  ['נדרשת כתובת מהתיעוד', 'b-warn'],
+  NEEDS_LOOKUP: ['נדרש שלב זיהוי מזהים', 'b-warn'],
+  CLOSED:     ['סגור להרשמה עצמית', 'b-err'],
+  STATUS_ONLY:['סטטוס בלבד — ללא מחירים', 'b-n'],
+};
+let catalogue = [];
+let catMode = 'all';
+
+function renderCatalogue() {
+  const list = catalogue.filter((t) =>
+    catMode === 'all' ? true
+    : catMode === 'usable' ? (t.readiness === 'READY' || t.readiness === 'BUILT_IN')
+    : t.readiness !== 'STATUS_ONLY');
+  $('#catList').innerHTML = list.map((t, i) => {
+    const r = READY_HE[t.readiness] || READY_HE.NEEDS_URL;
+    const env = t.envVars?.length
+      ? `<div class="muted">משתני סביבה: ${t.envVars.map(v => `<code class="ltr">${esc(v)}</code>`).join(' · ')}
+         ${t.envConfigured === true ? '<span class="badge b-ok">מוגדר</span>'
+           : t.envConfigured === false ? '<span class="badge b-n">חסר</span>' : ''}</div>`
+      : '';
+    const canFill = t.readiness !== 'BUILT_IN' && t.readiness !== 'CLOSED' && t.readiness !== 'STATUS_ONLY';
+    return `<div class="cat">
+      <div class="row">
+        <span class="t grow">${esc(t.label)} <span class="muted ltr">${esc(t.vendor)}</span></span>
+        <span class="badge ${r[1]}">${r[0]}</span>
+        ${t.installed ? '<span class="badge b-ok">מותקן</span>' : ''}
+      </div>
+      <div class="n">${esc(t.note)}</div>
+      ${env}
+      <div class="row">
+        <a class="btn btn-g" href="${esc(t.signupUrl)}" target="_blank" rel="noopener">קבלת מפתח</a>
+        ${t.docsUrl ? `<a class="btn btn-g" href="${esc(t.docsUrl)}" target="_blank" rel="noopener">תיעוד</a>` : ''}
+        ${canFill ? `<button class="btn btn-p" data-cat-add="${i}">הוסף לטופס</button>` : ''}
+      </div>
+    </div>`;
+  }).join('') || '<p class="muted">אין מנועים בקטגוריה הזו.</p>';
+
+  $('#catList').querySelectorAll('[data-cat-add]').forEach(b => b.addEventListener('click', () => {
+    const t = list[Number(b.dataset.catAdd)];
+    $('#fName').value = t.id;
+    $('#fUrl').value = t.urlTemplate || '';
+    $('#fHeaders').value = t.headers ? JSON.stringify(t.headers) : '';
+    $('#fItems').value = t.itemsPath || '';
+    $('#fMap').value = t.map ? JSON.stringify(t.map) : '';
+    $('#fTier').value = t.tier;
+    if (t.requestsPerMinute) $('#fRpm').value = t.requestsPerMinute;
+    if (t.concurrency) $('#fConc').value = t.concurrency;
+    $('#fKey').value = '';
+    $('#detectOut').innerHTML = t.urlTemplate
+      ? '<p class="muted">הטופס מולא. הדביקו מפתח ולחצו זיהוי אוטומטי.</p>'
+      : '<div class="warn">לא הוגדרה כתובת עבור המנוע הזה — העתיקו אותה מתיעוד הספק, החליפו ערכים בתבניות, ואז הריצו זיהוי אוטומטי.</div>';
+    $('#fName').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('#fKey').focus();
+  }));
+}
+
+$('#catFilter').querySelectorAll('[data-cat]').forEach(b => b.addEventListener('click', () => {
+  catMode = b.dataset.cat;
+  $('#catFilter').querySelectorAll('[data-cat]').forEach(x => x.classList.toggle('on', x === b));
+  renderCatalogue();
+}));
+
+async function loadCatalogue() {
+  try {
+    catalogue = await api('/api/admin/catalogue');
+    renderCatalogue();
+  } catch { /* the gate already reports auth problems */ }
+}
+
 /* ---- shape detection: read the API's real answer instead of guessing ---- */
 const FIELD_HE = {
   price: 'מחיר', currency: 'מטבע', airline: 'חברת תעופה', airlineName: 'שם החברה',
@@ -330,6 +420,7 @@ $('#btnDetect').addEventListener('click', async () => {
 
 async function load() {
   const list = await api('/api/admin/providers');
+  loadCatalogue();
   $('#gate').hidden = true; $('#app').hidden = false;
   $('#count').textContent = list.length;
   $('#empty').style.display = list.length ? 'none' : '';

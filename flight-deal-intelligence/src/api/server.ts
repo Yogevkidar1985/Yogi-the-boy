@@ -21,6 +21,7 @@ import { bus, liveState } from '../core/bus.js';
 import { providerInfo } from '../providers/config.js';
 import { ProviderStore } from '../providers/store.js';
 import { discoverMapping } from '../providers/discover.js';
+import { catalogueForDisplay, envConfigured } from '../providers/catalogue.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const db = getDatabase();
@@ -951,6 +952,16 @@ function isPrivateHost(host: string): boolean {
   const [a, b] = [Number(m[1]), Number(m[2])];
   return a === 127 || a === 10 || a === 0 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31) || (a === 169 && b === 254);
 }
+
+/** The engine catalogue: what can be connected, and how ready each one is. */
+app.get('/api/admin/catalogue', requireAdmin, (_req, res) => {
+  const installed = new Set(store.list().map((p) => p.name));
+  res.json(catalogueForDisplay().map((t) => ({
+    ...t,
+    envConfigured: envConfigured(t),
+    installed: installed.has(t.id),
+  })));
+});
 
 app.post('/api/admin/providers/probe', requireAdmin, async (req, res) => {
   const parsed = probeBody.safeParse(req.body);
